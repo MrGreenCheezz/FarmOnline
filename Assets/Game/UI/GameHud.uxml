@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="GameHud.uss" />
+
+    <ui:VisualElement name="screen" class="screen" picking-mode="Ignore">
+
+        <!-- ===== плашки уровней над грядками (под панелями) ===== -->
+        <ui:VisualElement name="world-badges" class="world-layer" picking-mode="Ignore" />
+
+        <!-- ===== всплывающие числа над событиями ===== -->
+        <ui:VisualElement name="floating-text" class="world-layer" picking-mode="Ignore" />
+
+        <!-- ================= HUD ================= -->
+        <ui:VisualElement name="hud" class="hud">
+
+            <ui:VisualElement name="topbar" class="topbar">
+                <ui:Label name="gold-value" text="0" class="gold" />
+                <ui:Label name="clock-value" text="—" class="gold gold--clock" />
+                <ui:Button name="inventory-button" text="Склад" class="btn" />
+                <ui:Button name="shop-button" text="Магазин" class="btn btn--accent" />
+                <ui:Button name="settings-button" text="Настройки" class="btn" />
+                <ui:Button name="collapse-button" text="Скрыть" class="btn btn--ghost" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="hud-panels" class="hud-panels">
+
+            <ui:VisualElement name="panel-farmer" class="panel">
+                <ui:Label text="ФЕРМЕР" class="panel__title" />
+                <ui:Label name="farmer-state" text="—" class="row row--strong" />
+
+                <ui:VisualElement class="meter">
+                    <ui:Label name="satiety-label" text="Сытость" class="meter__label" />
+                    <ui:VisualElement class="meter__track">
+                        <ui:VisualElement name="satiety-fill" class="meter__fill meter__fill--food" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement class="meter">
+                    <ui:Label name="hydration-label" text="Вода" class="meter__label" />
+                    <ui:VisualElement class="meter__track">
+                        <ui:VisualElement name="hydration-fill" class="meter__fill meter__fill--water" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement class="meter">
+                    <ui:Label name="energy-label" text="Бодрость" class="meter__label" />
+                    <ui:VisualElement class="meter__track">
+                        <ui:VisualElement name="energy-fill" class="meter__fill meter__fill--energy" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement class="meter">
+                    <ui:Label name="carry-label" text="Рюкзак" class="meter__label" />
+                    <ui:VisualElement class="meter__track">
+                        <ui:VisualElement name="carry-fill" class="meter__fill meter__fill--carry" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:VisualElement name="panel-skills" class="panel">
+                <ui:Label text="НАВЫКИ" class="panel__title" />
+                <ui:VisualElement name="skill-list" class="skill-list" />
+                <ui:Label name="skill-next" text="" class="hint" />
+            </ui:VisualElement>
+
+            <ui:VisualElement name="panel-farm" class="panel">
+                <ui:Label text="ФЕРМА" class="panel__title" />
+                <ui:Label name="storage-summary" text="—" class="row" />
+                <ui:Label name="plots-ready" text="—" class="row" />
+                <ui:Label name="plots-next" text="—" class="row row--muted" />
+            </ui:VisualElement>
+
+            </ui:VisualElement>
+
+        </ui:VisualElement>
+
+        <!-- ================= ПОСТРОЙКА ================= -->
+        <!-- Без затемнения и по правому краю: игрок должен видеть саму постройку, пока её улучшает. -->
+        <ui:VisualElement name="building-panel" class="building" style="display: none;">
+            <ui:VisualElement class="window__header">
+                <ui:Label name="building-title" text="" class="window__title" />
+                <ui:Button name="building-close" text="✕" class="btn btn--icon" />
+            </ui:VisualElement>
+
+            <ui:VisualElement class="window__body building__body">
+                <ui:VisualElement class="building__head">
+                    <ui:VisualElement name="building-icon" class="shop-item__icon" />
+                    <ui:VisualElement class="building__headtext">
+                        <ui:Label name="building-level" text="" class="row row--strong" />
+                        <ui:Label name="building-effect" text="" class="shop-item__desc" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="building-work" class="meter" style="display: none;">
+                    <ui:Label name="building-work-label" text="" class="meter__label" />
+                    <ui:VisualElement class="meter__track">
+                        <ui:VisualElement name="building-work-fill" class="meter__fill meter__fill--carry" />
+                    </ui:VisualElement>
+                </ui:VisualElement>
+
+                <ui:VisualElement name="building-next" class="building__next">
+                    <ui:Label text="СЛЕДУЮЩИЙ УРОВЕНЬ" class="panel__title building__section" />
+                    <ui:Label name="building-next-note" text="" class="shop-item__desc" />
+                    <ui:VisualElement name="building-cost" class="building__cost" />
+                    <ui:Button name="building-upgrade" text="Улучшить" class="btn btn--accent building__upgrade" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+
+            <ui:Label name="building-message" text="" class="window__message window__message--hint" />
+        </ui:VisualElement>
+
+        <!-- ================= НАСТРОЙКИ ================= -->
+        <ui:VisualElement name="settings-overlay" class="overlay" style="display: none;">
+            <ui:VisualElement name="settings-window" class="window window--narrow">
+                <ui:VisualElement class="window__header">
+                    <ui:Label text="НАСТРОЙКИ" class="window__title" />
+                    <ui:Button name="settings-close" text="✕" class="btn btn--icon" />
+                </ui:VisualElement>
+
+                <ui:VisualElement class="window__body settings">
+                    <ui:Label text="ЗВУК" class="panel__title" />
+
+                    <ui:VisualElement class="setting">
+                        <ui:Label name="volume-master-label" text="Общая громкость" class="setting__label" />
+                        <ui:Slider name="volume-master" low-value="0" high-value="1" value="0.8" class="setting__slider" />
+                    </ui:VisualElement>
+
+                    <ui:VisualElement class="setting">
+                        <ui:Label name="volume-effects-label" text="Эффекты" class="setting__label" />
+                        <ui:Slider name="volume-effects" low-value="0" high-value="1" value="1" class="setting__slider" />
+                    </ui:VisualElement>
+
+                    <ui:Button name="volume-test" text="Проверить звук" class="btn" />
+                    <ui:Label text="Настройки сохраняются автоматически." class="hint" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ================= СКЛАД ================= -->
+        <ui:VisualElement name="inventory-overlay" class="overlay" style="display: none;">
+            <ui:VisualElement name="inventory-window" class="window window--narrow">
+                <ui:VisualElement class="window__header">
+                    <ui:Label text="СКЛАД" class="window__title" />
+                    <ui:Label name="inventory-count" text="" class="gold gold--inline" />
+                    <ui:Button name="inventory-close" text="✕" class="btn btn--icon" />
+                </ui:VisualElement>
+
+                <ui:ScrollView name="inventory-scroll" class="window__body">
+                    <ui:VisualElement name="inventory-grid" class="inv-grid" />
+                </ui:ScrollView>
+
+                <ui:Label name="inventory-hint" text="клик по занятой ячейке — продать" class="window__message window__message--hint" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ================= МАГАЗИН ================= -->
+        <ui:VisualElement name="shop-overlay" class="overlay" style="display: none;">
+            <ui:VisualElement name="shop-window" class="window">
+
+                <ui:VisualElement class="window__header">
+                    <ui:Label text="МАГАЗИН" class="window__title" />
+                    <ui:Label name="shop-gold" text="0" class="gold gold--inline" />
+                    <ui:Button name="shop-close" text="✕" class="btn btn--icon" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="shop-tabs" class="tabs" />
+
+                <ui:ScrollView name="shop-scroll" class="window__body">
+                    <ui:VisualElement name="shop-list" class="shop-list" />
+                </ui:ScrollView>
+
+                <ui:Label name="shop-message" text="" class="window__message" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ===== контекстное меню — последним, чтобы рисовалось поверх окон ===== -->
+        <ui:VisualElement name="context-menu" class="ctx" style="display: none;">
+            <ui:Label name="ctx-title" text="" class="ctx__title" />
+            <ui:VisualElement name="ctx-items" class="ctx__items" />
+        </ui:VisualElement>
+
+    </ui:VisualElement>
+</ui:UXML>

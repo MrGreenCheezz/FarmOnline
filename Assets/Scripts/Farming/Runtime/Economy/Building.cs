@@ -1,0 +1,269 @@
+using System;
+using System.Collections.Generic;
+using UnityEngine;
+
+namespace Farm.Farming
+{
+    /// <summary>
+    /// A placed building. Holds its level, spends resources to upgrade, and serves the character.
+    /// <para>
+    /// Serving is pull, not push: the building never reaches out to the farmer, the farmer walks up
+    /// and asks. That keeps the need loop visible on screen — the player sees their character go eat
+    /// rather than watching a bar refill for reasons off-screen.
+    /// </para>
+    /// </summary>
+    [DisallowMultipleComponent]
+    [AddComponentMenu("Farm/Building")]
+    public sealed class Building : MonoBehaviour
+    {
+        [SerializeField] private BuildingDefinition _definition;
+        [SerializeField, Min(1)] private int _level = 1;
+
+        /// <summary>Level went up. Second argument is the new level.</summary>
+        public event Action<Building, int> Upgraded;
+
+        /// <summary>Served the character. Floats are satiety and hydration actually restored.</summary>
+        public event Action<Building, float, float> Served;
+
+        public BuildingDefinition Definition => _definition;
+        public int Level => _level;
+        public bool IsMaxLevel => _definition != null && _level >= _definition.MaxLevel;
+        public float Efficiency => _definition != null ? _definition.EfficiencyAt(_level) : 0f;
+        public BuildingService Service => _definition != null ? _definition.Service : BuildingService.Kitchen;
+
+        /// <summary>Workshop speed multiplier or market bonus at the current level.</summary>
+        public float Output => _definition != null ? _definition.OutputAt(_level) : 0f;
+
+        private void OnEnable() => BuildingRegistry.Register(this);
+        private void OnDisable() => BuildingRegistry.Unregister(this);
+
+        internal int RegistryIndex = -1;
+
+        public void Configure(BuildingDefinition definition, int level = 1)
+        {
+            _definition = definition;
+            _level = Mathf.Max(1, level);
+        }
+
+        // ---- улучшение ----
+
+        public bool CanUpgrade(out string reason)
+        {
+            reason = null;
+
+            if (_definition == null) { reason = "нет данных постройки"; return false; }
+            if (IsMaxLevel) { reason = "максимальный уровень"; return false; }
+
+            var cost = _definition.CostOf(_level + 1);
+            if (cost == null) { reason = "нет данных уровня"; return false; }
+
+            int gold = Wallet.Instance != null ? Wallet.Instance.Gold : 0;
+            return cost.Value.CanPay(gold, FarmingRuntime.Sink as IInventory, out reason);
+        }
+
+        public bool TryUpgrade()
+        {
+            if (!CanUpgrade(out _)) return false;
+
+            var cost = _definition.CostOf(_level + 1).Value;
+
+            // Золото первым: если кошелёк откажет, склад ещё не тронут.
+            if (cost.Gold > 0 && (Wallet.Instance == null || !Wallet.Instance.TrySpend(cost.Gold))) return false;
+            cost.ChargeResources(FarmingRuntime.Sink as IInventory);
+
+            _level++;
+            Raise(Upgraded, _level);
+            BuildingRegistry.RaiseUpgraded(this, _level);
+            return true;
+        }
+
+        // ---- обслуживание ----
+
+        /// <summary>Is there anything this building could do for those needs right now?</summary>
+        public bool CanServe(float satiety01, float hydration01)
+        {
+            if (_definition == null) return false;
+
+            switch (_definition.Service)
+            {
+                case BuildingService.Well:
+                    return hydration01 < 0.999f;
+
+                case BuildingService.Kitchen:
+                    // Кухне нужна еда на складе, иначе визит будет впустую
+                    return satiety01 < 0.999f && FindBestFood(out _, out _);
+
+                // Мастерская и рынок работают сами. Ходить к ним незачем, и фермер
+                // не должен считать их подходящей целью, когда голоден.
+                default:
+                    return false;
+            }
+        }
+
+        /// <summary>
+        /// Serve one visit. Returns how much of each need was restored, in units of the meter.
+        /// </summary>
+        public void Serve(float maxSatiety, float maxHydration, out float satietyGain, out float hydrationGain)
+        {
+            satietyGain = 0f;
+            hydrationGain = 0f;
+            if (_definition == null) return;
+
+            if (_definition.Service == BuildingService.Well)
+            {
+                hydrationGain = maxHydration * _definition.BaseRestore * Efficiency;
+            }
+            else if (_definition.Service == BuildingService.Kitchen && FindBestFood(out var food, out int available))
+            {
+                var storage = FarmingRuntime.Sink as IInventory;
+
+                // Съедаем ровно столько, сколько нужно, чтобы наесться на этом уровне кухни.
+                float perUnit = food.Nutrition * Efficiency;
+                int want = Mathf.Max(1, Mathf.CeilToInt(maxSatiety * Efficiency / Mathf.Max(0.01f, perUnit)));
+                int taken = storage.TryRemove(food, Mathf.Min(want, available));
+
+                satietyGain = taken * perUnit;
+                hydrationGain = taken * food.Hydration * Efficiency;
+            }
+
+            if (satietyGain > 0f || hydrationGain > 0f) Raise(Served, satietyGain, hydrationGain);
+        }
+
+        /// <summary>
+        /// Cheapest food on hand. Deliberately not the most nutritious: expensive tiers are worth
+        /// more sold than eaten, and a farmer who eats the good stuff first burns the player's profit.
+        /// </summary>
+        private bool FindBestFood(out ResourceDefinition food, out int amount)
+        {
+            food = null;
+            amount = 0;
+
+            var storage = FarmingRuntime.Sink as IInventory;
+            if (storage == null) return false;
+
+            int bestPrice = int.MaxValue;
+            var entries = storage.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var r = entries[i].Resource;
+                if (r == null || !r.IsFood || entries[i].Amount <= 0) continue;
+                if (r.SellPrice >= bestPrice) continue;
+
+                bestPrice = r.SellPrice;
+                food = r;
+                amount = entries[i].Amount;
+            }
+
+            return food != null;
+        }
+
+        private void Raise<T1, T2>(Action<Building, T1, T2> handler, T1 a, T2 b)
+        {
+            if (handler == null) return;
+            try { handler(this, a, b); }
+            catch (Exception e) { Debug.LogException(e, this); }
+        }
+
+        private void Raise(Action<Building, int> handler, int arg)
+        {
+            if (handler == null) return;
+            try { handler(this, arg); }
+            catch (Exception e) { Debug.LogException(e, this); }
+        }
+    }
+
+    /// <summary>Live index of placed buildings, so the farmer can find the nearest useful one.</summary>
+    public static class BuildingRegistry
+    {
+        private static readonly List<Building> _all = new List<Building>(16);
+
+        public static IReadOnlyList<Building> All => _all;
+        public static int Count => _all.Count;
+
+        /// <summary>
+        /// Any building levelled up. Farm-wide twin of <see cref="Building.Upgraded"/>, so audio and
+        /// UI can subscribe once instead of chasing every building that gets placed.
+        /// </summary>
+        public static event Action<Building, int> Upgraded;
+
+        internal static void RaiseUpgraded(Building building, int level)
+        {
+            var handler = Upgraded;
+            if (handler == null) return;
+            try { handler(building, level); }
+            catch (Exception e) { Debug.LogException(e, building); }
+        }
+
+        internal static void Register(Building b)
+        {
+            if (b == null || b.RegistryIndex >= 0) return;
+            b.RegistryIndex = _all.Count;
+            _all.Add(b);
+        }
+
+        internal static void Unregister(Building b)
+        {
+            if (b == null) return;
+
+            int i = b.RegistryIndex;
+            if (i < 0 || i >= _all.Count || _all[i] != b) { b.RegistryIndex = -1; return; }
+
+            int last = _all.Count - 1;
+            _all[i] = _all[last];
+            if (_all[i] != null) _all[i].RegistryIndex = i;
+            _all.RemoveAt(last);
+            b.RegistryIndex = -1;
+        }
+
+        /// <summary>
+        /// Extra fraction every sale is worth thanks to markets. Takes the best market rather than
+        /// summing them: stacking would make spamming stalls the whole game, and the player should
+        /// be upgrading one market instead of buying twelve.
+        /// </summary>
+        public static float MarketBonus
+        {
+            get
+            {
+                float best = 0f;
+                for (int i = 0; i < _all.Count; i++)
+                {
+                    var b = _all[i];
+                    if (b == null || b.Service != BuildingService.Market) continue;
+                    if (b.Output > best) best = b.Output;
+                }
+                return best;
+            }
+        }
+
+        /// <summary>Nearest building that can actually help with the given needs right now.</summary>
+        public static Building FindNearestUseful(Vector3 position, float satiety01, float hydration01,
+                                                 BuildingService? service = null)
+        {
+            Building best = null;
+            float bestSqr = float.PositiveInfinity;
+
+            for (int i = 0; i < _all.Count; i++)
+            {
+                var b = _all[i];
+                if (b == null) continue;
+                if (service.HasValue && b.Service != service.Value) continue;
+                if (!b.CanServe(satiety01, hydration01)) continue;
+
+                float sqr = (b.transform.position - position).sqrMagnitude;
+                if (sqr >= bestSqr) continue;
+
+                bestSqr = sqr;
+                best = b;
+            }
+
+            return best;
+        }
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics()
+        {
+            _all.Clear();
+            Upgraded = null;
+        }
+    }
+}

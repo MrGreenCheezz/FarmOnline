@@ -1,0 +1,32 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a43c6e6d2831bc46a6c627a744f9212, type: 3}
+  m_Name: Growable_vein_silver
+  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.GrowableDefinition
+  _id: vein_silver
+  _displayName: "\u0421\u0435\u0440\u0435\u0431\u0440\u044F\u043D\u0430\u044F \u0436\u0438\u043B\u0430"
+  _category: 2
+  _defaultStageDuration: 21.779999
+  _stages:
+  - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
+    _duration: 21.779999
+    _visual: {fileID: 919132149155446097, guid: 26e64fe635c0b7440a68df0a622bf13c, type: 3}
+  - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
+    _duration: 0
+    _visual: {fileID: 919132149155446097, guid: 26e64fe635c0b7440a68df0a622bf13c, type: 3}
+  _yieldResource: {fileID: 11400000, guid: 0eb7a3fa9b5f01744a817a0cdb5f376e, type: 2}
+  _baseYield: 1
+  _yieldPerLevel: 2
+  _regrows: 1
+  _regrowStage: 0
+  _removeWhenEmpty: 0
+  _witherAfter: 0

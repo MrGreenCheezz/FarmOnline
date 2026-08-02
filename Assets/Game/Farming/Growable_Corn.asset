@@ -1,0 +1,37 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0a43c6e6d2831bc46a6c627a744f9212, type: 3}
+  m_Name: Growable_Corn
+  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.GrowableDefinition
+  _id: corn
+  _displayName: "\u041A\u0443\u043A\u0443\u0440\u0443\u0437\u0430"
+  _category: 0
+  _defaultStageDuration: 2
+  _stages:
+  - _name: "\u0420\u043E\u0441\u0442\u043E\u043A"
+    _duration: 2
+    _visual: {fileID: 919132149155446097, guid: ed2041e0d966be94daeb2772b5ed1718, type: 3}
+  - _name: "\u041C\u043E\u043B\u043E\u0434\u0430\u044F"
+    _duration: 2
+    _visual: {fileID: 919132149155446097, guid: 2c621e3b8831eff4b9bfe0c530e958c2, type: 3}
+  - _name: "\u0420\u043E\u0441\u043B\u0430\u044F"
+    _duration: 3
+    _visual: {fileID: 919132149155446097, guid: 81a89cce1660f0342827d897ec1ac8f1, type: 3}
+  - _name: "\u0421\u043F\u0435\u043B\u0430\u044F"
+    _duration: 0
+    _visual: {fileID: 919132149155446097, guid: a665a202ef65cd24290de026db498849, type: 3}
+  _yieldResource: {fileID: 11400000, guid: 455db639183c5884eb92aed3433d92cc, type: 2}
+  _baseYield: 1
+  _yieldPerLevel: 2
+  _regrows: 1
+  _regrowStage: 1
+  _witherAfter: 0

@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 403798483515b7c429dffb8c4390bf0a, type: 3}
+  m_Name: Building_well
+  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.BuildingDefinition
+  _id: well
+  _displayName: "\u041A\u043E\u043B\u043E\u0434\u0435\u0446"
+  _description: "\u0412\u043E\u0434\u0430 \u0431\u0435\u0441\u043F\u043B\u0430\u0442\u043D\u0430
+    \u2014 \u043F\u043B\u0430\u0442\u0438\u0442\u044C \u043D\u0430\u0434\u043E \u0442\u043E\u043B\u044C\u043A\u043E
+    \u0437\u0430 \u043F\u043E\u0441\u0442\u0440\u043E\u0439\u043A\u0443."
+  _icon: {fileID: 21300000, guid: 3be96a2891e7afd4699e6a178a4cf1d0, type: 3}
+  _service: 1
+  _prefab: {fileID: 919132149155446097, guid: c90fade016e90de4496982818ddf7ebe, type: 3}
+  _levels:
+  - Cost:
+      Gold: 90
+      Resources:
+      - Resource: {fileID: 11400000, guid: 4e1b1690ff8cb9e4ea0c362f99990416, type: 2}
+        Amount: 12
+      - Resource: {fileID: 11400000, guid: 3d5ce0206a39d3946b6c0fd789550000, type: 2}
+        Amount: 6
+    Efficiency: 0.35
+    Output: 1
+    Note: "\u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0435\u0442 35% \u043F\u043E\u0442\u0440\u0435\u0431\u043D\u043E\u0441\u0442\u0438
+      \u0437\u0430 \u0432\u0438\u0437\u0438\u0442"
+  - Cost:
+      Gold: 207
+      Resources:
+      - Resource: {fileID: 11400000, guid: 4e1b1690ff8cb9e4ea0c362f99990416, type: 2}
+        Amount: 19
+      - Resource: {fileID: 11400000, guid: 3d5ce0206a39d3946b6c0fd789550000, type: 2}
+        Amount: 9
+    Efficiency: 0.57
+    Output: 1
+    Note: "\u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0435\u0442 57% \u043F\u043E\u0442\u0440\u0435\u0431\u043D\u043E\u0441\u0442\u0438
+      \u0437\u0430 \u0432\u0438\u0437\u0438\u0442"
+  - Cost:
+      Gold: 476
+      Resources:
+      - Resource: {fileID: 11400000, guid: 9a01d007d572e36438c21343617b5304, type: 2}
+        Amount: 29
+      - Resource: {fileID: 11400000, guid: f1c5f4dcfe6684b4199a4ca64f9926df, type: 2}
+        Amount: 14
+    Efficiency: 0.78999996
+    Output: 1
+    Note: "\u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0435\u0442 79% \u043F\u043E\u0442\u0440\u0435\u0431\u043D\u043E\u0441\u0442\u0438
+      \u0437\u0430 \u0432\u0438\u0437\u0438\u0442"
+  - Cost:
+      Gold: 1095
+      Resources:
+      - Resource: {fileID: 11400000, guid: 9a01d007d572e36438c21343617b5304, type: 2}
+        Amount: 45
+      - Resource: {fileID: 11400000, guid: f1c5f4dcfe6684b4199a4ca64f9926df, type: 2}
+        Amount: 22
+    Efficiency: 1
+    Output: 1
+    Note: "\u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0435\u0442 100% \u043F\u043E\u0442\u0440\u0435\u0431\u043D\u043E\u0441\u0442\u0438
+      \u0437\u0430 \u0432\u0438\u0437\u0438\u0442"
+  _serviceDuration: 1.4
+  _baseRestore: 1
+  _recipes: []

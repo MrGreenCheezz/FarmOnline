@@ -1,0 +1,104 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9567fa6451a2d3143ad7ffab772b7a43, type: 3}
+  m_Name: SoundBank
+  m_EditorClassIdentifier: Farm.Juice::Farm.Juice.SoundBank
+  Plant:
+    Clips:
+    - {fileID: 8300000, guid: 8df26d2ed4db402419c17f3468388f99, type: 3}
+    - {fileID: 8300000, guid: 9276c29346b8fc74a94acf12d688ecd0, type: 3}
+    - {fileID: 8300000, guid: 09924c1cfd1cac54292ea2a33a1339bc, type: 3}
+    Volume: 0.55
+    PitchJitter: 0.1
+  Ready:
+    Clips:
+    - {fileID: 8300000, guid: 201b87137fd2c8c4ebb03b605f798002, type: 3}
+    - {fileID: 8300000, guid: 1a72f7a0d0809bb47a89922df2cf97d0, type: 3}
+    - {fileID: 8300000, guid: d7999aa8b57c7904f8d453ea1e099e58, type: 3}
+    Volume: 0.32
+    PitchJitter: 0.12
+  Harvest:
+    Clips:
+    - {fileID: 8300000, guid: 9f9b1a413f399e44c80aa9b379a7d910, type: 3}
+    - {fileID: 8300000, guid: d95898346e905b64d827c3382be5fb72, type: 3}
+    - {fileID: 8300000, guid: e07acbac33595a24c8402636a088428c, type: 3}
+    Volume: 0.55
+    PitchJitter: 0.12
+  Merge:
+    Clips:
+    - {fileID: 8300000, guid: a4a182efa20734d46a81de63ff7662c7, type: 3}
+    - {fileID: 8300000, guid: fb763bc3ace1f114ca5f0c77af170e49, type: 3}
+    - {fileID: 8300000, guid: 3360ac64f971f7549a3879cf79607684, type: 3}
+    Volume: 0.85
+    PitchJitter: 0.06
+  Wither:
+    Clips:
+    - {fileID: 8300000, guid: db725b1c458dc654eaa106a0df93bc61, type: 3}
+    - {fileID: 8300000, guid: c1facf15bf8f1aa4ca2593ac7d94c6d3, type: 3}
+    Volume: 0.45
+    PitchJitter: 0.1
+  PickUp:
+    Clips:
+    - {fileID: 8300000, guid: 0fa50a45cd13a7a4680c9e444c06c37a, type: 3}
+    - {fileID: 8300000, guid: 15f2ca1e021b1b646a02d8a2100d2733, type: 3}
+    Volume: 0.4
+    PitchJitter: 0.1
+  Drop:
+    Clips:
+    - {fileID: 8300000, guid: 19df0d4fdca7d9b4cb78fd1b754643a8, type: 3}
+    - {fileID: 8300000, guid: 7cb91d9f95e865e49b47af0cddbc9002, type: 3}
+    - {fileID: 8300000, guid: ce8d1a60d59e76b459864eea2b9fe70d, type: 3}
+    Volume: 0.5
+    PitchJitter: 0.1
+  Deliver:
+    Clips:
+    - {fileID: 8300000, guid: 338e344c72e73e3468729cee9678bf5e, type: 3}
+    - {fileID: 8300000, guid: 14ffa5e75b066364f92056ecb74ee242, type: 3}
+    Volume: 0.7
+    PitchJitter: 0.08
+  Buy:
+    Clips:
+    - {fileID: 8300000, guid: 14ffa5e75b066364f92056ecb74ee242, type: 3}
+    - {fileID: 8300000, guid: f1c0abf993c61954e87f5f72ffd3aff7, type: 3}
+    Volume: 0.75
+    PitchJitter: 0.06
+  Sell:
+    Clips:
+    - {fileID: 8300000, guid: 338e344c72e73e3468729cee9678bf5e, type: 3}
+    - {fileID: 8300000, guid: 52b3af7ca6a931c429e7c917a83c1542, type: 3}
+    Volume: 0.8
+    PitchJitter: 0.06
+  Refused:
+    Clips:
+    - {fileID: 8300000, guid: ac336c839772f3943b7662e53f94710e, type: 3}
+    - {fileID: 8300000, guid: 181b8906bb52a8747920e30fb9903288, type: 3}
+    Volume: 0.55
+    PitchJitter: 0.05
+  UiOpen:
+    Clips:
+    - {fileID: 8300000, guid: 7027f72c12c9d0740af7abdd9c04660b, type: 3}
+    - {fileID: 8300000, guid: 09595618174c17c41a728f1ea5691228, type: 3}
+    Volume: 0.45
+    PitchJitter: 0.05
+  UiClose:
+    Clips:
+    - {fileID: 8300000, guid: c3f9d41d7746f8248836bb8e0b5545bc, type: 3}
+    - {fileID: 8300000, guid: e7dafad80b11c0441a9fccabf8a8f5c1, type: 3}
+    Volume: 0.4
+    PitchJitter: 0.05
+  UiClick:
+    Clips:
+    - {fileID: 8300000, guid: 24271bb8b66e05a47a3f87c8f18499ce, type: 3}
+    - {fileID: 8300000, guid: b9a63f63e4ca52c4b8ede6bfc99cf3ba, type: 3}
+    - {fileID: 8300000, guid: b5d79cca4313ec54da39962b31c64d14, type: 3}
+    Volume: 0.22
+    PitchJitter: 0.14

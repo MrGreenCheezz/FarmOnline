@@ -1,0 +1,542 @@
+/* HUD и магазин. Раскладка — флексбокс, как в CSS, свойства с юнитевскими именами. */
+
+.screen {
+    flex-grow: 1;
+}
+
+/* ================= HUD ================= */
+
+.hud {
+    position: absolute;
+    left: 0;
+    top: 0;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 14px;
+}
+
+.topbar {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.gold {
+    font-size: 24px;
+    -unity-font-style: bold;
+    color: rgb(255, 205, 90);
+    background-color: rgba(18, 22, 28, 0.88);
+    border-radius: 6px;
+    padding: 5px 14px 6px 14px;
+    margin-right: 10px;
+    -unity-text-align: middle-center;
+}
+
+.gold--inline {
+    font-size: 20px;
+    margin-right: 14px;
+}
+
+.hud-panels {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.btn--ghost {
+    background-color: rgba(30, 36, 45, 0.75);
+    color: rgba(228, 234, 240, 0.65);
+    margin-left: 4px;
+}
+
+.btn--ghost:hover { color: rgb(232, 238, 244); }
+
+/* ---- настройки ---- */
+
+.settings { padding: 12px 16px 14px 16px; }
+
+.setting {
+    flex-direction: column;
+    margin-bottom: 12px;
+}
+
+.setting__label {
+    font-size: 15px;
+    color: rgb(228, 234, 240);
+    margin-bottom: 4px;
+}
+
+.setting__slider { margin: 0; }
+
+.setting__slider .unity-base-slider__tracker {
+    background-color: rgba(255, 255, 255, 0.14);
+    border-width: 0;
+    height: 6px;
+    border-radius: 3px;
+}
+
+.setting__slider .unity-base-slider__dragger {
+    background-color: rgb(150, 210, 165);
+    border-width: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: 8px;
+    margin-top: -5px;
+}
+
+.panel {
+    background-color: rgba(18, 22, 28, 0.88);
+    border-left-color: rgba(120, 200, 140, 0.95);
+    border-left-width: 4px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    padding: 10px 16px 12px 12px;
+    margin-bottom: 10px;
+    min-width: 300px;
+}
+
+.panel__title {
+    -unity-font-style: bold;
+    font-size: 15px;
+    color: rgb(150, 210, 165);
+    margin-bottom: 6px;
+    letter-spacing: 2px;
+}
+
+.row {
+    font-size: 17px;
+    color: rgb(228, 234, 240);
+    margin-top: 2px;
+}
+
+.row--muted { color: rgba(228, 234, 240, 0.45); }
+
+.row--strong {
+    -unity-font-style: bold;
+    font-size: 18px;
+    color: rgb(255, 214, 120);
+    margin-bottom: 6px;
+}
+
+.hint {
+    font-size: 12px;
+    color: rgba(228, 234, 240, 0.35);
+    margin-top: 6px;
+}
+
+/* ---- ячейки склада ---- */
+
+.inv-grid {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    padding: 4px;
+}
+
+.cell {
+    width: 74px;
+    height: 74px;
+    margin: 4px;
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.10);
+    justify-content: flex-end;
+    align-items: flex-end;
+}
+
+/* Пустая ячейка не должна выглядеть кликабельной. */
+.cell--empty {
+    background-color: rgba(255, 255, 255, 0.025);
+    border-color: rgba(255, 255, 255, 0.06);
+}
+
+.cell--filled:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-color: rgba(150, 210, 165, 0.85);
+}
+
+.cell__icon {
+    position: absolute;
+    left: 6px;
+    top: 6px;
+    right: 6px;
+    bottom: 6px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.cell__count {
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: rgb(255, 255, 255);
+    background-color: rgba(0, 0, 0, 0.75);
+    border-radius: 5px;
+    padding: 0 5px 1px 5px;
+    margin: 3px;
+}
+
+/* ---- плашки уровней над грядками ---- */
+
+.world-layer {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+}
+
+.badge {
+    position: absolute;
+    font-size: 14px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: rgb(255, 255, 255);
+    background-color: rgba(20, 24, 30, 0.85);
+    border-radius: 9px;
+    border-width: 2px;
+    padding: 1px 7px 2px 7px;
+    min-width: 26px;
+}
+
+/* Цвет — быстрый способ увидеть, что с чем сливать, не читая цифру. */
+.badge--lvl1 { border-color: rgb(150, 210, 165); color: rgb(190, 232, 200); }
+.badge--lvl2 { border-color: rgb(96, 178, 232); color: rgb(160, 210, 245); }
+.badge--lvl3 { border-color: rgb(186, 140, 232); color: rgb(214, 180, 245); }
+.badge--lvl4 { border-color: rgb(255, 196, 84); color: rgb(255, 220, 150); }
+.badge--lvl5 { border-color: rgb(240, 110, 96); color: rgb(255, 170, 158); }
+
+/* Готово к сбору. Ниже цветов уровня, чтобы фон перебивал их, а рамка уровня осталась. */
+.badge--ready {
+    background-color: rgb(70, 142, 86);
+    color: rgb(255, 255, 255);
+}
+
+/* ---- всплывающие числа ---- */
+
+.float {
+    position: absolute;
+    font-size: 18px;
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: rgb(235, 240, 245);
+    -unity-text-outline-width: 1.4px;
+    -unity-text-outline-color: rgba(0, 0, 0, 0.85);
+}
+
+.float--harvest { color: rgb(168, 226, 178); }
+.float--gold { color: rgb(255, 208, 96); font-size: 21px; }
+.float--merge { color: rgb(255, 236, 150); font-size: 26px; }
+.float--bad { color: rgb(240, 128, 116); }
+
+/* ---- полоски ---- */
+
+.meter { flex-direction: column; margin-top: 7px; }
+
+.meter__label {
+    font-size: 14px;
+    color: rgba(228, 234, 240, 0.8);
+    margin-bottom: 3px;
+}
+
+.meter__track {
+    height: 10px;
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.meter__fill { height: 100%; width: 100%; border-radius: 5px; }
+.meter__fill--food { background-color: rgb(226, 168, 74); }
+.meter__fill--water { background-color: rgb(88, 172, 224); }
+.meter__fill--carry { background-color: rgb(140, 196, 130); }
+.meter__fill--energy { background-color: rgb(196, 160, 232); }
+.meter__fill--low { background-color: rgb(214, 88, 78); }
+
+/* ---- навыки ---- */
+
+.gold--clock {
+    color: rgb(178, 208, 236);
+    font-size: 20px;
+}
+
+.skill-list { flex-direction: column; }
+
+.skill {
+    flex-direction: column;
+    margin-top: 6px;
+}
+
+.skill__head {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.skill__name {
+    font-size: 15px;
+    color: rgb(228, 234, 240);
+}
+
+.skill__level {
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: rgb(255, 214, 120);
+}
+
+/* Тоньше полосок потребностей: навык растёт часами, за ним не следят посекундно. */
+.skill__track {
+    height: 6px;
+    background-color: rgba(255, 255, 255, 0.12);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 3px;
+}
+
+.skill__fill {
+    height: 100%;
+    width: 0;
+    background-color: rgb(150, 210, 165);
+    border-radius: 3px;
+}
+
+/* Умение уже открыто — полоску закрашиваем целиком другим цветом. */
+.skill__fill--max { background-color: rgb(255, 214, 120); }
+
+/* ================= кнопки ================= */
+
+.btn {
+    font-size: 15px;
+    color: rgb(232, 238, 244);
+    background-color: rgba(52, 62, 74, 0.95);
+    border-width: 0;
+    border-radius: 6px;
+    padding: 7px 14px 8px 14px;
+}
+
+.btn:hover { background-color: rgba(74, 88, 104, 1); }
+.btn:disabled { opacity: 0.4; }
+
+.btn--accent {
+    background-color: rgba(72, 132, 88, 0.95);
+    -unity-font-style: bold;
+}
+.btn--accent:hover { background-color: rgb(96, 168, 112); }
+
+.btn--icon {
+    font-size: 16px;
+    padding: 4px 10px 5px 10px;
+}
+
+/* ================= контекстное меню ================= */
+
+.ctx {
+    position: absolute;
+    min-width: 260px;
+    background-color: rgb(30, 36, 45);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.16);
+    padding: 6px 0 6px 0;
+}
+
+.ctx__title {
+    font-size: 14px;
+    -unity-font-style: bold;
+    color: rgb(150, 210, 165);
+    padding: 4px 14px 6px 14px;
+}
+
+.ctx__items { flex-direction: column; }
+
+.ctx__item {
+    font-size: 15px;
+    color: rgb(232, 238, 244);
+    background-color: transparent;
+    border-width: 0;
+    border-radius: 0;
+    padding: 7px 14px 8px 14px;
+    margin: 0;
+    -unity-text-align: middle-left;
+}
+
+.ctx__item:hover { background-color: rgba(120, 200, 140, 0.22); }
+.ctx__item:disabled { color: rgba(232, 238, 244, 0.35); }
+
+/* ================= магазин ================= */
+
+.overlay {
+    position: absolute;
+    left: 0; top: 0; right: 0; bottom: 0;
+    background-color: rgba(0, 0, 0, 0.55);
+    justify-content: center;
+    align-items: center;
+}
+
+.window--narrow { width: 420px; }
+
+.window {
+    width: 620px;
+    max-height: 78%;
+    background-color: rgb(24, 29, 36);
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.12);
+    padding: 0;
+    overflow: hidden;
+}
+
+.window__header {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.05);
+    padding: 10px 12px 10px 16px;
+}
+
+.window__title {
+    font-size: 18px;
+    -unity-font-style: bold;
+    color: rgb(150, 210, 165);
+    letter-spacing: 2px;
+    flex-grow: 1;
+}
+
+.window__body {
+    max-height: 420px;
+    padding: 6px 10px 6px 10px;
+}
+
+.window__message {
+    font-size: 14px;
+    color: rgb(230, 140, 130);
+    padding: 4px 16px 10px 16px;
+    min-height: 20px;
+}
+
+/* Должно идти после .window__message — при равной специфичности выигрывает то, что ниже. */
+.window__message--hint { color: rgba(228, 234, 240, 0.4); }
+
+.tabs {
+    flex-direction: row;
+    padding: 8px 12px 0 12px;
+}
+
+.tab {
+    font-size: 15px;
+    color: rgba(228, 234, 240, 0.6);
+    background-color: transparent;
+    border-width: 0;
+    border-bottom-width: 3px;
+    border-bottom-color: rgba(0, 0, 0, 0);
+    border-radius: 0;
+    padding: 6px 16px 6px 16px;
+    margin-right: 4px;
+}
+
+.tab:hover { color: rgb(228, 234, 240); }
+
+.tab--active {
+    color: rgb(255, 214, 120);
+    -unity-font-style: bold;
+    border-bottom-color: rgb(255, 214, 120);
+}
+
+.shop-list { flex-direction: column; }
+
+.shop-item {
+    flex-direction: row;
+    align-items: center;
+    background-color: rgba(255, 255, 255, 0.045);
+    border-radius: 8px;
+    padding: 10px;
+    margin: 4px 2px;
+}
+
+.shop-item__icon {
+    width: 54px;
+    height: 54px;
+    margin-right: 12px;
+    -unity-background-scale-mode: scale-to-fit;
+    background-color: rgba(255, 255, 255, 0.06);
+    border-radius: 6px;
+}
+
+.shop-item__text { flex-grow: 1; flex-direction: column; }
+
+.shop-item__name {
+    font-size: 17px;
+    -unity-font-style: bold;
+    color: rgb(232, 238, 244);
+}
+
+.shop-item__desc {
+    font-size: 13px;
+    color: rgba(228, 234, 240, 0.5);
+    white-space: normal;
+}
+
+.shop-item__price {
+    font-size: 15px;
+    color: rgb(255, 205, 90);
+    margin-top: 3px;
+}
+
+.shop-item__price--unaffordable { color: rgb(214, 108, 98); }
+
+/* ================= панель постройки ================= */
+
+.building {
+    position: absolute;
+    right: 14px;
+    top: 14px;
+    width: 340px;
+    background-color: rgb(24, 29, 36);
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+}
+
+/* Панель растёт по содержимому: прокручивать тут нечего, а фиксированная высота
+   оставляла пустоту под постройкой максимального уровня. */
+.building__body {
+    max-height: none;
+    padding: 10px 14px 4px 14px;
+}
+
+.building__head {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.building__headtext {
+    flex-grow: 1;
+    flex-direction: column;
+}
+
+.building__section { margin-top: 12px; }
+.building__next { flex-direction: column; }
+.building__cost { flex-direction: column; margin-top: 6px; }
+
+.cost {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 3px;
+}
+
+.cost__name {
+    font-size: 15px;
+    color: rgba(228, 234, 240, 0.75);
+}
+
+/* Зелёное — хватает, красное — нет. Игрок должен видеть, чего именно недостаёт,
+   не вчитываясь в причину под кнопкой. */
+.cost__have {
+    font-size: 15px;
+    -unity-font-style: bold;
+    color: rgb(150, 210, 165);
+}
+
+.cost__have--short { color: rgb(214, 108, 98); }
+
+.building__upgrade {
+    margin-top: 12px;
+    margin-bottom: 4px;
+}

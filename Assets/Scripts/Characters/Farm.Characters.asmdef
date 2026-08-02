@@ -1,0 +1,16 @@
+{
+    "name": "Farm.Characters",
+    "rootNamespace": "Farm.Characters",
+    "references": [
+        "Farm.Farming"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 57949a4d3b0fa044abff7abe77c9c99c, type: 3}
+  m_Name: Shop_coop
+  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.ShopItemDefinition
+  _id: coop
+  _displayName: "\u041A\u0443\u0440\u044F\u0442\u043D\u0438\u043A"
+  _description: "\u041F\u043E\u0441\u0442\u0440\u043E\u0439\u043A\u0430. \u0424\u0443\u043D\u043A\u0446\u0438\u0438
+    \u043F\u043E\u044F\u0432\u044F\u0442\u0441\u044F \u043F\u043E\u0437\u0436\u0435."
+  _icon: {fileID: 21300000, guid: b395db8500a2de84596c5d09c7737e23, type: 3}
+  _category: 2
+  _price:
+    Gold: 150
+    Resources:
+    - Resource: {fileID: 11400000, guid: 104b5960eb50096459f5ca59ef0ab91b, type: 2}
+      Amount: 30
+  _kind: 1
+  _growable: {fileID: 0}
+  _prefab: {fileID: 919132149155446097, guid: 132bdd3d4179a93459cb17dbb11674dc, type: 3}
+  _maxOwned: 0

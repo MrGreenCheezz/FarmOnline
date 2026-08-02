@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 57949a4d3b0fa044abff7abe77c9c99c, type: 3}
+  m_Name: Shop_bigbarn
+  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.ShopItemDefinition
+  _id: bigbarn
+  _displayName: "\u0411\u043E\u043B\u044C\u0448\u043E\u0439 \u0430\u043C\u0431\u0430\u0440"
+  _description: "\u041E\u0434\u0438\u043D \u043D\u0430 \u0444\u0435\u0440\u043C\u0443."
+  _icon: {fileID: 21300000, guid: 4839874f151895748af03f469d170bbd, type: 3}
+  _category: 2
+  _price:
+    Gold: 400
+    Resources:
+    - Resource: {fileID: 11400000, guid: 455db639183c5884eb92aed3433d92cc, type: 2}
+      Amount: 60
+  _kind: 1
+  _growable: {fileID: 0}
+  _prefab: {fileID: 919132149155446097, guid: 88e973361efe96b439c6c120e0534414, type: 3}
+  _maxOwned: 1

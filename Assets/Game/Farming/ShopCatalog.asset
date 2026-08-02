@@ -1,0 +1,36 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7f2c88f1f15900741bd57b3e4f7f202b, type: 3}
+  m_Name: ShopCatalog
+  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.ShopCatalog
+  _items:
+  - {fileID: 11400000, guid: 4eccf34377f490848b1ceb91b86d092a, type: 2}
+  - {fileID: 11400000, guid: abf8524895d1d2849bd3dfcc65621a90, type: 2}
+  - {fileID: 11400000, guid: 0aadd5b7d0f8f0b49888baa25509fa12, type: 2}
+  - {fileID: 11400000, guid: 5cc3dc0608d8ade4fba7c8d58930c7a4, type: 2}
+  - {fileID: 11400000, guid: f87f47a015e807d488e91c2197bef55c, type: 2}
+  - {fileID: 11400000, guid: 48e498aafd0bac14cb2b3b8393d23469, type: 2}
+  - {fileID: 11400000, guid: af49a001bd046e849b26b45a4f66e7c9, type: 2}
+  - {fileID: 11400000, guid: 69a2039db90be4d4b9bb5a8d356e73b1, type: 2}
+  - {fileID: 11400000, guid: 045eb972202aa3641aaec01443eba6b2, type: 2}
+  - {fileID: 11400000, guid: 60a35aa5ee3ea044796c62c1d803a3f0, type: 2}
+  - {fileID: 11400000, guid: 443bc0e5dfdfc384f9c4facd5e7a500d, type: 2}
+  - {fileID: 11400000, guid: 99799aa5bde593e41ac8b303b4012ec8, type: 2}
+  - {fileID: 11400000, guid: 3fc511fcbc2dffd41835cedc31654ee7, type: 2}
+  - {fileID: 11400000, guid: 07620e891ba163f4fa600dda89058c0a, type: 2}
+  - {fileID: 11400000, guid: cfcb379b855f4f8459ed6f9da1597f54, type: 2}
+  - {fileID: 11400000, guid: d38b010ba027c3447ba6fffc1453e008, type: 2}
+  - {fileID: 11400000, guid: dbdaacb7d84af3f47be73cae0c466310, type: 2}
+  - {fileID: 11400000, guid: e24f2172eb789a142993cf9876d18257, type: 2}
+  - {fileID: 11400000, guid: 000245fba87e5fe4896d190211553b4a, type: 2}
+  - {fileID: 11400000, guid: 49182827947de1541b9d6086e1bbd05b, type: 2}
+  - {fileID: 11400000, guid: 7124ebf1cade11f489134a07c86f9360, type: 2}

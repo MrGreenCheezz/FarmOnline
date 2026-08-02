@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: acd9f548f96bff84b8857d0576068aa3, type: 3}
+  m_Name: Resource_Corn
+  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.ResourceDefinition
+  _id: corn
+  _displayName: "\u041A\u0443\u043A\u0443\u0440\u0443\u0437\u0430"
+  _icon: {fileID: 21300000, guid: 26105ad2056e49c45ae6165347d886bc, type: 3}
+  _category: 0
+  _sellPrice: 3
+  _tier: 1
+  _nutrition: 9
+  _hydration: 2

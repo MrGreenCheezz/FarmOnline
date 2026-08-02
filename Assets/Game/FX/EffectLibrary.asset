@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2de7ee8248ae02348abbeb3d4a4cd476, type: 3}
+  m_Name: EffectLibrary
+  m_EditorClassIdentifier: Farm.Juice::Farm.Juice.EffectLibrary
+  MergeBurst: {fileID: 5809745878824725611, guid: 28e9b58a4d003ee48a7c6f94dcd1f041, type: 3}
+  Harvest: {fileID: 9157759754266823691, guid: 0d821853a162ed6459129c3f8d12ffc4, type: 3}
+  Plant: {fileID: 1643873110058818884, guid: 938572ccd599c8548aaa1f1a416ad88f, type: 3}
+  Ready: {fileID: 141639185576527995, guid: 519d1f9c08b9a7041825028e51b4fdb9, type: 3}
+  Wither: {fileID: 5449794246490436675, guid: 78b13db778c2bc54db79ead961a75032, type: 3}
+  Place: {fileID: 679957706177514889, guid: 9f56e3d332bff7b4d98b48f984ac16fc, type: 3}
