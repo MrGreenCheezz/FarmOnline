@@ -4,11 +4,11 @@ using UnityEngine;
 namespace Farm.Juice
 {
     /// <summary>
-    /// Spawns one-shot particle effects, pooled per prefab.
+    /// Запускает одноразовые эффекты частиц, с пулом на каждый префаб.
     /// <para>
-    /// Pooled rather than Instantiate/Destroy because effects fire hardest exactly when the game is
-    /// busiest — a chain of merges — and that is the worst possible moment to be allocating and
-    /// collecting GameObjects.
+    /// Пул вместо Instantiate/Destroy, потому что эффекты стреляют чаще всего именно тогда,
+    /// когда игре и так жарко — в цепочке слияний, — а это худший момент для аллокаций
+    /// и сборки мусора из GameObject-ов.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -32,7 +32,7 @@ namespace Farm.Juice
         public static Effects Instance { get; private set; }
         public EffectLibrary Library => _library;
 
-        /// <summary>Size multiplier applied to every effect. Tune it once for the camera distance.</summary>
+        /// <summary>Множитель размера всех эффектов. Настраивается один раз под дистанцию камеры.</summary>
         public float GlobalScale
         {
             get => _globalScale;
@@ -50,7 +50,7 @@ namespace Farm.Juice
             if (Instance == this) Instance = null;
         }
 
-        /// <summary>Fire <paramref name="prefab"/> at a world position. Null prefab is a no-op.</summary>
+        /// <summary>Выстрелить <paramref name="prefab"/> в мировой точке. Null-префаб — тихий no-op.</summary>
         public void Spawn(GameObject prefab, Vector3 position, float scale = 1f)
         {
             if (prefab == null) return;

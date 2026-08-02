@@ -5,17 +5,17 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// Seeds the farm with things to pick up after dark, and clears them at dawn.
+    /// С темнотой рассыпает по ферме то, что можно подобрать, и убирает это на рассвете.
     /// <para>
-    /// The night used to be dead time: the farmer sleeps, nothing grows faster, and the player has
-    /// nothing to do but wait for morning. Idle games are allowed quiet stretches, but a stretch
-    /// where being present is worth exactly nothing teaches the player to close the game — and that
-    /// is the one habit an idle game cannot afford.
+    /// Раньше ночь была мёртвым временем: фермер спит, ничего не растёт быстрее, игроку остаётся
+    /// ждать утра. Инкременталу позволены тихие отрезки, но отрезок, где присутствие не стоит
+    /// ровно ничего, учит игрока закрывать игру — а это единственная привычка, которую
+    /// инкрементал позволить себе не может.
     /// </para>
     /// <para>
-    /// So the night is not the farmer's shift, it is the player's. What appears here yields only to
-    /// hand, never to him, which is also why it is worth more per unit than anything he collects on
-    /// his own: it costs attention rather than time.
+    /// Поэтому ночь — смена не фермера, а игрока. Появившееся здесь отдаётся только рукам и
+    /// никогда ему, потому оно и дороже за единицу, чем всё, что он собирает сам: оно стоит
+    /// внимания, а не времени.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -58,7 +58,7 @@ namespace Farm.Farming
         private Transform _holder;
         private bool _nightActive;
 
-        /// <summary>How many nodes are out right now.</summary>
+        /// <summary>Сколько узлов лежит прямо сейчас.</summary>
         public int Active
         {
             get
@@ -71,12 +71,12 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Sync with the clock every frame instead of subscribing to its events.
+        /// Сверяемся с часами каждый кадр, а не подписываемся на их события.
         /// <para>
-        /// Both components sit on the same object, so <c>OnEnable</c> order decides whether the
-        /// clock's singleton exists yet when this one looks for it — and when it does not, the
-        /// subscription silently never happens and the night stays empty forever. Comparing state
-        /// costs one bool per frame and cannot be missed, whichever way Unity orders them.
+        /// Оба компонента сидят на одном объекте, и порядок их <c>OnEnable</c> решает, существует
+        /// ли уже синглтон часов, когда этот его ищет, — а когда нет, подписка молча не происходит
+        /// и ночь остаётся пустой навсегда. Сравнение состояния стоит один bool за кадр и не может
+        /// быть пропущено, в каком бы порядке Unity их ни поднял.
         /// </para>
         /// </summary>
         private void Update()
@@ -94,7 +94,7 @@ namespace Farm.Farming
             }
         }
 
-        /// <summary>Scatter a night's worth of nodes. Public so a test can call it without waiting.</summary>
+        /// <summary>Рассыпать ночную порцию узлов. Публичный, чтобы тест мог вызвать не дожидаясь ночи.</summary>
         public void Spawn()
         {
             if (_nightActive) return;

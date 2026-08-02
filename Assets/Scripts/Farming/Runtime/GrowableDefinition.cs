@@ -3,19 +3,19 @@ using UnityEngine;
 
 namespace Farm.Farming
 {
-    /// <summary>One step of a growth chain. The final stage in a definition is the ripe state.</summary>
+    /// <summary>Один шаг цепочки роста. Последняя стадия определения — спелое состояние.</summary>
     [Serializable]
     public sealed class GrowthStageDef
     {
-        [Tooltip("Label for readability and debugging only.")]
+        [Tooltip("Подпись только для читаемости и отладки.")]
         [SerializeField] private string _name = "Stage";
 
-        [Tooltip("Seconds spent on this stage before moving to the next.\n" +
-                 "Leave at 0 to use the definition's Default Stage Duration.\n" +
-                 "Ignored on the last stage — that one is the ripe state and never expires.")]
+        [Tooltip("Секунды на этой стадии до перехода к следующей.\n" +
+                 "0 — взять Default Stage Duration из определения.\n" +
+                 "У последней стадии игнорируется: она спелая и не истекает.")]
         [SerializeField, Min(0f)] private float _duration;
 
-        [Tooltip("Optional mesh shown while on this stage. Rendered by GrowableVisuals.")]
+        [Tooltip("Необязательный меш этой стадии. Показывается через GrowableVisuals.")]
         [SerializeField] private GameObject _visual;
 
         public string Name => string.IsNullOrEmpty(_name) ? "Stage" : _name;
@@ -24,52 +24,53 @@ namespace Farm.Farming
     }
 
     /// <summary>
-    /// Everything that makes one plantable thing tick: its stage chain, timings, and payout.
-    /// Pure data — a definition is shared by every plot growing it, so it holds no runtime state.
+    /// Всё, что определяет одну сажаемую вещь: цепочка стадий, тайминги, выплата.
+    /// Чистые данные — определение общее для всех грядок этой культуры и не хранит
+    /// никакого рантайм-состояния.
     /// </summary>
     [CreateAssetMenu(menuName = "Farm/Growable", fileName = "Growable_")]
     public sealed class GrowableDefinition : ScriptableObject
     {
-        [Header("Identity")]
-        [Tooltip("Stable key for saves and lookups. Falls back to the asset name when empty.")]
+        [Header("Что это")]
+        [Tooltip("Стабильный ключ для сохранений и поиска. Пусто — берётся имя ассета.")]
         [SerializeField] private string _id;
         [SerializeField] private string _displayName;
         [SerializeField] private ResourceCategory _category = ResourceCategory.Crop;
 
-        [Header("Growth")]
-        [Tooltip("Used by any stage whose own Duration is 0.")]
+        [Header("Рост")]
+        [Tooltip("Используется стадиями, у которых собственная длительность 0.")]
         [SerializeField, Min(0.01f)] private float _defaultStageDuration = 10f;
 
-        [Tooltip("Ordered from seed to ripe. The last entry is the harvestable state.")]
+        [Tooltip("По порядку от семечка к спелому. Последняя запись — собираемое состояние.")]
         [SerializeField] private GrowthStageDef[] _stages = Array.Empty<GrowthStageDef>();
 
-        [Header("Harvest")]
+        [Header("Урожай")]
         [SerializeField] private ResourceDefinition _yieldResource;
 
-        [Tooltip("Yield at level 1.")]
+        [Tooltip("Урожай на уровне 1.")]
         [SerializeField, Min(1)] private int _baseYield = 1;
 
-        [Tooltip("Yield is multiplied by this per level above 1.\n" +
-                 "2 mirrors the merge rule: two level-N merge into one level-N+1 that pays double.")]
+        [Tooltip("Во столько раз урожай умножается за каждый уровень выше первого.\n" +
+                 "2 зеркалит правило слияния: два уровня N дают один N+1, платящий вдвое.")]
         [SerializeField, Min(1f)] private float _yieldPerLevel = 2f;
 
-        [Header("After harvest")]
-        [Tooltip("On: the plot restarts itself from Regrow Stage instead of emptying.")]
+        [Header("После сбора")]
+        [Tooltip("Вкл: грядка перезапускается с Regrow Stage вместо опустошения.")]
         [SerializeField] private bool _regrows;
 
-        [Tooltip("Stage the plot restarts from when regrowing (e.g. 1 to skip the seed stage).")]
+        [Tooltip("С какой стадии перезапускаться при отрастании (например 1 — пропустить семечко).")]
         [SerializeField, Min(0)] private int _regrowStage;
 
-        [Tooltip("On: когда грядка опустела (собрали одноразовую или всё испортилось), объект удаляется.\n" +
-                 "Off: остаётся пустой грядкой на будущее.\n" +
+        [Tooltip("Вкл: когда грядка опустела (собрали одноразовую или всё испортилось), объект удаляется.\n" +
+                 "Выкл: остаётся пустой грядкой на будущее.\n" +
                  "Без этого поле зарастает невидимыми мёртвыми объектами, которые всё ещё можно схватить.")]
         [SerializeField] private bool _removeWhenEmpty = true;
 
-        [Header("Spoilage")]
-        [Tooltip("Seconds a ripe plot may sit unharvested before it withers. 0 disables withering.")]
+        [Header("Порча")]
+        [Tooltip("Сколько секунд спелая грядка может стоять несобранной до порчи. 0 — не портится.")]
         [SerializeField, Min(0f)] private float _witherAfter;
 
-        // Cumulative growth-seconds at which each stage begins; [0] is always 0.
+        // Накопленные секунды роста, с которых начинается каждая стадия; [0] всегда 0.
         [NonSerialized] private double[] _stageStart;
 
         public string Id => string.IsNullOrEmpty(_id) ? name : _id;
@@ -90,7 +91,7 @@ namespace Farm.Farming
             return _stages[index];
         }
 
-        /// <summary>Seconds spent on <paramref name="index"/>. The last stage never expires, so it reports 0.</summary>
+        /// <summary>Секунды на стадии <paramref name="index"/>. Последняя стадия не истекает и отвечает 0.</summary>
         public float StageDuration(int index)
         {
             if (index < 0 || index >= StageCount) return 0f;
@@ -101,7 +102,7 @@ namespace Farm.Farming
             return d > 0f ? d : _defaultStageDuration;
         }
 
-        /// <summary>Growth-seconds from planting until <paramref name="index"/> begins.</summary>
+        /// <summary>Секунды роста от посадки до начала стадии <paramref name="index"/>.</summary>
         public double StageStartTime(int index)
         {
             EnsureCache();
@@ -109,23 +110,23 @@ namespace Farm.Farming
             return _stageStart[Mathf.Clamp(index, 0, _stageStart.Length - 1)];
         }
 
-        /// <summary>Growth-seconds from planting until ripe.</summary>
+        /// <summary>Секунды роста от посадки до спелости.</summary>
         public double TotalGrowTime => StageStartTime(LastStageIndex);
 
-        /// <summary>Which stage a plot is on after <paramref name="elapsedGrowth"/> growth-seconds.</summary>
+        /// <summary>На какой стадии окажется грядка через <paramref name="elapsedGrowth"/> секунд роста.</summary>
         public int StageAtElapsed(double elapsedGrowth)
         {
             EnsureCache();
             if (_stageStart.Length == 0) return 0;
             if (elapsedGrowth >= _stageStart[_stageStart.Length - 1]) return _stageStart.Length - 1;
 
-            // Stage counts are tiny (3-6), so a forward scan beats a binary search here.
+            // Стадий совсем мало (3-6), поэтому простой проход тут быстрее бинарного поиска.
             for (int i = _stageStart.Length - 1; i > 0; i--)
                 if (elapsedGrowth >= _stageStart[i]) return i;
             return 0;
         }
 
-        /// <summary>Harvest amount for a given merge level.</summary>
+        /// <summary>Размер урожая для данного уровня слияния.</summary>
         public int YieldFor(int level)
         {
             int lvl = Mathf.Max(1, level);
@@ -154,7 +155,7 @@ namespace Farm.Farming
 
         private void OnValidate()
         {
-            _stageStart = null; // durations may have changed in the inspector
+            _stageStart = null; // длительности могли поменяться в инспекторе
             if (StageCount > 0) _regrowStage = Mathf.Clamp(_regrowStage, 0, LastStageIndex);
         }
     }

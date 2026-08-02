@@ -3,13 +3,13 @@ using UnityEngine;
 namespace Farm.Juice
 {
     /// <summary>
-    /// The farm's weather, as far as the vegetation shader is concerned. Publishes wind direction,
-    /// strength and gusts as global shader values.
+    /// Погода фермы с точки зрения шейдера растительности. Публикует направление ветра,
+    /// силу и порывы как глобальные шейдер-переменные.
     /// <para>
-    /// Gusts live here rather than in the shader because a gust has to be shared: when every plant
-    /// rolls its own, the field shimmers evenly and reads as noise. One gust curve driving the whole
-    /// farm is what makes it read as wind — the field surges and settles together, while each plant
-    /// still has its own phase from its position.
+    /// Порывы живут здесь, а не в шейдере, потому что порыв обязан быть общим: когда каждое
+    /// растение крутит свой, поле ровно мерцает и читается как шум. Одна кривая порыва на всю
+    /// ферму — то, что делает его похожим на ветер: поле накатывает и стихает вместе, а у
+    /// каждого растения при этом своя фаза от его позиции.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -46,7 +46,7 @@ namespace Farm.Juice
         [Tooltip("Множитель мелкой дрожи листвы. Растёт вместе с порывом.")]
         [SerializeField, Range(0f, 2f)] private float _turbulence = 1f;
 
-        /// <summary>Current gust multiplier. Exposed so effects and audio can breathe with the wind.</summary>
+        /// <summary>Текущий множитель порыва. Открыт, чтобы эффекты и звук могли дышать вместе с ветром.</summary>
         public float Gust { get; private set; } = 1f;
 
         private void OnEnable() => Apply();
@@ -94,8 +94,8 @@ namespace Farm.Juice
         }
 
         /// <summary>
-        /// Wind exists even without this component in the scene — otherwise a scene that forgot it
-        /// renders every plant frozen mid-bend at whatever the last scene left in the globals.
+        /// Ветер существует и без этого компонента в сцене — иначе сцена, забывшая его, рисует
+        /// каждое растение замершим на полусгибе с тем, что прошлая сцена оставила в глобалях.
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void SetDefaults() => Publish(new Vector2(0.82f, 0.57f), 1f, 1f, 1f, 1f);

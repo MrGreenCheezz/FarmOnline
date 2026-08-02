@@ -4,8 +4,8 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// Everything the shop sells. A single asset so the whole offer can be reviewed and balanced
-    /// in one place instead of being scattered across scene references.
+    /// Всё, что продаёт магазин. Один ассет — чтобы весь ассортимент можно было
+    /// просмотреть и отбалансировать в одном месте, а не собирать по ссылкам в сцене.
     /// </summary>
     [CreateAssetMenu(menuName = "Farm/Shop Catalog", fileName = "ShopCatalog")]
     public sealed class ShopCatalog : ScriptableObject
@@ -14,7 +14,7 @@ namespace Farm.Farming
 
         public IReadOnlyList<ShopItemDefinition> Items => _items;
 
-        /// <summary>Fills <paramref name="results"/> with the items of one tab. Clears it first.</summary>
+        /// <summary>Заполняет <paramref name="results"/> товарами одной вкладки. Сначала очищает список.</summary>
         public void GetByCategory(ShopCategory category, List<ShopItemDefinition> results)
         {
             if (results == null) return;

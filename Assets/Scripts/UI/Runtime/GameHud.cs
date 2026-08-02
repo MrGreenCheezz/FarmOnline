@@ -7,11 +7,11 @@ using Farm.Characters;
 namespace Farm.UI
 {
     /// <summary>
-    /// The always-on HUD: gold, farmer condition, farm status, and the buttons that open storage
-    /// and the shop. It also owns the shared sell menu, which <see cref="InventoryWindow"/> reuses.
+    /// Постоянный HUD: золото, состояние фермера, статус фермы и кнопки, открывающие склад и
+    /// магазин. Ему же принадлежит общее меню продажи, которое переиспользует <see cref="InventoryWindow"/>.
     /// <para>
-    /// Layout and looks live in <c>GameHud.uxml</c> / <c>GameHud.uss</c>; this class only pushes
-    /// values into named elements, so restyling never touches C#.
+    /// Раскладка и внешний вид живут в <c>GameHud.uxml</c> / <c>GameHud.uss</c>; этот класс только
+    /// заталкивает значения в именованные элементы, поэтому смена стиля не трогает C#.
     /// </para>
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
@@ -51,16 +51,6 @@ namespace Farm.UI
         private VisualElement _energyFill;
         private VisualElement _carryFill;
         private VisualElement _skillList;
-
-        // Одна строка на навык, собирается один раз — перестраивать её каждый кадр значит
-        // выбрасывать десяток объектов в секунду ради четырёх меняющихся чисел.
-        private readonly Dictionary<FarmerSkill, SkillRow> _skillRows = new Dictionary<FarmerSkill, SkillRow>();
-
-        private struct SkillRow
-        {
-            public Label Level;
-            public VisualElement Fill;
-        }
         private VisualElement _contextMenu;
         private VisualElement _contextItems;
         private Label _contextTitle;
@@ -69,6 +59,17 @@ namespace Farm.UI
         private IInventory _storage;
         private Wallet _wallet;
         private float _timer;
+
+        /// <summary>Пара ссылок на живые элементы одной строки навыка.</summary>
+        private struct SkillRow
+        {
+            public Label Level;
+            public VisualElement Fill;
+        }
+
+        // Одна строка на навык, собирается один раз — перестраивать её каждый кадр значит
+        // выбрасывать десяток объектов в секунду ради четырёх меняющихся чисел.
+        private readonly Dictionary<FarmerSkill, SkillRow> _skillRows = new Dictionary<FarmerSkill, SkillRow>();
 
         private void OnEnable()
         {
@@ -304,11 +305,11 @@ namespace Farm.UI
         // ---- меню продажи ----
 
         /// <summary>
-        /// Show the sell menu for a resource, anchored to the element the player clicked.
+        /// Показать меню продажи ресурса, пришвартованное к элементу, по которому кликнули.
         /// <para>
-        /// Hand-built rather than <see cref="GenericDropdownMenu"/>, which sizes itself to the
-        /// element it is anchored to — a small cell made it unreadably narrow. Public because the
-        /// storage window raises it too, and duplicating the menu would mean two sets of prices.
+        /// Собрано вручную, а не через <see cref="GenericDropdownMenu"/>: тот подгоняет ширину под
+        /// элемент-якорь, и от маленькой ячейки меню становилось нечитаемо узким. Публичное, потому
+        /// что окно склада тоже его поднимает, а дубль меню означал бы два комплекта цен.
         /// </para>
         /// </summary>
         public void ShowSellMenu(ResourceDefinition resource, VisualElement anchor)
@@ -367,9 +368,9 @@ namespace Farm.UI
         // ---- сворачивание панелей ----
 
         /// <summary>
-        /// Hide the info column. UI Toolkit eats clicks under any element it draws, so the panels
-        /// were a dead zone over a third of the field — the player must be able to get them out of
-        /// the way without losing the toolbar.
+        /// Спрятать колонку с панелями. UI Toolkit съедает клики под любым нарисованным элементом,
+        /// и панели были мёртвой зоной над третью поля — игрок должен уметь убрать их с дороги,
+        /// не теряя панель инструментов.
         /// </summary>
         public void TogglePanels()
         {
@@ -387,7 +388,7 @@ namespace Farm.UI
             if (_collapseButton != null) _collapseButton.text = _collapsed ? "Показать" : "Скрыть";
         }
 
-        /// <summary>Any click that is not inside the menu dismisses it.</summary>
+        /// <summary>Любой клик вне меню закрывает его.</summary>
         private void OnRootPointerDown(PointerDownEvent evt)
         {
             if (_contextMenu == null || _contextMenu.style.display == DisplayStyle.None) return;
@@ -438,7 +439,7 @@ namespace Farm.UI
 
             if (_plotsNext == null) return;
 
-            // Small farms only — scanning a few dozen plots ten times a second is free.
+            // Только для маленьких ферм — просмотреть пару десятков грядок десять раз в секунду бесплатно.
             double soonest = double.MaxValue;
             var all = GrowableRegistry.All;
             for (int i = 0; i < all.Count; i++)

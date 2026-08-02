@@ -3,7 +3,7 @@ using Farm.Farming;
 
 namespace Farm.Characters.Samples
 {
-    /// <summary>Narrates what the farmer is doing to the console. Debug aid, not gameplay.</summary>
+    /// <summary>Рассказывает в консоль, чем занят фермер. Отладочный помощник, не геймплей.</summary>
     [AddComponentMenu("Farm/Samples/Farmer Logger")]
     public sealed class FarmerLogger : MonoBehaviour
     {

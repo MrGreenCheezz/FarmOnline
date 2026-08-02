@@ -4,12 +4,12 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// One plot / pen / vein: something that grows through stages and can be harvested.
+    /// Одна грядка / загон / жила: то, что растёт по стадиям и собирается.
     /// <para>
-    /// Holds no timer of its own. Progress is derived from the timestamp it was planted at, so the
-    /// state is correct no matter how much time passes between wake-ups — a plot that slept through
-    /// four stages catches up in a single call. The only per-frame work in the whole system happens
-    /// in <see cref="GrowthScheduler"/>.
+    /// Собственного таймера не держит. Прогресс выводится из таймстампа посадки, поэтому
+    /// состояние верно независимо от того, сколько времени прошло между пробуждениями —
+    /// грядка, проспавшая четыре стадии, догоняет реальность одним вызовом. Единственная
+    /// покадровая работа всей системы происходит в <see cref="GrowthScheduler"/>.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -18,10 +18,10 @@ namespace Farm.Farming
     {
         [SerializeField] private GrowableDefinition _definition;
 
-        [Tooltip("Merge level. Two level-N growables merge into one level-N+1; level scales the yield.")]
+        [Tooltip("Уровень слияния. Два уровня N сливаются в один N+1; уровень масштабирует урожай.")]
         [SerializeField, Min(1)] private int _level = 1;
 
-        [Tooltip("Multiplies growth speed. Buffs, tools and buildings hook in here.")]
+        [Tooltip("Множитель скорости роста. Сюда цепляются баффы, инструменты и постройки.")]
         [SerializeField, Min(0.01f)] private float _growthSpeed = 1f;
 
         [SerializeField] private bool _plantOnStart = true;
@@ -32,36 +32,36 @@ namespace Farm.Farming
         private double _readyAt;
         private int _handle = GrowthScheduler.InvalidHandle;
 
-        // Slot bookkeeping owned by GrowableRegistry — keeps its list operations O(1).
+        // Служебные индексы, которыми владеет GrowableRegistry, — держат его операции O(1).
         internal int RegistryIndex = -1;
         internal int ReadyIndex = -1;
 
-        #region Per-instance events
+        #region События экземпляра
 
-        /// <summary>A new growth cycle began. Also fires when a regrowing plot restarts after harvest.</summary>
+        /// <summary>Начался новый цикл роста. Поднимается и когда отрастающая грядка перезапускается после сбора.</summary>
         public event Action<Growable> Planted;
 
-        /// <summary>Growth tick: moved onto the stage index passed along.</summary>
+        /// <summary>Тик роста: перешла на переданный индекс стадии.</summary>
         public event Action<Growable, int> StageAdvanced;
 
-        /// <summary>Reached the final stage and can be harvested.</summary>
+        /// <summary>Дошла до последней стадии, можно собирать.</summary>
         public event Action<Growable> Ready;
 
-        /// <summary>Harvested; the yield is already in the sink.</summary>
+        /// <summary>Собрана; урожай уже в стоке.</summary>
         public event Action<Growable, HarvestResult> Harvested;
 
-        /// <summary>Spoiled after sitting ripe too long.</summary>
+        /// <summary>Испортилась, простояв спелой слишком долго.</summary>
         public event Action<Growable> Withered;
 
-        /// <summary>Went empty.</summary>
+        /// <summary>Опустела.</summary>
         public event Action<Growable> Cleared;
 
-        /// <summary>Levelled up by absorbing the growable passed along, which is about to be destroyed.</summary>
+        /// <summary>Поднялась на уровень, поглотив переданную грядку — та вот-вот будет уничтожена.</summary>
         public event Action<Growable, Growable> Merged;
 
         #endregion
 
-        #region State
+        #region Состояние
 
         public GrowableDefinition Definition => _definition;
         public GrowthPhase Phase => _phase;
@@ -79,8 +79,8 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Growth rate multiplier. Changing it mid-growth keeps the progress already made —
-        /// the plant timestamp is rebased rather than the plot restarting.
+        /// Множитель скорости роста. Смена посреди роста сохраняет уже накопленный прогресс —
+        /// перебазируется таймстамп посадки, а не перезапускается грядка.
         /// </summary>
         public float GrowthSpeed
         {
@@ -93,7 +93,7 @@ namespace Farm.Farming
                 if (_phase == GrowthPhase.Growing)
                 {
                     double now = FarmingRuntime.Now;
-                    double done = (now - _plantedAt) * _growthSpeed;   // growth-seconds already banked
+                    double done = (now - _plantedAt) * _growthSpeed;   // секунды роста, уже заработанные
                     _growthSpeed = v;
                     _plantedAt = now - done / v;
                 }
@@ -106,7 +106,7 @@ namespace Farm.Farming
             }
         }
 
-        /// <summary>0..1 across the whole chain, for progress bars.</summary>
+        /// <summary>0..1 по всей цепочке — для полосок прогресса.</summary>
         public float Progress01
         {
             get
@@ -120,7 +120,7 @@ namespace Farm.Farming
             }
         }
 
-        /// <summary>Real seconds until harvestable. 0 when ready, -1 when nothing is growing.</summary>
+        /// <summary>Реальные секунды до спелости. 0 — уже спелая, -1 — ничего не растёт.</summary>
         public double TimeUntilReady
         {
             get
@@ -133,7 +133,7 @@ namespace Farm.Farming
             }
         }
 
-        /// <summary>Real seconds until the next stage change. -1 when not growing.</summary>
+        /// <summary>Реальные секунды до следующей смены стадии. -1, когда ничего не растёт.</summary>
         public double TimeUntilNextStage
         {
             get
@@ -148,7 +148,7 @@ namespace Farm.Farming
 
         #endregion
 
-        #region Unity lifecycle
+        #region Жизненный цикл Unity
 
         private void OnEnable()
         {
@@ -157,7 +157,7 @@ namespace Farm.Farming
             var scheduler = GrowthScheduler.Instance;
             if (scheduler != null) _handle = scheduler.Register(this);
 
-            // Time may have moved on while disabled — catch up before resuming.
+            // Пока объект был выключен, время шло — сначала догоняем, потом продолжаем.
             if (_phase == GrowthPhase.Growing) AdvanceTo(FarmingRuntime.Now);
             else if (_phase == GrowthPhase.Ready) GrowableRegistry.SetReady(this, true);
 
@@ -171,7 +171,7 @@ namespace Farm.Farming
 
         private void OnDisable()
         {
-            // Existing, not Instance: never spawn the scheduler while the scene is tearing down.
+            // Existing, а не Instance: нельзя порождать планировщик, пока сцена разбирается.
             var scheduler = GrowthScheduler.Existing;
             if (scheduler != null && _handle != GrowthScheduler.InvalidHandle) scheduler.Unregister(_handle);
             _handle = GrowthScheduler.InvalidHandle;
@@ -181,12 +181,12 @@ namespace Farm.Farming
 
         #endregion
 
-        #region Public API
+        #region Публичный API
 
-        /// <summary>Plant the assigned definition at the current level.</summary>
+        /// <summary>Посадить назначенное определение на текущем уровне.</summary>
         public void Plant() => Plant(_definition, _level);
 
-        /// <summary>Plant <paramref name="definition"/> from the first stage.</summary>
+        /// <summary>Посадить <paramref name="definition"/> с первой стадии.</summary>
         public void Plant(GrowableDefinition definition, int level)
         {
             if (definition == null)
@@ -207,16 +207,16 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Harvest if ripe. The yield goes to <see cref="FarmingRuntime.Sink"/>, then the plot either
-        /// restarts (definitions with Regrows) or empties.
+        /// Собрать, если спелая. Урожай уходит в <see cref="FarmingRuntime.Sink"/>, затем грядка
+        /// либо перезапускается (определения с Regrows), либо пустеет.
         /// </summary>
         public bool TryHarvest(out HarvestResult result) => TryHarvest(out result, null);
 
         /// <summary>
-        /// Harvest into a specific sink. A character carrying the crop home passes its backpack here
-        /// so the yield lands in the world storage only once it has actually been delivered.
+        /// Собрать в конкретный сток. Персонаж, несущий урожай домой, передаёт сюда свой рюкзак,
+        /// чтобы урожай попал на склад мира только после настоящей доставки.
         /// </summary>
-        /// <param name="into">Destination for the yield. Null routes it to <see cref="FarmingRuntime.Sink"/>.</param>
+        /// <param name="into">Приёмник урожая. Null — направить в <see cref="FarmingRuntime.Sink"/>.</param>
         public bool TryHarvest(out HarvestResult result, IResourceSink into)
         {
             result = default;
@@ -237,10 +237,10 @@ namespace Farm.Farming
             return true;
         }
 
-        /// <summary>Convenience overload for callers that don't need the details.</summary>
+        /// <summary>Удобная перегрузка для тех, кому детали не нужны.</summary>
         public bool TryHarvest() => TryHarvest(out _);
 
-        /// <summary>Empty the plot from any state.</summary>
+        /// <summary>Опустошить грядку из любого состояния.</summary>
         public void Clear()
         {
             if (_phase == GrowthPhase.Empty) return;
@@ -249,9 +249,9 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Can <paramref name="other"/> be merged into this one? Same crop, same level, both
-        /// actually planted — the rule the whole progression rests on, so it lives here rather
-        /// than in whatever happens to be dragging things around.
+        /// Можно ли слить <paramref name="other"/> в эту грядку? Та же культура, тот же уровень,
+        /// обе реально посажены — правило, на котором держится вся прогрессия, поэтому оно
+        /// живёт здесь, а не в том, что в данный момент таскает объекты.
         /// </summary>
         public bool CanMergeWith(Growable other)
         {
@@ -262,11 +262,11 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Absorb <paramref name="other"/>: this plot goes up one level and the other is destroyed.
+        /// Поглотить <paramref name="other"/>: эта грядка растёт на уровень, вторая уничтожается.
         /// <para>
-        /// Growth progress is deliberately kept, not reset. Merging is meant to be a pure gain —
-        /// charging the player a fresh growth cycle for it would make the core action feel like a
-        /// setback. If balance later needs a cost, this is the one line to change.
+        /// Прогресс роста намеренно сохраняется, а не сбрасывается. Слияние задумано как чистый
+        /// выигрыш — брать за него плату в виде нового цикла роста значило бы превратить главное
+        /// действие игры в откат. Если балансу позже понадобится цена, менять нужно ровно тут.
         /// </para>
         /// </summary>
         public bool TryMergeWith(Growable other)
@@ -283,7 +283,7 @@ namespace Farm.Farming
             return true;
         }
 
-        /// <summary>Skip straight to ripe. For boosters, cheats and tests.</summary>
+        /// <summary>Перескочить сразу к спелости. Для бустеров, читов и тестов.</summary>
         public void ForceReady()
         {
             if (_definition == null || _phase == GrowthPhase.Ready) return;
@@ -296,17 +296,17 @@ namespace Farm.Farming
 
         #endregion
 
-        #region Internals
+        #region Внутренности
 
         private double ElapsedGrowth(double now) => (now - _plantedAt) * _growthSpeed;
 
-        /// <summary>Begin a growth cycle at <paramref name="fromStage"/> (0 = fresh, higher = regrow).</summary>
+        /// <summary>Начать цикл роста со стадии <paramref name="fromStage"/> (0 — заново, больше — отрастание).</summary>
         private void StartCycle(int fromStage)
         {
             int stage = Mathf.Clamp(fromStage, 0, _definition.LastStageIndex);
             double now = FarmingRuntime.Now;
 
-            // Rebase the timestamp so "elapsed" already covers the stages we're skipping.
+            // Перебазируем таймстамп так, чтобы «прошло» уже покрывало пропускаемые стадии.
             _plantedAt = now - _definition.StageStartTime(stage) / _growthSpeed;
             _stageIndex = stage;
             _phase = GrowthPhase.Growing;
@@ -318,7 +318,7 @@ namespace Farm.Farming
             ScheduleNext();
         }
 
-        /// <summary>Catch the plot up to wherever <paramref name="now"/> says it should be.</summary>
+        /// <summary>Догнать грядку до состояния, которое диктует <paramref name="now"/>.</summary>
         private void AdvanceTo(double now)
         {
             if (_definition == null || _phase != GrowthPhase.Growing) return;
@@ -345,7 +345,7 @@ namespace Farm.Farming
             _phase = GrowthPhase.Ready;
             _stageIndex = _definition.LastStageIndex;
 
-            // Exact moment of ripening, not the moment we noticed — keeps wither timing honest.
+            // Точный момент созревания, а не момент, когда мы заметили, — держит порчу честной.
             _readyAt = _plantedAt + _definition.TotalGrowTime / _growthSpeed;
             if (_readyAt > now) _readyAt = now;
 
@@ -381,7 +381,7 @@ namespace Farm.Farming
             if (remove && Application.isPlaying) Destroy(gameObject);
         }
 
-        /// <summary>Ask the scheduler to wake us at the next moment something actually changes.</summary>
+        /// <summary>Попросить планировщик разбудить нас в следующий момент, когда что-то реально изменится.</summary>
         private void ScheduleNext()
         {
             var scheduler = GrowthScheduler.Instance;
@@ -424,7 +424,7 @@ namespace Farm.Farming
             }
         }
 
-        // Subscriber exceptions must not break the plot that raised the event.
+        // Исключение подписчика не должно ломать грядку, поднявшую событие.
         private void Raise(Action<Growable> handler)
         {
             if (handler == null) return;

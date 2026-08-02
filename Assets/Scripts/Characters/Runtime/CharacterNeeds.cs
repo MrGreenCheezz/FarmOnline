@@ -4,15 +4,16 @@ using UnityEngine;
 namespace Farm.Characters
 {
     /// <summary>
-    /// Hunger and thirst as two draining meters.
+    /// Голод и жажда как две убывающие шкалы.
     /// <para>
-    /// Stored as <i>satiety</i> and <i>hydration</i> — how full the character is, not how empty —
-    /// so "more is better" holds for both and UI bars need no inversion.
+    /// Хранятся как <i>сытость</i> и <i>вода</i> — насколько персонаж полон, а не насколько пуст, —
+    /// чтобы «больше — лучше» работало для обеих и полоскам UI не нужна была инверсия.
     /// </para>
     /// <para>
-    /// Needs are a lever, not a tax. Running empty never kills or stops the farmer — it slows them
-    /// down, and no lower than <see cref="_minProductivity"/>. A starving farmer who cannot work at
-    /// all cannot fetch the food that would fix it, and the run is over with nothing to do about it.
+    /// Нужды — рычаг, а не налог. Пустая шкала никогда не убивает и не останавливает фермера —
+    /// только замедляет, и не ниже <see cref="_minProductivity"/>. Голодающий фермер, который
+    /// вовсе не может работать, не может и дойти до еды, которая бы это исправила, — партия
+    /// закончена, и сделать с этим нечего.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -63,28 +64,28 @@ namespace Farm.Characters
         private bool _wasTired;
 
         /// <summary>
-        /// How hard the character is working right now, 0..1. The agent sets it every frame.
+        /// Насколько тяжело персонаж работает прямо сейчас, 0..1. Агент выставляет каждый кадр.
         /// <para>
-        /// Energy drains by activity rather than by the clock, unlike hunger and thirst — a farmer
-        /// who stood around all morning should not need a nap. It still ticks down at rest, so
-        /// standing still is not a way to skip the night.
+        /// Бодрость уходит от активности, а не по часам, в отличие от голода и жажды: фермер,
+        /// простоявший всё утро, не должен нуждаться в дрёме. В покое она всё же тает — стоять
+        /// столбом не способ пропустить ночь.
         /// </para>
         /// </summary>
         public float Exertion { get; set; }
 
-        /// <summary>Crossed below the low threshold.</summary>
+        /// <summary>Опустился ниже нижнего порога.</summary>
         public event Action<CharacterNeeds> BecameHungry;
         public event Action<CharacterNeeds> BecameThirsty;
 
-        /// <summary>Climbed back above the low threshold.</summary>
+        /// <summary>Поднялся обратно выше нижнего порога.</summary>
         public event Action<CharacterNeeds> Sated;
         public event Action<CharacterNeeds> Quenched;
 
-        /// <summary>Ran out of energy and needs to sleep.</summary>
+        /// <summary>Кончилась бодрость, нужен сон.</summary>
         public event Action<CharacterNeeds> BecameTired;
         public event Action<CharacterNeeds> Rested;
 
-        /// <summary>Hit zero. Nothing reacts to this yet — it is the hook for later consequences.</summary>
+        /// <summary>Дошло до нуля. Пока никто не реагирует — крючок для будущих последствий.</summary>
         public event Action<CharacterNeeds> Starving;
         public event Action<CharacterNeeds> Dehydrated;
 
@@ -103,19 +104,19 @@ namespace Farm.Characters
         public bool IsThirsty => Hydration01 <= _lowThreshold;
         public bool IsTired => Energy01 <= _tiredThreshold;
 
-        /// <summary>Rested enough to get back up. Deliberately above the tired threshold so he does
-        /// not wake, take two steps and collapse again.</summary>
+        /// <summary>Выспался достаточно, чтобы встать. Нарочно выше порога усталости — чтобы не
+        /// просыпался, делал два шага и снова падал.</summary>
         public bool IsRested => Energy01 >= 0.95f;
 
-        /// <summary>Worst of the three meters, 0..1. Handy as a single "how bad is it" number.</summary>
+        /// <summary>Худшая из трёх шкал, 0..1. Удобно как одно число «насколько всё плохо».</summary>
         public float Wellbeing01 => Mathf.Min(Satiety01, Mathf.Min(Hydration01, Energy01));
 
         /// <summary>
-        /// How well the farmer works right now, from <see cref="_minProductivity"/> to 1.
+        /// Насколько хорошо фермер сейчас работает, от <see cref="_minProductivity"/> до 1.
         /// <para>
-        /// Driven by whichever need is worse — being stuffed does not compensate for being parched.
-        /// Above the comfort threshold there is no penalty at all: a game that demands attention
-        /// every minute stops being idle and starts being a chore.
+        /// Ведётся по худшей из нужд — сытость до отвала не компенсирует пересохшее горло.
+        /// Выше порога комфорта штрафа нет вовсе: игра, требующая внимания каждую минуту,
+        /// перестаёт быть idle и становится повинностью.
         /// </para>
         /// </summary>
         public float Productivity01
@@ -150,11 +151,11 @@ namespace Farm.Characters
         public void Eat(float amount) => Set(_satiety + Mathf.Max(0f, amount), _hydration, _energy);
         public void Drink(float amount) => Set(_satiety, _hydration + Mathf.Max(0f, amount), _energy);
 
-        /// <summary>Sleep for <paramref name="seconds"/> worth of recovery.</summary>
+        /// <summary>Поспать: восстановление за <paramref name="seconds"/> секунд сна.</summary>
         public void Sleep(float seconds) =>
             Set(_satiety, _hydration, _energy + _energyRecoveryPerSecond * Mathf.Max(0f, seconds));
 
-        /// <summary>Refill every meter.</summary>
+        /// <summary>Наполнить все шкалы доверху.</summary>
         public void Restore() => Set(_maxSatiety, _maxHydration, _maxEnergy);
 
         private void Set(float satiety, float hydration, float energy)

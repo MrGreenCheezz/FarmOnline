@@ -6,30 +6,29 @@ using UnityEngine;
 namespace Farm.Juice
 {
     /// <summary>
-    /// The handful of tweens this game needs, and nothing more.
+    /// Горстка твинов, которые нужны этой игре, и ничего сверх.
     /// <para>
-    /// Unity ships no tweening, and pulling in a whole library for four curves would be a large
-    /// dependency for a small need. Everything is coroutine-based and keyed by transform: starting
-    /// a tween cancels the object's previous one, so a merge punch and a highlight release can
-    /// never fight over the same scale.
+    /// В Unity твинов нет, а тащить целую библиотеку ради четырёх кривых — крупная зависимость
+    /// под мелкую нужду. Всё на корутинах и с ключом-transform: старт твина отменяет прежний твин
+    /// объекта, поэтому панч слияния и снятие подсветки никогда не дерутся за один масштаб.
     /// </para>
     /// <para>
-    /// Cancelling is where naive tweeners go wrong. Every public call here follows the same order —
-    /// stop the old tween <i>and restore what it promised to return to</i>, only then read the
-    /// current scale as the new baseline. Do it the other way round and objects drift: grab and drop
-    /// a plot fast enough and it stays permanently at 1.08×.
+    /// Отмена — то место, где наивные твинеры ошибаются. Каждый публичный вызов здесь идёт в одном
+    /// порядке: остановить старый твин <i>и вернуть то, что тот обещал вернуть</i>, и лишь потом
+    /// прочитать текущий масштаб как новую базу. Сделай наоборот — и объекты «плывут»: схвати и
+    /// брось грядку достаточно быстро, и она навсегда останется в 1.08×.
     /// </para>
     /// </summary>
     public static class Tween
     {
         private static readonly Dictionary<Transform, Coroutine> _running = new Dictionary<Transform, Coroutine>();
 
-        /// <summary>Scale that a returning tween owes the object if it is cut short.</summary>
+        /// <summary>Масштаб, который возвращающийся твин должен объекту, если его оборвут.</summary>
         private static readonly Dictionary<Transform, Vector3> _restoreScale = new Dictionary<Transform, Vector3>();
 
-        // ---- easing ----
+        // ---- кривые ----
 
-        /// <summary>Overshoots then settles. The reason a pop reads as "pop" and not as "grow".</summary>
+        /// <summary>Перелетает и оседает. Причина, по которой «поп» читается как поп, а не как рост.</summary>
         public static float OutBack(float t, float overshoot = 1.7f)
         {
             t -= 1f;
@@ -42,7 +41,7 @@ namespace Farm.Juice
 
         // ---- жизненный цикл ----
 
-        /// <summary>Stop the object's tween and put back the scale it was going to return to.</summary>
+        /// <summary>Остановить твин объекта и вернуть масштаб, к которому тот собирался прийти.</summary>
         public static void Kill(Transform target)
         {
             if (target == null) return;
@@ -71,8 +70,8 @@ namespace Farm.Juice
         }
 
         /// <summary>
-        /// Runs the tween, then hands over. The callback fires only after the registry entry is
-        /// dropped — otherwise chaining a second tween would kill the coroutine calling it.
+        /// Прогоняет твин и передаёт эстафету. Колбэк срабатывает только после снятия записи из
+        /// реестра — иначе цепочка из второго твина убила бы корутину, которая его вызывает.
         /// </summary>
         private static IEnumerator Wrap(Transform target, IEnumerator routine, Action onComplete)
         {
@@ -84,7 +83,7 @@ namespace Farm.Juice
 
         // ---- твины ----
 
-        /// <summary>Scale up past the base and settle back. The workhorse "that mattered" cue.</summary>
+        /// <summary>Раздуться выше базы и осесть обратно. Рабочая лошадка сигнала «это было важно».</summary>
         public static void Punch(Transform target, float strength = 0.35f, float duration = 0.32f)
         {
             if (target == null) return;
@@ -109,7 +108,7 @@ namespace Farm.Juice
             if (target != null) target.localScale = baseScale;
         }
 
-        /// <summary>Squash down and spring back — impact, landing, harvesting.</summary>
+        /// <summary>Сплющиться и спружинить обратно — удар, приземление, сбор.</summary>
         public static void Squash(Transform target, float strength = 0.3f, float duration = 0.28f)
         {
             if (target == null) return;
@@ -138,7 +137,7 @@ namespace Farm.Juice
             if (target != null) target.localScale = baseScale;
         }
 
-        /// <summary>Grow from nothing with an overshoot. For things that appear.</summary>
+        /// <summary>Вырасти из ничего с перелётом. Для того, что появляется.</summary>
         public static void PopIn(Transform target, float duration = 0.4f, float delay = 0f)
         {
             if (target == null) return;
@@ -165,8 +164,8 @@ namespace Farm.Juice
         }
 
         /// <summary>
-        /// Smoothly reach a scale and stay there — hover highlight. Registers no restore value on
-        /// purpose: this tween is meant to end somewhere else, so cancelling it must not undo it.
+        /// Плавно дойти до масштаба и остаться — подсветка наведения. Намеренно не записывает
+        /// восстановление: этот твин должен закончиться в другом месте, и отмена не должна его откатывать.
         /// </summary>
         public static void ScaleTo(Transform target, Vector3 to, float duration = 0.15f)
         {
@@ -189,7 +188,7 @@ namespace Farm.Juice
             if (target != null) target.localScale = to;
         }
 
-        /// <summary>Arc to a position — dropping something onto the ground.</summary>
+        /// <summary>Дугой к точке — бросок предмета на землю.</summary>
         public static void HopTo(Transform target, Vector3 to, float height = 0.35f, float duration = 0.22f,
                                  Action onComplete = null)
         {

@@ -5,17 +5,17 @@ using Farm.Farming;
 namespace Farm.UI
 {
     /// <summary>
-    /// The panel for one placed building: what it does now, what the next level costs, and the
-    /// button that buys it. Opens when the player clicks a building, closes when they click away.
+    /// Панель одной поставленной постройки: что делает сейчас, что стоит следующий уровень
+    /// и кнопка, которая его покупает. Открывается кликом по постройке, закрывается кликом мимо.
     /// <para>
-    /// Asks <see cref="Building"/> whether an upgrade is possible instead of comparing prices
-    /// itself — the building already owns that rule, and a second copy here is how the button ends
-    /// up enabled for a purchase that then fails.
+    /// Спрашивает у <see cref="Building"/>, возможно ли улучшение, вместо того чтобы сравнивать
+    /// цены самой — постройка уже владеет этим правилом, и вторая копия здесь — путь к кнопке,
+    /// включённой для покупки, которая затем проваливается.
     /// </para>
     /// <para>
-    /// Cost rows show have-vs-need per resource. A single "не хватает 14 — Железо" line under the
-    /// button only names the first missing item, which reads as "get 14 iron" when the player is
-    /// actually short on three things.
+    /// Строки цены показывают «есть/надо» по каждому ресурсу. Одна строка «не хватает 14 — Железо»
+    /// под кнопкой называла бы лишь первую нехватку и читалась бы как «принеси 14 железа»,
+    /// когда игроку на деле не хватает трёх вещей.
     /// </para>
     /// </summary>
     [RequireComponent(typeof(UIDocument))]

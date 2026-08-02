@@ -3,9 +3,9 @@ using UnityEngine;
 namespace Farm.Farming.Samples
 {
     /// <summary>
-    /// Drops into a scene and narrates every farming event to the console.
-    /// Doubles as the reference for how to hook into the system: subscribe to
-    /// <see cref="FarmingEvents"/> once and you see the whole farm, no per-plot wiring.
+    /// Бросается в сцену и рассказывает каждое событие фермы в консоль.
+    /// Заодно служит образцом подключения к системе: одна подписка на
+    /// <see cref="FarmingEvents"/> — и видна вся ферма, без проводки к каждой грядке.
     /// </summary>
     [AddComponentMenu("Farm/Samples/Farming Event Logger")]
     public sealed class FarmingEventLogger : MonoBehaviour

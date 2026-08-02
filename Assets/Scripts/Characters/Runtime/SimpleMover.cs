@@ -3,8 +3,8 @@ using UnityEngine;
 namespace Farm.Characters
 {
     /// <summary>
-    /// Straight-line walker: turns toward the destination and walks at a constant speed.
-    /// No pathfinding — it will happily walk through obstacles, which is fine for an open field.
+    /// Ходок по прямой: разворачивается к цели и идёт с постоянной скоростью.
+    /// Без поиска пути — спокойно пройдёт сквозь препятствие, что для открытого поля нормально.
     /// </summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("Farm/Simple Mover")]

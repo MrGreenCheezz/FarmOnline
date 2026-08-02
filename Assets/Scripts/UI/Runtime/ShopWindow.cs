@@ -7,12 +7,12 @@ using Farm.Farming;
 namespace Farm.UI
 {
     /// <summary>
-    /// The shop overlay: tabs by category, one row per item, buy buttons that grey out when the
-    /// price cannot be paid.
+    /// Окно магазина: вкладки по категориям, строка на товар, кнопки покупки, гаснущие,
+    /// когда цену не оплатить.
     /// <para>
-    /// Reads everything from <see cref="Shop"/> and never touches the wallet or storage itself —
-    /// prices, limits and delivery are the shop's rules, and duplicating them here is how the two
-    /// drift apart.
+    /// Всё читает из <see cref="Shop"/> и сам никогда не трогает ни кошелёк, ни склад — цены,
+    /// лимиты и доставка есть правила магазина, и их дубль здесь — ровно тот путь, которым
+    /// двое расходятся.
     /// </para>
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
@@ -61,7 +61,7 @@ namespace Farm.UI
             var close = root.Q<Button>("shop-close");
             if (close != null) close.clicked += Close;
 
-            // Clicking the dimmed backdrop closes, clicking the window itself must not.
+            // Клик по затемнению закрывает, клик по самому окну — не должен.
             if (_overlay != null) _overlay.RegisterCallback<ClickEvent>(OnOverlayClick);
 
             BindShop();
@@ -188,7 +188,7 @@ namespace Farm.UI
             SelectTab(_active);
         }
 
-        /// <summary>Switch tab. Public so other systems can open the shop straight on a category.</summary>
+        /// <summary>Переключить вкладку. Публичный — другие системы могут открыть магазин сразу на категории.</summary>
         public void SelectTab(ShopCategory category)
         {
             _active = category;

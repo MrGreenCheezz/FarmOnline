@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Farm.Farming
 {
-    /// <summary>Shop tab an item belongs to. Values are serialized — append, never renumber.</summary>
+    /// <summary>Вкладка магазина, к которой относится товар. Значения сериализуются — добавляй в конец, не перенумеровывай.</summary>
     public enum ShopCategory
     {
         Plants = 0,
@@ -11,20 +11,20 @@ namespace Farm.Farming
         Ore = 3
     }
 
-    /// <summary>What actually appears on the farm when the item is bought.</summary>
+    /// <summary>Что реально появляется на ферме при покупке.</summary>
     public enum ShopItemKind
     {
-        /// <summary>Creates a working plot running the assigned <see cref="GrowableDefinition"/>.</summary>
+        /// <summary>Создаёт рабочую грядку с назначенным <see cref="GrowableDefinition"/>.</summary>
         Plot = 0,
-        /// <summary>Instantiates the prefab as-is. Decoration and anything without behaviour yet.</summary>
+        /// <summary>Ставит префаб как есть. Декор и всё, у чего пока нет поведения.</summary>
         Prop = 1,
-        /// <summary>Places a working <see cref="Building"/> at level 1 from a <see cref="BuildingDefinition"/>.</summary>
+        /// <summary>Ставит рабочую <see cref="Building"/> 1-го уровня из <see cref="BuildingDefinition"/>.</summary>
         Building = 2
     }
 
     /// <summary>
-    /// One line in the shop. Data only — the <see cref="Shop"/> decides what buying means, so
-    /// adding a new kind of purchase never touches the catalogue assets.
+    /// Одна строка магазина. Только данные — что значит «купить», решает <see cref="Shop"/>,
+    /// поэтому новый вид покупки никогда не трогает ассеты каталога.
     /// </summary>
     [CreateAssetMenu(menuName = "Farm/Shop Item", fileName = "Shop_")]
     public sealed class ShopItemDefinition : ScriptableObject
@@ -64,13 +64,13 @@ namespace Farm.Farming
         public BuildingDefinition Building => _building;
         public int MaxOwned => _maxOwned;
 
-        /// <summary>Falls back to the building's own icon so a building is drawn once, not twice.</summary>
+        /// <summary>Откатывается к иконке самой постройки — постройку рисуют один раз, а не дважды.</summary>
         public Sprite Icon => _icon != null ? _icon : (_building != null ? _building.Icon : null);
 
         /// <summary>
-        /// What the item costs. A building quotes its own level-1 cost rather than a copy typed here:
-        /// the shop price and the first rung of the upgrade ladder are the same number by definition,
-        /// and two places to edit it is one place to get it wrong.
+        /// Сколько товар стоит. Постройка называет собственную цену 1-го уровня, а не копию,
+        /// вбитую здесь: цена в магазине и первая ступень лестницы улучшений — одно и то же
+        /// число по определению, а два места для правки — это одно место для ошибки.
         /// </summary>
         public Price Price
         {

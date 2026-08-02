@@ -6,11 +6,11 @@ using Farm.Farming;
 namespace Farm.UI
 {
     /// <summary>
-    /// Numbers that rise off the thing that produced them and fade.
+    /// Числа, взлетающие над тем, что их породило, и тающие.
     /// <para>
-    /// This is the cheapest way to make a result feel earned: the player sees <i>where</i> the gain
-    /// came from, not just that a counter somewhere changed. Merges get the loudest treatment
-    /// because that is the decision the game is built on.
+    /// Самый дешёвый способ сделать результат заслуженным: игрок видит, <i>откуда</i> пришла
+    /// прибавка, а не просто что где-то сменился счётчик. Слияниям — самое громкое оформление,
+    /// потому что это решение, на котором построена игра.
     /// </para>
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
@@ -154,7 +154,7 @@ namespace Farm.UI
             }
         }
 
-        /// <summary>Fast at first, then drifting — matches how a "pop" reads.</summary>
+        /// <summary>Сначала быстро, потом дрейф — так и читается «выскочило».</summary>
         private static float Tween01(float k) => 1f - (1f - k) * (1f - k);
 
         private void Retire(int index)

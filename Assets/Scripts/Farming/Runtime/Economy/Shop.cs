@@ -5,8 +5,8 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// Buying and selling. Owns the rules — what is affordable, what is charged, what appears —
-    /// so the UI only asks questions and never touches the wallet or the store itself.
+    /// Покупка и продажа. Владеет правилами — что по карману, что списывается, что появляется, —
+    /// поэтому UI только задаёт вопросы и никогда сам не трогает ни кошелёк, ни склад.
     /// </summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("Farm/Shop")]
@@ -31,15 +31,15 @@ namespace Farm.Farming
         public ShopCatalog Catalog => _catalog;
         public Wallet Wallet => _wallet != null ? _wallet : Wallet.Instance;
 
-        /// <summary>Where purchases are paid from and sales are taken from.</summary>
+        /// <summary>Откуда оплачиваются покупки и берётся продаваемое.</summary>
         public IInventory Storage => FarmingRuntime.Sink as IInventory;
 
         public event Action<Shop, ShopItemDefinition> Bought;
 
-        /// <summary>Sold: resource, units, gold received.</summary>
+        /// <summary>Продано: ресурс, единицы, полученное золото.</summary>
         public event Action<Shop, ResourceDefinition, int, int> Sold;
 
-        /// <summary>A purchase or sale was refused; the string explains why, ready for the UI.</summary>
+        /// <summary>В покупке или продаже отказано; строка объясняет почему и готова для UI.</summary>
         public event Action<Shop, string> Refused;
 
         private void Awake()
@@ -67,7 +67,7 @@ namespace Farm.Farming
             return count;
         }
 
-        // ---- buying ----
+        // ---- покупка ----
 
         public bool CanBuy(ShopItemDefinition item, out string reason)
         {
@@ -93,7 +93,7 @@ namespace Farm.Farming
                 return false;
             }
 
-            // Charge gold first: if the wallet refuses we have not touched storage yet.
+            // Золото первым: если кошелёк откажет, склад ещё не тронут.
             if (item.Price.Gold > 0 && (Wallet == null || !Wallet.TrySpend(item.Price.Gold)))
             {
                 RaiseRefused("не хватает золота");
@@ -105,7 +105,7 @@ namespace Farm.Farming
             if (!Deliver(item))
             {
                 RaiseRefused("некуда поставить — на ферме нет места");
-                // Refund: the player must never pay for something that did not arrive.
+                // Возврат: игрок никогда не должен платить за то, что не приехало.
                 if (item.Price.Gold > 0 && Wallet != null) Wallet.Add(item.Price.Gold);
                 RefundResources(item.Price);
                 return false;
@@ -236,11 +236,11 @@ namespace Farm.Farming
             return true;
         }
 
-        // ---- selling ----
+        // ---- продажа ----
 
         /// <summary>
-        /// Gold a stack fetches, markets included. Every sale goes through here, so a market that
-        /// pays a bonus is one line instead of a rule the UI and the seller each have to remember.
+        /// Золото за стопку, с учётом рынков. Каждая продажа проходит здесь, поэтому рынок
+        /// с надбавкой — одна строка, а не правило, которое UI и продавец должны помнить каждый сам.
         /// </summary>
         public int SellValue(ResourceDefinition resource, int amount)
         {
@@ -252,7 +252,7 @@ namespace Farm.Farming
             return Mathf.Max(raw, Mathf.RoundToInt(raw * (1f + BuildingRegistry.MarketBonus)));
         }
 
-        /// <summary>Sell up to <paramref name="amount"/> units. Returns the gold received.</summary>
+        /// <summary>Продать до <paramref name="amount"/> единиц. Возвращает полученное золото.</summary>
         public int TrySell(ResourceDefinition resource, int amount)
         {
             var storage = Storage;

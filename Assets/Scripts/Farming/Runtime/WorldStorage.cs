@@ -3,15 +3,16 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// The farm's own store — where everything the character hauls home ends up.
+    /// Собственный склад фермы — сюда попадает всё, что персонаж приносит домой.
     /// <para>
-    /// Drop it in a scene and it becomes <see cref="FarmingRuntime.Sink"/>, replacing the debug
-    /// placeholder. It is a real <see cref="IInventory"/>, so it raises change events the UI can
-    /// bind to and can be capped later when barns start limiting how much the farm holds.
+    /// Брось в сцену — и он станет <see cref="FarmingRuntime.Sink"/> вместо отладочной
+    /// заглушки. Это настоящий <see cref="IInventory"/>: поднимает события изменений,
+    /// к которым привязывается UI, и позже может получить лимит, когда амбары начнут
+    /// ограничивать вместимость фермы.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
-    [DefaultExecutionOrder(-200)]   // becomes the sink before any Growable can harvest into it
+    [DefaultExecutionOrder(-200)]   // становится стоком раньше, чем первая грядка сможет собраться в него
     [AddComponentMenu("Farm/World Storage")]
     public sealed class WorldStorage : MonoBehaviour
     {

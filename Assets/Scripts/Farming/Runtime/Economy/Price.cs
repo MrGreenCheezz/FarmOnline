@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Farm.Farming
 {
-    /// <summary>A quantity of one resource that something costs.</summary>
+    /// <summary>Количество одного ресурса, входящее в цену.</summary>
     [Serializable]
     public struct ResourceCost
     {
@@ -15,8 +15,9 @@ namespace Farm.Farming
     }
 
     /// <summary>
-    /// What something costs: gold, resources, or both. Resource costs are what keep the farm
-    /// relevant once gold starts piling up — a barn should want planks, not just coins.
+    /// Сколько что-то стоит: золото, ресурсы или и то и другое. Ресурсная часть цены —
+    /// то, что держит ферму нужной, когда золото начинает копиться горой: амбар должен
+    /// хотеть досок, а не только монет.
     /// </summary>
     [Serializable]
     public struct Price
@@ -26,7 +27,7 @@ namespace Farm.Farming
 
         public bool IsFree => Gold <= 0 && (Resources == null || Resources.Length == 0);
 
-        /// <summary>Can this be paid from the given wallet and store?</summary>
+        /// <summary>Можно ли оплатить из этого кошелька и склада?</summary>
         public bool CanPay(int gold, IInventory storage, out string missing)
         {
             missing = null;
@@ -54,8 +55,8 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Take the resource half of the price out of storage. Gold is handled by the wallet.
-        /// Only call after <see cref="CanPay"/> succeeded — this does not re-check.
+        /// Списать ресурсную половину цены со склада. Золото — забота кошелька.
+        /// Вызывать только после успешного <see cref="CanPay"/> — повторной проверки тут нет.
         /// </summary>
         public void ChargeResources(IInventory storage)
         {

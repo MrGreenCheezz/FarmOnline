@@ -5,16 +5,16 @@ using Farm.Farming;
 namespace Farm.Juice
 {
     /// <summary>
-    /// Scatters decorative grass, flowers and mushrooms over the ground so the farm sits in a world
-    /// instead of on an empty plane.
+    /// Рассыпает декоративную траву, цветы и грибы по земле, чтобы ферма стояла в мире,
+    /// а не на пустой плоскости.
     /// <para>
-    /// Placement is seeded, not random: a field that rearranges itself every launch reads as a bug,
-    /// and there is no way to tune density when you cannot compare two runs.
+    /// Расстановка по сиду, а не случайная: поле, перестраивающее себя при каждом запуске,
+    /// читается как баг, а плотность не настроить, когда два запуска не сравнить.
     /// </para>
     /// <para>
-    /// The tufts are plain GameObjects and must never be marked static. Batching merges meshes into
-    /// one transform, and the wind shader takes each plant's phase from its object origin — merged
-    /// foliage would sway in perfect unison, which is the one thing the wind is there to avoid.
+    /// Кустики — обычные GameObject и никогда не должны помечаться static. Батчинг сливает меши
+    /// в один transform, а шейдер ветра берёт фазу растения из позиции его объекта — слитая
+    /// листва качалась бы строем, а это ровно то, от чего ветер и спасает.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -73,12 +73,12 @@ namespace Farm.Juice
 
         private Transform _holder;
 
-        /// <summary>How many tufts actually got placed. Below the requested count when it ran out of room.</summary>
+        /// <summary>Сколько кустиков реально встало. Меньше запрошенного, когда кончилось место.</summary>
         public int Placed { get; private set; }
 
         private void Start() => Rebuild();
 
-        /// <summary>Wipes and re-scatters. Public so a level editor or a save load can re-run it.</summary>
+        /// <summary>Стереть и рассыпать заново. Публичный — чтобы редактор уровня или загрузка могли перезапустить.</summary>
         public void Rebuild()
         {
             Clear();
@@ -187,7 +187,7 @@ namespace Farm.Juice
             instance.isStatic = false;
         }
 
-        /// <summary>Far enough from anything the player placed or will interact with.</summary>
+        /// <summary>Достаточно далеко от всего, что игрок поставил или с чем будет взаимодействовать.</summary>
         private bool IsClear(Vector3 point)
         {
             float sqr = _clearance * _clearance;

@@ -1,6 +1,6 @@
 namespace Farm.Farming
 {
-    /// <summary>Broad family a growable belongs to. Merge rules and AI priorities key off this.</summary>
+    /// <summary>Семейство, к которому относится растимое. От него зависят правила слияния и приоритеты ИИ.</summary>
     public enum ResourceCategory
     {
         Crop = 0,
@@ -8,26 +8,26 @@ namespace Farm.Farming
         Ore = 2
     }
 
-    /// <summary>Lifecycle state of a single growable slot.</summary>
+    /// <summary>Фаза жизненного цикла одной грядки.</summary>
     public enum GrowthPhase
     {
-        /// <summary>Nothing planted — the slot is free.</summary>
+        /// <summary>Ничего не посажено — место свободно.</summary>
         Empty = 0,
-        /// <summary>Planted and advancing through stages.</summary>
+        /// <summary>Посажено и идёт по стадиям.</summary>
         Growing = 1,
-        /// <summary>On the final stage and harvestable.</summary>
+        /// <summary>На последней стадии, можно собирать.</summary>
         Ready = 2,
-        /// <summary>Was ready but sat unharvested past the wither timeout.</summary>
+        /// <summary>Было спелым, но простояло несобранным дольше таймаута порчи.</summary>
         Withered = 3
     }
 
-    /// <summary>What a single harvest produced. Returned by <see cref="Growable.TryHarvest"/>.</summary>
+    /// <summary>Что дал один сбор. Возвращается из <see cref="Growable.TryHarvest"/>.</summary>
     public readonly struct HarvestResult
     {
         public readonly Growable Source;
         public readonly ResourceDefinition Resource;
         public readonly int Amount;
-        /// <summary>Merge level of the growable at harvest time — the amount already accounts for it.</summary>
+        /// <summary>Уровень слияния грядки в момент сбора — количество его уже учитывает.</summary>
         public readonly int Level;
 
         public HarvestResult(Growable source, ResourceDefinition resource, int amount, int level)

@@ -4,34 +4,34 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// Farm-wide event bus. Every growable also exposes the same events locally
-    /// (<see cref="Growable.Planted"/> and friends) — use those when you care about one plot,
-    /// use these when a system cares about all of them: UI counters, quests, audio, statistics,
-    /// and the autonomous character deciding what to do next.
+    /// Общефермовая шина событий. Каждая грядка поднимает те же события и локально
+    /// (<see cref="Growable.Planted"/> и остальные) — подписывайся на грядку, когда важна
+    /// одна, и сюда, когда системе нужны все сразу: счётчики UI, квесты, звук, статистика
+    /// и автономный персонаж, решающий, чем заняться.
     /// </summary>
     public static class FarmingEvents
     {
-        /// <summary>Something was planted. Fires after the growable is fully initialised.</summary>
+        /// <summary>Что-то посажено. Поднимается после полной инициализации грядки.</summary>
         public static event Action<Growable> Planted;
 
-        /// <summary>A growth tick landed: the growable moved onto the stage index passed along.</summary>
+        /// <summary>Тик роста: грядка перешла на переданный индекс стадии.</summary>
         public static event Action<Growable, int> StageAdvanced;
 
-        /// <summary>Reached its final stage and can now be harvested.</summary>
+        /// <summary>Дошло до последней стадии, теперь можно собирать.</summary>
         public static event Action<Growable> Ready;
 
-        /// <summary>Harvested. The yield has already been pushed to <see cref="FarmingRuntime.Sink"/>.</summary>
+        /// <summary>Собрано. Урожай уже отправлен в <see cref="FarmingRuntime.Sink"/>.</summary>
         public static event Action<Growable, HarvestResult> Harvested;
 
-        /// <summary>Sat ripe past its wither timeout and spoiled.</summary>
+        /// <summary>Простояло спелым дольше таймаута и испортилось.</summary>
         public static event Action<Growable> Withered;
 
-        /// <summary>Emptied — harvested without regrow, withered away, or cleared by hand.</summary>
+        /// <summary>Опустело — собрано без отрастания, испортилось или очищено вручную.</summary>
         public static event Action<Growable> Cleared;
 
         /// <summary>
-        /// Two growables merged. First argument is the survivor (already levelled up),
-        /// second is the one being destroyed — read what you need from it now.
+        /// Две грядки слились. Первый аргумент — выживший (уровень уже поднят),
+        /// второй — уничтожаемый: читай из него нужное прямо сейчас.
         /// </summary>
         public static event Action<Growable, Growable> Merged;
 
@@ -64,7 +64,7 @@ namespace Farm.Farming
             catch (Exception e) { Debug.LogException(e, g); }
         }
 
-        // One misbehaving subscriber must not stop the rest of the farm from ticking.
+        // Один сломавшийся подписчик не должен останавливать тикание остальной фермы.
         private static void Safe(Action<Growable> handler, Growable g, string label)
         {
             if (handler == null) return;

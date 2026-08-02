@@ -3,10 +3,11 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// Makes a small object drift and bob in place.
+    /// Заставляет маленький объект дрейфовать и покачиваться на месте.
     /// <para>
-    /// Exists for one reason: a firefly that holds perfectly still reads as a glowing pebble, and
-    /// the player never thinks to click it. Movement is what says "this is alive, take it".
+    /// Существует ради одного: светлячок, застывший неподвижно, читается как светящийся
+    /// камешек, и игроку не приходит в голову по нему кликнуть. Движение — то, что
+    /// говорит «это живое, бери».
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]

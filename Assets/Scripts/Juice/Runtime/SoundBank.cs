@@ -3,9 +3,9 @@ using UnityEngine;
 namespace Farm.Juice
 {
     /// <summary>
-    /// Which clip plays for which action, in one asset. Variants per cue are picked at random so
-    /// repeated actions do not turn into a machine-gun of the identical sample — the single most
-    /// noticeable difference between "has sound" and "sounds good".
+    /// Какой клип на какое действие, в одном ассете. Вариант внутри кью выбирается случайно,
+    /// чтобы повторяющиеся действия не превращались в пулемёт из одного сэмпла — самая
+    /// заметная разница между «есть звук» и «звучит хорошо».
     /// </summary>
     [CreateAssetMenu(menuName = "Farm/Sound Bank", fileName = "SoundBank")]
     public sealed class SoundBank : ScriptableObject

@@ -3,11 +3,11 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// The playable area. Everything the player can place or drag is kept inside it.
+    /// Игровая территория. Всё, что игрок ставит или перетаскивает, удерживается внутри неё.
     /// <para>
-    /// A soft rule enforced in code rather than colliders: dragging is done by projecting onto a
-    /// ground plane, which has no edges, so without this a plot could be flicked to the horizon and
-    /// become unreachable — and the farmer would happily walk out there after it.
+    /// Мягкое правило в коде, а не коллайдеры: перетаскивание проецируется на плоскость
+    /// земли, у которой нет краёв, — без этого грядку можно швырнуть за горизонт, где её
+    /// не достать, а фермер радостно уйдёт туда за ней пешком.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -45,7 +45,7 @@ namespace Farm.Farming
             return delta.sqrMagnitude <= UsableRadius * UsableRadius;
         }
 
-        /// <summary>Nearest position inside the farm. Height is left alone.</summary>
+        /// <summary>Ближайшая точка внутри фермы. Высота не трогается.</summary>
         public Vector3 Clamp(Vector3 worldPosition)
         {
             Vector3 delta = worldPosition - Center;
@@ -60,7 +60,7 @@ namespace Farm.Farming
             return clamped;
         }
 
-        /// <summary>Clamp through the singleton, falling back to the original point when absent.</summary>
+        /// <summary>Зажать через синглтон; если его нет — вернуть точку как есть.</summary>
         public static Vector3 ClampToFarm(Vector3 worldPosition) =>
             Instance != null ? Instance.Clamp(worldPosition) : worldPosition;
 

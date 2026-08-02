@@ -5,11 +5,11 @@ using Farm.Farming;
 namespace Farm.Characters
 {
     /// <summary>
-    /// What the character is carrying, as a component: capacity is tweakable in the inspector and
-    /// other systems can find the inventory with a plain <c>GetComponent</c>.
+    /// Что несёт персонаж, в виде компонента: ёмкость крутится в инспекторе, а другие
+    /// системы находят инвентарь обычным <c>GetComponent</c>.
     /// <para>
-    /// The container itself is a plain <see cref="Farming.Inventory"/>. This is only the scene-facing
-    /// shell, so the same logic backs a barn, a chest or a test with no MonoBehaviour in sight.
+    /// Сам контейнер — обычный <see cref="Farming.Inventory"/>. Это лишь сценовая обёртка,
+    /// поэтому та же логика без единого MonoBehaviour обслуживает амбар, сундук или тест.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -29,7 +29,8 @@ namespace Farm.Characters
         private Inventory _inventory;
 
         /// <summary>
-        /// Built lazily so component order never matters — whoever asks first gets it ready.
+        /// Создаётся лениво, чтобы порядок компонентов не имел значения — кто первым спросил,
+        /// тот и получил готовый.
         /// </summary>
         public Inventory Inventory
         {
@@ -46,7 +47,7 @@ namespace Farm.Characters
         public bool IsFull => Inventory.IsFull;
         public int FreeUnits => Inventory.FreeUnits;
 
-        /// <summary>Forwarded so UI can subscribe to the component without reaching inside.</summary>
+        /// <summary>Проброшено, чтобы UI подписывался на компонент, не залезая внутрь.</summary>
         public event Action<IInventory> Changed
         {
             add => Inventory.Changed += value;
@@ -77,7 +78,7 @@ namespace Farm.Characters
 
         private void OnValidate()
         {
-            if (_inventory == null) return;   // not running yet — the getter will pick these up
+            if (_inventory == null) return;   // ещё не работает — геттер подхватит эти значения сам
 
             _inventory.CapacityMode = _capacityMode;
             _inventory.Capacity = Mathf.Max(1, _capacity);

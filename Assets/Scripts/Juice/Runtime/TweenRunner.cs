@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Farm.Juice
 {
-    /// <summary>Hidden host for tween coroutines — a static class cannot run them on its own.</summary>
+    /// <summary>Скрытый хост корутин твинов — статический класс сам их запускать не умеет.</summary>
     [AddComponentMenu("")]
     public sealed class TweenRunner : MonoBehaviour
     {

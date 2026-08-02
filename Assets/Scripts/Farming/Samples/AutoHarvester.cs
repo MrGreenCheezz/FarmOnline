@@ -3,17 +3,17 @@ using UnityEngine;
 namespace Farm.Farming.Samples
 {
     /// <summary>
-    /// Stand-in for the character that will eventually do this itself: every
-    /// <see cref="_interval"/> seconds it grabs the nearest ripe growable and harvests it.
-    /// Shows that the AI only needs <see cref="GrowableRegistry"/> — it never scans the scene
-    /// and never touches a plot that is still growing.
+    /// Заглушка вместо персонажа, который однажды займётся этим сам: каждые
+    /// <see cref="_interval"/> секунд берёт ближайшую спелую грядку и собирает её.
+    /// Показывает, что ИИ достаточно одного <see cref="GrowableRegistry"/> — он никогда
+    /// не сканирует сцену и не трогает ещё растущие грядки.
     /// </summary>
     [AddComponentMenu("Farm/Samples/Auto Harvester")]
     public sealed class AutoHarvester : MonoBehaviour
     {
         [SerializeField, Min(0.1f)] private float _interval = 1f;
 
-        [Tooltip("Reach in world units. 0 or less means unlimited.")]
+        [Tooltip("Дальность в мировых единицах. 0 и меньше — без ограничений.")]
         [SerializeField] private float _range;
 
         [SerializeField] private bool _filterByCategory;

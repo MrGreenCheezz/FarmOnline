@@ -3,20 +3,20 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// Shows the mesh for the current stage. Entirely optional — <see cref="Growable"/> never
-    /// references it, it just listens to the same events anything else would. Swap it for a
-    /// shader-driven or animated version without touching the growth logic.
+    /// Показывает меш текущей стадии. Полностью необязателен — <see cref="Growable"/> на него
+    /// не ссылается, он просто слушает те же события, что и любой другой подписчик. Можно
+    /// заменить шейдерной или анимированной версией, не трогая логику роста.
     /// </summary>
     [RequireComponent(typeof(Growable))]
     [AddComponentMenu("Farm/Growable Visuals")]
     public sealed class GrowableVisuals : MonoBehaviour
     {
-        [Tooltip("Parent for spawned stage meshes. Defaults to this transform.")]
+        [Tooltip("Родитель для мешей стадий. Пусто — этот transform.")]
         [SerializeField] private Transform _anchor;
 
-        [Tooltip("On: every stage mesh is spawned once and toggled with SetActive — no allocation " +
-                 "on stage changes, at the cost of holding all stages in memory.\n" +
-                 "Off: the current stage is spawned on demand and destroyed when it changes.")]
+        [Tooltip("Вкл: меши всех стадий создаются один раз и переключаются через SetActive — " +
+                 "ноль аллокаций на смене стадии, ценой хранения всех стадий в памяти.\n" +
+                 "Выкл: текущая стадия создаётся по требованию и уничтожается при смене.")]
         [SerializeField] private bool _cacheStages = true;
 
         private Growable _growable;
@@ -53,7 +53,7 @@ namespace Farm.Farming
         private void OnStageAdvanced(Growable g, int stage) => Show(stage);
         private void OnCleared(Growable g) => Show(-1);
 
-        /// <summary>Show stage <paramref name="stage"/>, or nothing when it is negative.</summary>
+        /// <summary>Показать стадию <paramref name="stage"/>; отрицательное значение — спрятать всё.</summary>
         private void Show(int stage)
         {
             if (_visibleStage == stage) return;

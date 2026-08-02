@@ -4,25 +4,25 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// Time source for all growth math. Growth is derived from timestamps rather than
-    /// accumulated per-frame deltas, so swapping this for a persisted clock is all that
-    /// offline progress requires.
+    /// Источник времени для всей математики роста. Рост считается от таймстампов,
+    /// а не из накопленных покадровых дельт, поэтому для оффлайн-прогресса достаточно
+    /// подменить эти часы на сохраняемые.
     /// </summary>
     public interface IGameClock
     {
-        /// <summary>Seconds. Must be monotonically non-decreasing.</summary>
+        /// <summary>Секунды. Обязаны монотонно не убывать.</summary>
         double Now { get; }
     }
 
-    /// <summary>Default clock: Unity's scaled time since startup. Resets when the app restarts.</summary>
+    /// <summary>Часы по умолчанию: масштабируемое время Unity с запуска. Сбрасываются при перезапуске приложения.</summary>
     public sealed class UnityGameClock : IGameClock
     {
         public double Now => Time.timeAsDouble;
     }
 
     /// <summary>
-    /// Wall-clock seconds since the Unix epoch. Assign this to <see cref="FarmingRuntime.Clock"/>
-    /// once saving exists and crops keep growing while the game is closed.
+    /// Реальные секунды с эпохи Unix. Назначь эти часы в <see cref="FarmingRuntime.Clock"/>,
+    /// когда появятся сохранения и урожай продолжит расти при закрытой игре.
     /// </summary>
     public sealed class UnixGameClock : IGameClock
     {
@@ -31,15 +31,15 @@ namespace Farm.Farming
     }
 
     /// <summary>
-    /// Where harvested resources land. Storage isn't built yet, so the farming system depends
-    /// only on this seam — the real inventory can be dropped in without touching any growable.
+    /// Куда падают собранные ресурсы. Система фермы зависит только от этого шва —
+    /// настоящий склад подставляется, не трогая ни одну грядку.
     /// </summary>
     public interface IResourceSink
     {
         void Add(ResourceDefinition resource, int amount);
     }
 
-    /// <summary>Placeholder sink: logs the yield and keeps a running total per resource id.</summary>
+    /// <summary>Сток-заглушка: логирует урожай и ведёт суммарный счёт по каждому ресурсу.</summary>
     public sealed class DebugResourceSink : IResourceSink
     {
         private readonly System.Collections.Generic.Dictionary<string, int> _totals =
@@ -60,8 +60,8 @@ namespace Farm.Farming
     }
 
     /// <summary>
-    /// Single place to swap the farming system's external dependencies. Set these once at
-    /// startup — every growable reads through here instead of holding its own reference.
+    /// Единственное место подмены внешних зависимостей фермы. Выставляются один раз
+    /// на старте — каждая грядка читает отсюда, а не держит собственную ссылку.
     /// </summary>
     public static class FarmingRuntime
     {
@@ -80,12 +80,13 @@ namespace Farm.Farming
             set => _sink = value ?? throw new ArgumentNullException(nameof(value));
         }
 
-        /// <summary>Turn off once a real inventory UI exists.</summary>
+        /// <summary>Выключить, когда появится настоящий интерфейс инвентаря.</summary>
         public static bool LogHarvests = true;
 
         public static double Now => Clock.Now;
 
-        // Statics survive play-mode restarts when domain reload is disabled, so clear them explicitly.
+        // Статики переживают перезапуск Play Mode при отключённом domain reload —
+        // чистим явно, иначе второй запуск играет на мусоре первого.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {

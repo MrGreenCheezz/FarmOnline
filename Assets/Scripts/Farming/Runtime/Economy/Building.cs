@@ -5,11 +5,11 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// A placed building. Holds its level, spends resources to upgrade, and serves the character.
+    /// Поставленная постройка. Хранит уровень, тратит ресурсы на улучшение, обслуживает персонажа.
     /// <para>
-    /// Serving is pull, not push: the building never reaches out to the farmer, the farmer walks up
-    /// and asks. That keeps the need loop visible on screen — the player sees their character go eat
-    /// rather than watching a bar refill for reasons off-screen.
+    /// Обслуживание — «спроси сам», а не «раздаём всем»: постройка никогда не тянется к фермеру,
+    /// фермер подходит и просит. Это держит цикл нужд на экране — игрок видит, как персонаж идёт
+    /// поесть, а не как шкала наполняется по закадровым причинам.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -19,10 +19,10 @@ namespace Farm.Farming
         [SerializeField] private BuildingDefinition _definition;
         [SerializeField, Min(1)] private int _level = 1;
 
-        /// <summary>Level went up. Second argument is the new level.</summary>
+        /// <summary>Уровень вырос. Второй аргумент — новый уровень.</summary>
         public event Action<Building, int> Upgraded;
 
-        /// <summary>Served the character. Floats are satiety and hydration actually restored.</summary>
+        /// <summary>Обслужила персонажа. Числа — реально восстановленные сытость и вода.</summary>
         public event Action<Building, float, float> Served;
 
         public BuildingDefinition Definition => _definition;
@@ -31,7 +31,7 @@ namespace Farm.Farming
         public float Efficiency => _definition != null ? _definition.EfficiencyAt(_level) : 0f;
         public BuildingService Service => _definition != null ? _definition.Service : BuildingService.Kitchen;
 
-        /// <summary>Workshop speed multiplier or market bonus at the current level.</summary>
+        /// <summary>Множитель скорости мастерской или надбавка рынка на текущем уровне.</summary>
         public float Output => _definition != null ? _definition.OutputAt(_level) : 0f;
 
         private void OnEnable() => BuildingRegistry.Register(this);
@@ -79,7 +79,7 @@ namespace Farm.Farming
 
         // ---- обслуживание ----
 
-        /// <summary>Is there anything this building could do for those needs right now?</summary>
+        /// <summary>Может ли эта постройка прямо сейчас чем-то помочь этим нуждам?</summary>
         public bool CanServe(float satiety01, float hydration01)
         {
             if (_definition == null) return false;
@@ -101,7 +101,7 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Serve one visit. Returns how much of each need was restored, in units of the meter.
+        /// Обслужить один визит. Возвращает, сколько каждой нужды восстановлено, в единицах шкалы.
         /// </summary>
         public void Serve(float maxSatiety, float maxHydration, out float satietyGain, out float hydrationGain)
         {
@@ -130,8 +130,8 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Cheapest food on hand. Deliberately not the most nutritious: expensive tiers are worth
-        /// more sold than eaten, and a farmer who eats the good stuff first burns the player's profit.
+        /// Самая дешёвая еда в наличии. Намеренно не самая сытная: дорогие ступени выгоднее
+        /// продать, чем съесть, и фермер, который ест лучшее первым, сжигает прибыль игрока.
         /// </summary>
         private bool FindBestFood(out ResourceDefinition food, out int amount)
         {
@@ -172,7 +172,7 @@ namespace Farm.Farming
         }
     }
 
-    /// <summary>Live index of placed buildings, so the farmer can find the nearest useful one.</summary>
+    /// <summary>Живой список поставленных построек — фермер ищет по нему ближайшую полезную.</summary>
     public static class BuildingRegistry
     {
         private static readonly List<Building> _all = new List<Building>(16);
@@ -181,8 +181,8 @@ namespace Farm.Farming
         public static int Count => _all.Count;
 
         /// <summary>
-        /// Any building levelled up. Farm-wide twin of <see cref="Building.Upgraded"/>, so audio and
-        /// UI can subscribe once instead of chasing every building that gets placed.
+        /// Какая-то постройка выросла в уровне. Общефермовый близнец <see cref="Building.Upgraded"/> —
+        /// звук и UI подписываются один раз, а не гоняются за каждой новой постройкой.
         /// </summary>
         public static event Action<Building, int> Upgraded;
 
@@ -216,9 +216,9 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Extra fraction every sale is worth thanks to markets. Takes the best market rather than
-        /// summing them: stacking would make spamming stalls the whole game, and the player should
-        /// be upgrading one market instead of buying twelve.
+        /// Добавочная доля к каждой продаже благодаря рынкам. Берётся лучший рынок, а не сумма:
+        /// суммирование превратило бы спам ларьками во всю игру, а игрок должен улучшать один
+        /// рынок, а не покупать двенадцать.
         /// </summary>
         public static float MarketBonus
         {
@@ -235,7 +235,7 @@ namespace Farm.Farming
             }
         }
 
-        /// <summary>Nearest building that can actually help with the given needs right now.</summary>
+        /// <summary>Ближайшая постройка, реально способная помочь этим нуждам прямо сейчас.</summary>
         public static Building FindNearestUseful(Vector3 position, float satiety01, float hydration01,
                                                  BuildingService? service = null)
         {

@@ -3,11 +3,11 @@ using UnityEngine;
 namespace Farm.Characters
 {
     /// <summary>
-    /// Feeds the Animator from what the farmer is actually doing. Purely a translator — it reads
-    /// state, never sets it, so removing this component costs the visuals and nothing else.
+    /// Кормит Animator тем, что фермер реально делает. Чистый переводчик — читает состояние,
+    /// никогда его не задаёт, поэтому удаление этого компонента стоит только картинки.
     /// <para>
-    /// Parameters are looked up once and skipped if the controller does not declare them, so a
-    /// half-finished controller logs nothing and breaks nothing.
+    /// Параметры ищутся один раз и пропускаются, если контроллер их не объявляет, —
+    /// недособранный контроллер ничего не логирует и ничего не ломает.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]

@@ -3,14 +3,14 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// A harvestable resource type (wheat, milk, iron ore...). Deliberately thin — it exists so
-    /// yields are typed asset references instead of magic strings, and so icons/names have a home
-    /// once inventory UI arrives.
+    /// Тип собираемого ресурса (пшеница, молоко, железная руда...). Нарочно тонкий —
+    /// существует, чтобы урожай был типизированной ссылкой на ассет, а не магической
+    /// строкой, и чтобы у иконок и названий был дом.
     /// </summary>
     [CreateAssetMenu(menuName = "Farm/Resource", fileName = "Resource_")]
     public sealed class ResourceDefinition : ScriptableObject
     {
-        [Tooltip("Stable key for saves and lookups. Falls back to the asset name when empty.")]
+        [Tooltip("Стабильный ключ для сохранений и поиска. Пусто — берётся имя ассета.")]
         [SerializeField] private string _id;
 
         [SerializeField] private string _displayName;
@@ -44,7 +44,7 @@ namespace Farm.Farming
         public ResourceCategory Category => _category;
         public int SellPrice => _sellPrice;
 
-        /// <summary>May the farmer sell this on his own? The player always may.</summary>
+        /// <summary>Может ли фермер продавать это самостоятельно? Игрок может всегда.</summary>
         public bool FarmerMaySell => _farmerMaySell;
 
         public int Tier => _tier;

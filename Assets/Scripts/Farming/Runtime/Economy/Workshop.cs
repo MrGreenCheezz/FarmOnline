@@ -4,17 +4,17 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// The production half of a building: pulls raw resources out of world storage and puts refined
-    /// ones back. Sits next to a <see cref="Building"/> and reads its level, so a workshop is
-    /// upgraded by the same ladder as everything else instead of growing a second progression.
+    /// Производственная половина постройки: забирает сырьё со склада мира и кладёт обратно
+    /// переработанное. Стоит рядом с <see cref="Building"/> и читает его уровень, поэтому
+    /// мастерская качается той же лестницей, что и всё остальное, а не растит вторую прогрессию.
     /// <para>
-    /// Runs on <see cref="GrowthScheduler"/>, not Update. A farm ends up with a lot of these and
-    /// each one only needs waking when its batch is due — same reasoning as growables.
+    /// Работает на <see cref="GrowthScheduler"/>, не в Update. Мастерских на ферме набирается
+    /// много, и каждую нужно будить только к готовности партии — то же рассуждение, что у грядок.
     /// </para>
     /// <para>
-    /// Inputs are taken at the start of a batch, not the end, so the player sees the cost the moment
-    /// work begins. What is in the machine is refunded if the workshop is switched off mid-batch —
-    /// resources must never quietly evaporate.
+    /// Сырьё списывается в начале партии, а не в конце, — игрок видит цену в момент старта
+    /// работы. Что лежит «в станке», возвращается, если мастерскую выключили посреди партии:
+    /// ресурсы не имеют права тихо испаряться.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -22,7 +22,7 @@ namespace Farm.Farming
     [AddComponentMenu("Farm/Workshop")]
     public sealed class Workshop : MonoBehaviour, IGrowthScheduled
     {
-        /// <summary>Seconds before looking for work again when nothing could be started.</summary>
+        /// <summary>Через сколько секунд снова искать работу, когда ничего не удалось начать.</summary>
         private const double IdleRetry = 2.0;
 
         private Building _building;
@@ -32,17 +32,17 @@ namespace Farm.Farming
         private double _startedAt;
         private double _readyAt;
 
-        /// <summary>A batch came out: the recipe and how many units were actually stored.</summary>
+        /// <summary>Партия вышла: рецепт и сколько единиц реально легло на склад.</summary>
         public event Action<Workshop, WorkshopRecipe, int> Produced;
 
-        /// <summary>Work started or stopped. Second argument is the recipe, null when idle.</summary>
+        /// <summary>Работа началась или остановилась. Второй аргумент — рецепт, null при простое.</summary>
         public event Action<Workshop, WorkshopRecipe> WorkChanged;
 
         public Building Building => _building != null ? _building : (_building = GetComponent<Building>());
         public WorkshopRecipe Running => _running;
         public bool IsWorking => _running != null;
 
-        /// <summary>How far the current batch has come, 0..1. Zero when idle.</summary>
+        /// <summary>Насколько продвинулась текущая партия, 0..1. Ноль при простое.</summary>
         public float Progress01
         {
             get
@@ -54,7 +54,7 @@ namespace Farm.Farming
             }
         }
 
-        /// <summary>Seconds one batch of <paramref name="recipe"/> takes at the current level.</summary>
+        /// <summary>Секунды на одну партию <paramref name="recipe"/> при текущем уровне.</summary>
         public double BatchSeconds(WorkshopRecipe recipe)
         {
             if (recipe == null) return 0.0;
@@ -134,9 +134,9 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Best batch that can be started right now: the most valuable output the level allows and
-        /// the store can pay for. Value rather than order, so unlocking a better recipe upgrades the
-        /// workshop's behaviour without anyone reordering the list.
+        /// Лучшая партия, которую можно начать прямо сейчас: самый ценный выход из доступных
+        /// уровню и посильных складу. По ценности, а не по порядку — открытие рецепта получше
+        /// улучшает поведение мастерской само, без перестановки списка.
         /// </summary>
         private WorkshopRecipe PickRecipe()
         {

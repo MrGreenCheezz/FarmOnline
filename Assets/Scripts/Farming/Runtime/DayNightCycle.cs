@@ -5,23 +5,22 @@ using UnityEngine.Rendering;
 namespace Farm.Farming
 {
     /// <summary>
-    /// The farm's clock: turns the sun, dims the sky, counts days.
+    /// Часы фермы: крутят солнце, гасят небо, считают дни.
     /// <para>
-    /// It lives in the farming assembly rather than with the rest of the juice because the farmer
-    /// plans his day around it, and the character assembly cannot reference juice without a cycle.
-    /// The visual side is a handful of lines; splitting the clock from the light it drives would
-    /// cost more than it saves.
+    /// Живут в сборке фермы, а не рядом с остальным «соком», потому что фермер строит по ним
+    /// свой день, а сборка персонажей не может ссылаться на Juice без цикла. Визуальная
+    /// сторона — горстка строк; отделять часы от света, которым они управляют, стоило бы
+    /// дороже, чем экономило.
     /// </para>
     /// <para>
-    /// It exists so the farmer has something to organise his life around. A character who works
-    /// until a meter runs out and then naps is a state machine; a character who works while it is
-    /// light and goes to bed at dusk is a routine, and a routine is what makes checking back in
-    /// after ten minutes feel like something happened.
+    /// Существуют, чтобы фермеру было вокруг чего строить жизнь. Персонаж, который работает,
+    /// пока не сядет шкала, и дремлет — это конечный автомат; персонаж, который работает,
+    /// пока светло, и ложится в сумерках — это распорядок, а распорядок и делает возвращение
+    /// в игру через десять минут ощущением, что что-то произошло.
     /// </para>
     /// <para>
-    /// Ambient light is driven through <see cref="RenderSettings.ambientIntensity"/> rather than by
-    /// switching the ambient mode: the scene is lit from the skybox, and swapping that at runtime
-    /// would change how everything looks the moment this component is added.
+    /// Окружающий свет ведётся через плоский ambient, а не множителем скайбокса: множитель
+    /// бесполезен ровно там, где нужен, — на закате скайбокс сам почти чёрный.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -101,26 +100,26 @@ namespace Farm.Farming
 
         public static DayNightCycle Instance { get; private set; }
 
-        /// <summary>Time of day, 0..1. 0 is midnight, 0.5 is noon.</summary>
+        /// <summary>Время суток, 0..1. 0 — полночь, 0.5 — полдень.</summary>
         public float Time01 => _time01;
 
-        /// <summary>Which day it is, starting at 1.</summary>
+        /// <summary>Номер дня, с единицы.</summary>
         public int Day => _day;
 
         public bool IsNight => _time01 < _dawn || _time01 >= _dusk;
         public bool IsDay => !IsNight;
 
-        /// <summary>Fraction of the working day already gone, 0..1. Clamped outside daylight.</summary>
+        /// <summary>Какая доля рабочего дня прошла, 0..1. Вне светлого времени зажата в края.</summary>
         public float DayProgress01 =>
             Mathf.Clamp01(Mathf.InverseLerp(_dawn, _dusk, _time01));
 
-        /// <summary>Dawn broke. Argument is the day that just started.</summary>
+        /// <summary>Рассвело. Аргумент — только что начавшийся день.</summary>
         public event Action<DayNightCycle, int> DayStarted;
 
-        /// <summary>Dusk fell.</summary>
+        /// <summary>Стемнело.</summary>
         public event Action<DayNightCycle, int> NightStarted;
 
-        /// <summary>Clock reading like "07:30", for the HUD.</summary>
+        /// <summary>Показание часов вида «07:30» — для HUD.</summary>
         public string ClockText
         {
             get
@@ -186,11 +185,11 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Jump to a time of day. Handy for testing the night without waiting for it.
+        /// Перепрыгнуть на время суток. Удобно тестировать ночь, не дожидаясь её.
         /// <para>
-        /// Raises the dawn/dusk event if the jump crossed one. Skipping it would leave everything
-        /// that lives by those events — the night harvest, the farmer's bedtime — stuck in the old
-        /// half of the day while the sky says otherwise.
+        /// Если прыжок пересёк рассвет или закат — поднимает событие. Пропустить его значило бы
+        /// оставить всё, что живёт по этим событиям — ночной сбор, отбой фермера, — в старой
+        /// половине суток, когда небо уже говорит другое.
         /// </para>
         /// </summary>
         public void SetTime(float time01)

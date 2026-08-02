@@ -4,12 +4,12 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// Live index of every growable in the scene, plus a separate list of the ones ready to harvest.
+    /// Живой указатель на все грядки сцены, плюс отдельный список готовых к сбору.
     /// <para>
-    /// This is the query surface the autonomous character will live on: instead of scanning the
-    /// world it asks "what is ripe near me?" and gets an answer without touching a single plot that
-    /// is still growing. Both lists use swap-removal with a cached index, so registering,
-    /// unregistering and flipping ready state are all O(1).
+    /// Это опорная поверхность запросов для автономного персонажа: вместо сканирования
+    /// мира он спрашивает «что спелого рядом со мной?» и получает ответ, не тронув ни
+    /// одну ещё растущую грядку. Оба списка используют swap-removal с кэшированным
+    /// индексом, поэтому регистрация, выход и смена готовности — всё O(1).
     /// </para>
     /// </summary>
     public static class GrowableRegistry
@@ -19,7 +19,7 @@ namespace Farm.Farming
 
         public static IReadOnlyList<Growable> All => _all;
 
-        /// <summary>Everything currently harvestable. Do not hold across frames — it is mutated in place.</summary>
+        /// <summary>Всё, что сейчас можно собрать. Не держи между кадрами — список мутируется на месте.</summary>
         public static IReadOnlyList<Growable> Ready => _ready;
 
         public static int Count => _all.Count;
@@ -70,8 +70,8 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Closest harvestable growable to <paramref name="position"/>, optionally limited to one
-        /// category. Returns null when nothing qualifies.
+        /// Ближайшая к <paramref name="position"/> спелая грядка, при желании — только одной
+        /// категории. Возвращает null, когда подходящих нет.
         /// </summary>
         public static Growable FindNearestReady(Vector3 position, ResourceCategory? category = null,
                                                 float maxDistance = float.PositiveInfinity)
@@ -97,7 +97,7 @@ namespace Farm.Farming
             return best;
         }
 
-        /// <summary>Fills <paramref name="results"/> with harvestable growables of a category. Clears it first.</summary>
+        /// <summary>Заполняет <paramref name="results"/> спелыми грядками категории. Сначала очищает список.</summary>
         public static void GetReady(List<Growable> results, ResourceCategory? category = null)
         {
             if (results == null) return;

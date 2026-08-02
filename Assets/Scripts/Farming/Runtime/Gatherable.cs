@@ -4,26 +4,26 @@ using UnityEngine;
 
 namespace Farm.Farming
 {
-    /// <summary>How the player takes it.</summary>
+    /// <summary>Как игрок это берёт.</summary>
     public enum GatherMode
     {
-        /// <summary>One unit per click. Fast, twitchy, good for things that move.</summary>
+        /// <summary>Единица за клик. Быстро, дёргано, хорошо для подвижного.</summary>
         Click = 0,
-        /// <summary>Hold the button to fill a bar. Slower per unit, but pays more per node.</summary>
+        /// <summary>Держать кнопку, заполняя шкалу. Медленнее за единицу, но узел платит больше.</summary>
         Hold = 1
     }
 
     /// <summary>
-    /// Something the player picks up by hand, as opposed to everything the farmer does on his own.
+    /// То, что игрок собирает руками, — в противовес всему, что фермер делает сам.
     /// <para>
-    /// This is the counterweight to the farmer's autonomy. He runs the farm while you are away; a
-    /// gatherable only ever yields to someone actually sitting there. That is what gives the night
-    /// shift a point — the farm does not stop because he sleeps, it changes hands.
+    /// Это противовес его автономии. Он ведёт ферму, пока тебя нет; собираемое отдаётся только
+    /// тому, кто реально сидит в игре. Именно это даёт смысл ночной смене — ферма не
+    /// останавливается из-за его сна, она переходит из рук в руки.
     /// </para>
     /// <para>
-    /// Yield goes straight to world storage rather than through the farmer's backpack: the player is
-    /// not standing anywhere, so there is nothing to carry home, and routing it through a sleeping
-    /// character would just mean the night's work sits in his pockets until morning.
+    /// Урожай идёт сразу на склад мира, минуя рюкзак фермера: игрок нигде не «стоит», нести
+    /// домой нечего, а маршрут через спящего персонажа означал бы, что ночная добыча пролежит
+    /// у него в карманах до утра.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -54,10 +54,10 @@ namespace Farm.Farming
 
         internal int RegistryIndex = -1;
 
-        /// <summary>Units were taken. Second argument is how many.</summary>
+        /// <summary>Единицы забрали. Второй аргумент — сколько.</summary>
         public event Action<Gatherable, int> Gathered;
 
-        /// <summary>Nothing left. Fires once, before the object is removed.</summary>
+        /// <summary>Ничего не осталось. Поднимается один раз, до удаления объекта.</summary>
         public event Action<Gatherable> Depleted;
 
         public ResourceDefinition Resource => _resource;
@@ -66,7 +66,7 @@ namespace Farm.Farming
         public int Remaining => _remaining;
         public bool IsEmpty => _remaining <= 0;
 
-        /// <summary>Progress toward the next unit while holding, 0..1. Zero in click mode.</summary>
+        /// <summary>Прогресс до следующей единицы при удержании, 0..1. В режиме клика — ноль.</summary>
         public float Progress01 => _mode == GatherMode.Hold ? Mathf.Clamp01(_progress / _holdSeconds) : 0f;
 
         private void Awake() => EnsureStarted();
@@ -86,7 +86,7 @@ namespace Farm.Farming
             _remaining = Mathf.Max(1, _amount);
         }
 
-        /// <summary>Set up a freshly spawned node. Call before it is shown.</summary>
+        /// <summary>Настроить свежесозданный узел. Вызывать до того, как он показан.</summary>
         public void Configure(ResourceDefinition resource, int amount, GatherMode mode)
         {
             _resource = resource;
@@ -97,7 +97,7 @@ namespace Farm.Farming
             _started = true;
         }
 
-        /// <summary>Take one unit. Click mode only — returns false when there is nothing left.</summary>
+        /// <summary>Взять одну единицу. Только для режима клика — false, когда ничего не осталось.</summary>
         public bool Collect()
         {
             if (IsEmpty) return false;
@@ -106,9 +106,9 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Keep holding. Returns true on the frames where a unit actually came out.
-        /// Progress is kept on the node, not on the input, so letting go and coming back
-        /// does not silently reset the work already done.
+        /// Продолжать удержание. Возвращает true в кадры, когда единица реально выпала.
+        /// Прогресс хранится на узле, а не во вводе, — отпустить и вернуться не значит
+        /// молча потерять уже сделанную работу.
         /// </summary>
         public bool Hold(float deltaTime)
         {
@@ -155,7 +155,7 @@ namespace Farm.Farming
         }
     }
 
-    /// <summary>Live index of everything the player can pick up. Same O(1) swap-removal as the rest.</summary>
+    /// <summary>Живой список всего, что игрок собирает руками. Тот же O(1) swap-removal, что и везде.</summary>
     public static class GatherableRegistry
     {
         private static readonly List<Gatherable> _all = new List<Gatherable>(32);

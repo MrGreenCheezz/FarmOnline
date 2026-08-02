@@ -7,14 +7,14 @@ using Farm.Juice;
 namespace Farm.Interaction
 {
     /// <summary>
-    /// Drag things around the farm with the mouse. Growables — crops and livestock alike — merge
-    /// when dropped onto another of the same kind and level; buildings marked
-    /// <see cref="Movable"/> can be repositioned but never merge.
+    /// Перетаскивание по ферме мышью. Растимое — и посевы, и животные — сливается при сбросе
+    /// на такое же той же породы и уровня; постройки с меткой <see cref="Movable"/> можно
+    /// переставлять, но они не сливаются никогда.
     /// <para>
-    /// Picking is measured <i>on screen</i>, not on the ground. With a tilted camera, clicking the
-    /// top of a tall plant projects onto the ground more than a metre behind its base, which made
-    /// tall crops effectively ungrabbable while short ones worked. Screen distance is also simply
-    /// what the player is aiming with.
+    /// Захват меряется <i>на экране</i>, а не по земле. С наклонной камерой клик по верхушке
+    /// высокого растения проецируется на землю на метр с лишним позади его основания — высокие
+    /// культуры было фактически не схватить, пока низкие работали. К тому же экранное
+    /// расстояние — это просто то, чем игрок целится.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -58,13 +58,13 @@ namespace Farm.Interaction
         private float _groundY;
         private Vector2 _pressScreen;
 
-        /// <summary>Node the player is currently working with their hands, or null.</summary>
+        /// <summary>Узел, который игрок сейчас собирает руками, или null.</summary>
         public Gatherable Gathering => _gathering;
 
-        /// <summary>Growable currently in hand, if the thing being dragged is one.</summary>
+        /// <summary>Грядка в руке, если тащат именно грядку.</summary>
         public Growable Dragged => _draggedGrowable;
 
-        /// <summary>Anything currently in hand — a plot, an animal or a building.</summary>
+        /// <summary>Что угодно в руке — грядка, животное или постройка.</summary>
         public Transform DraggedObject => _dragged;
 
         private void Awake()
@@ -107,7 +107,7 @@ namespace Farm.Interaction
 
         // ---- сбор руками ----
 
-        /// <summary>Grab the nearest gatherable under the cursor. Returns true when it took the click.</summary>
+        /// <summary>Схватить ближайший собираемый узел под курсором. True, если клик ушёл ему.</summary>
         private bool TryStartGather(Vector2 screen)
         {
             var node = FindNearestGatherable(screen);
@@ -236,9 +236,9 @@ namespace Farm.Interaction
         // ---- поиск ----
 
         /// <summary>
-        /// Growable that <paramref name="dragged"/> could merge into, or null.
-        /// The dragged object is passed in rather than read from the field so callers cannot get
-        /// the order wrong — releasing the field before searching silently killed every merge.
+        /// Грядка, в которую <paramref name="dragged"/> мог бы слиться, или null.
+        /// Перетаскиваемое передаётся параметром, а не читается из поля, чтобы вызывающий не мог
+        /// перепутать порядок — обнуление поля до поиска однажды молча убило все слияния.
         /// </summary>
         private Growable FindMergeTarget(Vector2 screen, Growable dragged)
         {
@@ -251,8 +251,8 @@ namespace Farm.Interaction
         }
 
         /// <summary>
-        /// Nearest draggable to the cursor in screen space, across both registries.
-        /// <paramref name="growable"/> comes back null when the winner is a plain movable.
+        /// Ближайшее к курсору перетаскиваемое в экранных координатах, по обоим реестрам.
+        /// <paramref name="growable"/> возвращается null, когда победил обычный movable.
         /// </summary>
         private bool TryFindNearest(Vector2 screen, float radiusPixels, Transform skip,
                                     out Transform found, out Growable growable)
@@ -295,7 +295,7 @@ namespace Farm.Interaction
             return found != null;
         }
 
-        /// <summary>Tap threshold squared, scaled to the window the same way pick radii are.</summary>
+        /// <summary>Квадрат порога «тапа», масштабированный под окно так же, как радиусы захвата.</summary>
         private float TapSlopSqr()
         {
             float scale = Screen.height > 0 ? Screen.height / 1080f : 1f;
@@ -306,7 +306,7 @@ namespace Farm.Interaction
         private bool TryScreenDistance(Vector3 worldPosition, float aimHeight, Vector2 screen, out float sqrDistance)
         {
             Vector3 sp = _camera.WorldToScreenPoint(worldPosition + Vector3.up * aimHeight);
-            if (sp.z <= 0f) { sqrDistance = float.MaxValue; return false; }   // за камерой
+            if (sp.z <= 0f) { sqrDistance = float.MaxValue; return false; }   // позади камеры
 
             sqrDistance = ((Vector2)sp - screen).sqrMagnitude;
             return true;
@@ -328,8 +328,8 @@ namespace Farm.Interaction
         }
 
         /// <summary>
-        /// True when the cursor is over a UI Toolkit element. Without this the first click on a
-        /// shop button would also grab whatever happens to be behind the window.
+        /// Истина, когда курсор над элементом UI Toolkit. Без этого первый клик по кнопке
+        /// магазина заодно хватал бы то, что оказалось позади окна.
         /// </summary>
         private bool IsPointerOverUI(Vector2 screen)
         {

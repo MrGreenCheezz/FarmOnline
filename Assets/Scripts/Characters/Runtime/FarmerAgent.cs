@@ -6,41 +6,41 @@ namespace Farm.Characters
 {
     public enum FarmerState
     {
-        /// <summary>Standing still between wander legs.</summary>
+        /// <summary>Стоит между прогулками.</summary>
         Idle = 0,
-        /// <summary>Strolling to a random point around home.</summary>
+        /// <summary>Бредёт к случайной точке вокруг дома.</summary>
         Wandering = 1,
-        /// <summary>Walking toward a ripe growable it has claimed.</summary>
+        /// <summary>Идёт к спелой грядке, которую застолбил.</summary>
         GoingToHarvest = 2,
-        /// <summary>Standing at the plot, working.</summary>
+        /// <summary>Стоит у грядки, работает.</summary>
         Harvesting = 3,
-        /// <summary>Carrying the load back to the home point.</summary>
+        /// <summary>Несёт груз обратно к дому.</summary>
         ReturningHome = 4,
-        /// <summary>At home, unloading into world storage.</summary>
+        /// <summary>Дома, выгружается в склад мира.</summary>
         Depositing = 5,
-        /// <summary>Walking to a kitchen or well because a need ran low.</summary>
+        /// <summary>Идёт к кухне или колодцу — просела нужда.</summary>
         GoingToService = 6,
-        /// <summary>Eating or drinking.</summary>
+        /// <summary>Ест или пьёт.</summary>
         UsingService = 7,
-        /// <summary>Walking to the market — to sell, to buy, or both.</summary>
+        /// <summary>Идёт на рынок — продать, купить или и то и другое.</summary>
         GoingToMarket = 8,
-        /// <summary>Standing at the market, doing business.</summary>
+        /// <summary>Стоит на рынке, ведёт дела.</summary>
         AtMarket = 9,
-        /// <summary>Asleep at home — night, or worn out.</summary>
+        /// <summary>Спит — ночь или вымотался.</summary>
         Sleeping = 10
     }
 
     /// <summary>
-    /// The farmer, in its first form: wander → notice something ripe → harvest it → carry it home.
+    /// Фермер в своей первой форме: бродит → замечает спелое → собирает → несёт домой.
     /// <para>
-    /// It never scans the scene. Ripe plots come from <see cref="GrowableRegistry"/>, which the
-    /// farming system keeps up to date, so the cost of looking for work is proportional to how much
-    /// work exists — not to the size of the farm.
+    /// Он никогда не сканирует сцену. Спелые грядки приходят из <see cref="GrowableRegistry"/>,
+    /// который система фермы держит актуальным, поэтому цена поиска работы пропорциональна
+    /// количеству работы, а не размеру фермы.
     /// </para>
     /// <para>
-    /// Crops go into the character's <see cref="CharacterInventory"/> at the plot and only reach
-    /// <see cref="FarmingRuntime.Sink"/> once the character has physically walked home. Drop the
-    /// character mid-trip and the load is genuinely lost, which is what makes hauling matter.
+    /// Урожай попадает в <see cref="CharacterInventory"/> персонажа у самой грядки и доходит до
+    /// <see cref="FarmingRuntime.Sink"/> только после того, как персонаж физически дошёл домой.
+    /// Урони персонажа на полпути — и груз честно потерян; именно это делает перенос значимым.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -119,39 +119,39 @@ namespace Farm.Characters
         private int _plotsThisTrip;
         private Vector3 _lastPosition;
 
-        /// <summary>Fired whenever the farmer switches activity — handy for animation and UI.</summary>
+        /// <summary>Сменил занятие — удобно для анимации и UI.</summary>
         public event Action<FarmerAgent, FarmerState> StateChanged;
 
-        /// <summary>Picked something up. It is in the backpack, not in storage.</summary>
+        /// <summary>Что-то подобрал. Это в рюкзаке, ещё не на складе.</summary>
         public event Action<FarmerAgent, HarvestResult> Collected;
 
-        /// <summary>Unloaded at home. The int is how many units were handed to world storage.</summary>
+        /// <summary>Выгрузился дома. Число — сколько единиц сдано складу мира.</summary>
         public event Action<FarmerAgent, int> Delivered;
 
-        /// <summary>Ate or drank at a building.</summary>
+        /// <summary>Поел или попил у постройки.</summary>
         public event Action<FarmerAgent, Building> Refreshed;
 
-        /// <summary>Sold at the market on his own. The int is the gold he brought in.</summary>
+        /// <summary>Сам продал на рынке. Число — принесённое золото.</summary>
         public event Action<FarmerAgent, int> Traded;
 
-        /// <summary>Bought himself a new plot with the takings.</summary>
+        /// <summary>Купил себе новую грядку на выручку.</summary>
         public event Action<FarmerAgent, ShopItemDefinition> Restocked;
 
         public FarmerState State => _state;
         public Growable Target => _target;
         public Vector3 HomePosition => _homePosition;
 
-        /// <summary>His skills, or null when the component is absent — everything degrades to level 1.</summary>
+        /// <summary>Его навыки, или null без компонента — всё деградирует к уровню 1.</summary>
         public FarmerSkills Skills => _skills;
 
-        /// <summary>True while he is asleep. The HUD greys itself out on this.</summary>
+        /// <summary>Истина, пока он спит. HUD по этому флагу приглушает себя.</summary>
         public bool IsAsleep => _state == FarmerState.Sleeping;
 
         /// <summary>
-        /// What the farmer is carrying. Capacity lives on <see cref="CharacterInventory"/>.
+        /// Что фермер несёт. Ёмкость живёт на <see cref="CharacterInventory"/>.
         /// <para>
-        /// Resolved on demand rather than only in <c>Awake</c>: a HUD on another GameObject can
-        /// reach this from its own <c>OnEnable</c>, which Unity may run before ours.
+        /// Достаётся по требованию, а не только в <c>Awake</c>: HUD на другом объекте может
+        /// обратиться сюда из своего <c>OnEnable</c>, который Unity может выполнить раньше нашего.
         /// </para>
         /// </summary>
         public IInventory Inventory
@@ -187,7 +187,7 @@ namespace Farm.Characters
             if (_skills != null) _skills.LevelledUp -= OnLevelledUp;
         }
 
-        /// <summary>Capacity is re-derived rather than incremented, so it survives a reload intact.</summary>
+        /// <summary>Ёмкость выводится заново, а не инкрементируется, — переживает перезагрузку без потерь.</summary>
         private void OnLevelledUp(FarmerSkills skills, FarmerSkill skill, int level)
         {
             if (skill == FarmerSkill.Back) ApplyCapacity();
@@ -241,10 +241,10 @@ namespace Farm.Characters
         }
 
         /// <summary>
-        /// Turn movement into tiredness and into leg experience.
+        /// Превращает движение в усталость и в опыт ног.
         /// <para>
-        /// Measured from distance actually covered, not from time spent in a walking state: a farmer
-        /// stuck against a fence should not be getting fitter and more exhausted for standing still.
+        /// Меряется по реально пройденному расстоянию, а не по времени в «ходячем» состоянии:
+        /// фермер, упёршийся в забор, не должен крепнуть и выматываться за стояние на месте.
         /// </para>
         /// </summary>
         private void TrackEffort()
@@ -260,7 +260,7 @@ namespace Farm.Characters
                 _skills.Grant(FarmerSkill.Legs, moved * 0.25f);
         }
 
-        #region States
+        #region Состояния
 
         private void TickIdle()
         {
@@ -278,7 +278,7 @@ namespace Farm.Characters
 
         private void TickGoingToHarvest()
         {
-            // Someone else got there first, or it withered while we walked.
+            // Кто-то успел раньше, или грядка испортилась, пока мы шли.
             if (_target == null || !_target.IsReady)
             {
                 _target = null;
@@ -286,8 +286,8 @@ namespace Farm.Characters
                 return;
             }
 
-            // Check arrival BEFORE re-issuing the destination: setting it again clears the mover's
-            // arrived flag, so doing it first would mean we never see that we got there.
+            // Проверять прибытие ДО повторной установки цели: SetDestination сбрасывает флаг
+            // прибытия у ходока, и в обратном порядке мы никогда бы не увидели, что дошли.
             if (_mover.HasArrived)
             {
                 EnterHarvesting();
@@ -407,11 +407,11 @@ namespace Farm.Characters
         }
 
         /// <summary>
-        /// One visit does both halves of the trade: sell the surplus, then spend the takings.
+        /// Один визит закрывает обе половины сделки: продать излишки и потратить выручку.
         /// <para>
-        /// Together rather than as two errands because that is the point of the trip — a farmer who
-        /// walks to the market, sells, walks home and then walks back to buy looks broken, and the
-        /// gold from the sale is exactly what pays for the purchase.
+        /// Вместе, а не двумя походами, потому что в этом смысл похода — фермер, который сходил
+        /// на рынок, продал, вернулся домой и снова пошёл покупать, выглядит сломанным, а золото
+        /// с продажи — ровно то, чем оплачивается покупка.
         /// </para>
         /// </summary>
         private void TickAtMarket()
@@ -458,7 +458,7 @@ namespace Farm.Characters
 
         #endregion
 
-        #region Transitions
+        #region Переходы
 
         private void EnterIdle()
         {
@@ -485,7 +485,7 @@ namespace Farm.Characters
         {
             _mover.Stop();
 
-            // Face the plot while working.
+            // Пока работает — лицом к грядке.
             if (_target != null) FaceTowards(_target.transform.position);
 
             float speed = _skills != null ? _skills.HarvestSpeed : 1f;
@@ -575,11 +575,11 @@ namespace Farm.Characters
 
         #endregion
 
-        #region Decisions
+        #region Решения
 
         /// <summary>
-        /// Look for something worth doing. Returns true if the state changed.
-        /// Throttled — re-querying every frame buys nothing when crops ripen seconds apart.
+        /// Поискать занятие. Возвращает true, если состояние сменилось.
+        /// С тайм-аутом: опрашивать каждый кадр бессмысленно, когда урожай зреет секундами.
         /// </summary>
         private bool TryTakeWork()
         {
@@ -612,7 +612,7 @@ namespace Farm.Characters
                 return true;
             }
 
-            // Nothing ripe within reach — no reason to keep hauling a part-load around.
+            // Спелого в досягаемости нет — таскать недогруз дальше незачем.
             if (!Inventory.IsEmpty)
             {
                 EnterReturningHome();
@@ -626,11 +626,11 @@ namespace Farm.Characters
         }
 
         /// <summary>
-        /// Go to bed when night falls or when he is worn out. Returns true when the state changed.
+        /// Лечь спать с приходом ночи или когда вымотался. Возвращает true при смене состояния.
         /// <para>
-        /// He sleeps where he stands rather than walking home first. Nothing in the farm depends on
-        /// where he sleeps, and a farmer who collapses at the far fence and then trudges home before
-        /// he may rest reads as punishment for a decision the player never made.
+        /// Спит там, где стоит, а не идёт сначала домой. Ничто на ферме не зависит от места его
+        /// сна, а фермер, свалившийся у дальнего забора и бредущий домой, прежде чем ему позволят
+        /// отдохнуть, читается как наказание за решение, которого игрок не принимал.
         /// </para>
         /// </summary>
         private bool TryGoToBed()
@@ -654,9 +654,9 @@ namespace Farm.Characters
         }
 
         /// <summary>
-        /// Head to the market when there is business to do there.
-        /// <paramref name="minimum"/> raises the selling bar so an urgent check ignores small piles;
-        /// a purchase is always worth the walk, so it is not gated by it.
+        /// Пойти на рынок, когда там есть дела.
+        /// <paramref name="minimum"/> поднимает планку продажи, чтобы срочная проверка игнорировала
+        /// мелкие кучки; покупка похода стоит всегда и этой планкой не ограничивается.
         /// </summary>
         private bool TryGoToMarket(int minimum)
         {
@@ -673,17 +673,16 @@ namespace Farm.Characters
             return true;
         }
 
-        /// <summary>Anything left to do at the market at all.</summary>
+        /// <summary>Осталось ли на рынке хоть какое-то дело.</summary>
         private bool HasMarketErrand() => HasSurplus(out _, out _) || PickRestock() != null;
 
         /// <summary>
-        /// The best plot he is willing to buy for himself, or null.
+        /// Лучшая грядка, которую он готов купить себе, или null.
         /// <para>
-        /// Two rules keep his spending from trampling the player's plans. He never dips below the
-        /// gold reserve, and he only buys what costs plain gold — the material stockpile is what the
-        /// player is saving for buildings, and spending planks on saplings on their behalf is one
-        /// step past helpful. Buildings he never buys at all: where the kitchen goes is a decision,
-        /// not a chore.
+        /// Два правила не дают его тратам растоптать планы игрока. Он никогда не опускается ниже
+        /// золотого резерва и покупает только то, что стоит чистое золото, — запас материалов
+        /// игрок копит на постройки, и потратить доски на саженцы «за него» — это на шаг дальше,
+        /// чем помощь. Постройки он не покупает вовсе: где встанет кухня — решение, а не рутина.
         /// </para>
         /// </summary>
         private ShopItemDefinition PickRestock()
@@ -731,10 +730,10 @@ namespace Farm.Characters
         }
 
         /// <summary>
-        /// The biggest stack worth selling, or false when nothing qualifies.
+        /// Самая крупная стопка, которую стоит продать, или false, когда ничего не подходит.
         /// <para>
-        /// Food keeps a bigger reserve than materials on purpose: the kitchen eats out of the same
-        /// store, and a farmer who sold the last of the wheat has just made himself unfeedable.
+        /// У еды запас нарочно больше, чем у материалов: кухня ест из того же склада, и фермер,
+        /// продавший последнюю пшеницу, только что сделал себя некормимым.
         /// </para>
         /// </summary>
         private bool HasSurplus(out ResourceDefinition resource, out int amount)
@@ -769,8 +768,8 @@ namespace Farm.Characters
         }
 
         /// <summary>
-        /// Go eat or drink if a need is low and something can actually help.
-        /// Returns true when the state changed.
+        /// Сходить поесть или попить, если нужда просела и что-то реально может помочь.
+        /// Возвращает true при смене состояния.
         /// </summary>
         private bool TryTakeCare()
         {

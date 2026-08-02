@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace Farm.Farming
 {
-    /// <summary>Serialisable contents of an inventory, keyed by resource id rather than asset reference.</summary>
+    /// <summary>Сериализуемое содержимое инвентаря, с ключом-идентификатором вместо ссылки на ассет.</summary>
     [Serializable]
     public struct InventorySnapshotEntry
     {
@@ -13,8 +13,8 @@ namespace Farm.Farming
     }
 
     /// <summary>
-    /// Save-ready copy of an inventory. Ids instead of object references, so it survives a rebuild
-    /// of the asset database and can go straight into JSON.
+    /// Готовая к сохранению копия инвентаря. Идентификаторы вместо ссылок на объекты —
+    /// переживает пересборку базы ассетов и идёт прямиком в JSON.
     /// </summary>
     [Serializable]
     public sealed class InventorySnapshot
@@ -23,12 +23,13 @@ namespace Farm.Farming
     }
 
     /// <summary>
-    /// Default <see cref="IInventory"/>. Plain C# — no MonoBehaviour, no scene dependency — so it
-    /// works equally as a character's backpack, a building's store, or a throwaway in a test.
+    /// Реализация <see cref="IInventory"/> по умолчанию. Чистый C# — ни MonoBehaviour, ни
+    /// зависимости от сцены — поэтому одинаково служит рюкзаком персонажа, хранилищем
+    /// постройки или одноразовым контейнером в тесте.
     /// <para>
-    /// Contents live in a list rather than a dictionary: inventories hold tens of entries at most,
-    /// a linear scan beats hashing at that size, and the stable ordering means a UI list does not
-    /// reshuffle itself every time something is picked up.
+    /// Содержимое лежит в списке, а не в словаре: записей максимум десятки, линейный проход
+    /// на таком размере быстрее хеширования, а стабильный порядок означает, что список UI
+    /// не перетасовывается при каждом подборе.
     /// </para>
     /// </summary>
     public class Inventory : IInventory
@@ -46,16 +47,16 @@ namespace Farm.Farming
 
         public InventoryCapacity CapacityMode { get; set; }
 
-        /// <summary>Meaning depends on <see cref="CapacityMode"/>: units or distinct resources.</summary>
+        /// <summary>Смысл зависит от <see cref="CapacityMode"/>: единицы или число разных ресурсов.</summary>
         public int Capacity { get; set; }
 
         /// <summary>
-        /// When true a single add is never truncated, even if it exceeds capacity — the container
-        /// simply reports <see cref="IsFull"/> afterwards.
+        /// Когда включено, одно добавление никогда не урезается, даже сверх лимита —
+        /// контейнер просто сообщает <see cref="IsFull"/> после.
         /// <para>
-        /// The farmer's backpack needs this: a level-3 plot yields 4 at once, and refusing the
-        /// overflow would make any yield larger than the free space permanently unharvestable.
-        /// Fixed containers such as chests should leave it off.
+        /// Рюкзаку фермера это необходимо: грядка 3-го уровня отдаёт 4 за раз, и отказ от
+        /// перелива сделал бы любой урожай крупнее свободного места несобираемым навсегда.
+        /// У фиксированных контейнеров вроде сундуков должно быть выключено.
         /// </para>
         /// </summary>
         public bool AllowOverflow { get; set; }
@@ -91,14 +92,14 @@ namespace Farm.Farming
                 switch (CapacityMode)
                 {
                     case InventoryCapacity.Units: return Mathf.Max(0, Capacity - TotalUnits);
-                    // Slots do not bound units — only how many different resources fit.
+                    // Ячейки не ограничивают единицы — только число разных ресурсов.
                     case InventoryCapacity.Slots: return DistinctCount < Capacity ? int.MaxValue : 0;
                     default: return int.MaxValue;
                 }
             }
         }
 
-        // ---- reads ----
+        // ---- чтение ----
 
         public int GetAmount(ResourceDefinition resource)
         {
@@ -109,9 +110,9 @@ namespace Farm.Farming
         public bool Contains(ResourceDefinition resource, int amount = 1) =>
             amount <= 0 || GetAmount(resource) >= amount;
 
-        // ---- writes ----
+        // ---- запись ----
 
-        /// <summary><see cref="IResourceSink"/> entry point. Overflow is reported via <see cref="Rejected"/>.</summary>
+        /// <summary>Вход <see cref="IResourceSink"/>. О переполнении сообщает через <see cref="Rejected"/>.</summary>
         public void Add(ResourceDefinition resource, int amount) => TryAdd(resource, amount);
 
         public int TryAdd(ResourceDefinition resource, int amount)
@@ -176,7 +177,7 @@ namespace Farm.Farming
             if (target == null || TotalUnits == 0) return 0;
 
             int moved = 0;
-            // Backwards: entries that empty out are removed, and that shifts everything after them.
+            // С конца: опустевшие записи удаляются, и это сдвигает всё после них.
             for (int i = _entries.Count - 1; i >= 0; i--)
             {
                 var entry = _entries[i];
@@ -202,7 +203,7 @@ namespace Farm.Farming
             RaiseChanged();
         }
 
-        // ---- saving ----
+        // ---- сохранение ----
 
         public InventorySnapshot CaptureState()
         {
@@ -224,9 +225,10 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Refill from a snapshot. <paramref name="resolve"/> turns a saved id back into the asset —
-        /// pass whatever lookup the project ends up with; the inventory deliberately owns no registry.
-        /// Unresolved ids are skipped and reported, never silently dropped.
+        /// Наполнить заново из снимка. <paramref name="resolve"/> превращает сохранённый id обратно
+        /// в ассет — передай тот поиск, который в итоге появится в проекте; инвентарь намеренно
+        /// не владеет никаким реестром. Ненайденные id пропускаются с предупреждением,
+        /// но никогда не теряются молча.
         /// </summary>
         public void RestoreState(InventorySnapshot snapshot, Func<string, ResourceDefinition> resolve)
         {
@@ -248,7 +250,7 @@ namespace Farm.Farming
             }
         }
 
-        // ---- internals ----
+        // ---- внутренности ----
 
         private int FreeUnitsFor(ResourceDefinition resource)
         {
@@ -257,7 +259,7 @@ namespace Farm.Farming
                 case InventoryCapacity.Units:
                     return Mathf.Max(0, Capacity - TotalUnits);
                 case InventoryCapacity.Slots:
-                    // An existing stack never runs out of room; a new one needs a free slot.
+                    // Существующий стек не кончается никогда; новому нужна свободная ячейка.
                     return IndexOf(resource) >= 0 || DistinctCount < Capacity ? int.MaxValue : 0;
                 default:
                     return int.MaxValue;

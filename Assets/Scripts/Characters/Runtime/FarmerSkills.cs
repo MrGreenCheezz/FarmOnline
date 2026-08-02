@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Farm.Characters
 {
-    /// <summary>What the farmer gets better at. Values are serialized — append, never renumber.</summary>
+    /// <summary>В чём фермер набирается мастерства. Значения сериализуются — добавляй в конец, не перенумеровывай.</summary>
     public enum FarmerSkill
     {
         /// <summary>Сбор. Быстрее собирает и иногда снимает лишнее.</summary>
@@ -17,17 +17,17 @@ namespace Farm.Characters
     }
 
     /// <summary>
-    /// The farmer's skills. They rise from doing the work, never from a menu.
+    /// Навыки фермера. Растут от сделанной работы и никогда — из меню.
     /// <para>
-    /// This is the thing the player is meant to watch. A skill that goes up because you clicked
-    /// "upgrade" is a shop; a skill that goes up because he has been hauling turnips all morning is
-    /// a character. So nothing here is spendable — the only input is work already done.
+    /// Это то, за чем игроку положено наблюдать. Навык, растущий от нажатия «улучшить», — это
+    /// магазин; навык, растущий оттого, что он всё утро таскал репу, — это персонаж. Поэтому
+    /// здесь нечего тратить — единственный вход это уже сделанная работа.
     /// </para>
     /// <para>
-    /// Levels do two different jobs on purpose. Small ones tune numbers he already lives by (speed,
-    /// capacity); named thresholds hand him whole new duties. The second kind is what makes the
-    /// progression readable: you do not notice +8% walking speed, you notice him walking to the
-    /// market on his own for the first time.
+    /// Уровни нарочно делают две разные работы. Мелкие подкручивают числа, которыми он и так
+    /// живёт (скорость, ёмкость); именованные пороги вручают целые новые обязанности. Второе
+    /// и делает прогрессию читаемой: +8% к шагу не замечаешь, а вот как он впервые сам пошёл
+    /// на рынок — замечаешь.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -65,7 +65,7 @@ namespace Farm.Characters
         private readonly float[] _xp = new float[SkillCount];
         private bool _ready;
 
-        /// <summary>Skill went up. Third argument is the new level.</summary>
+        /// <summary>Навык вырос. Третий аргумент — новый уровень.</summary>
         public event Action<FarmerSkills, FarmerSkill, int> LevelledUp;
 
         public int MaxLevel => _maxLevel;
@@ -78,7 +78,7 @@ namespace Farm.Characters
             return _levels[(int)skill];
         }
 
-        /// <summary>How far into the current level, 0..1. Reports 1 at max level.</summary>
+        /// <summary>Насколько пройден текущий уровень, 0..1. На максимуме отвечает 1.</summary>
         public float Progress01(FarmerSkill skill)
         {
             EnsureReady();
@@ -90,13 +90,13 @@ namespace Farm.Characters
             return need > 0f ? Mathf.Clamp01(_xp[index] / need) : 0f;
         }
 
-        /// <summary>Experience the next level costs. Zero at max.</summary>
+        /// <summary>Сколько опыта стоит следующий уровень. Ноль на максимуме.</summary>
         public float CostOf(int level) =>
             level <= 1 || level > _maxLevel ? 0f : _baseCost * Mathf.Pow(_costGrowth, level - 2);
 
         // ---- запись ----
 
-        /// <summary>Credit work done. Levels up as many times as the experience covers.</summary>
+        /// <summary>Засчитать сделанную работу. Поднимает столько уровней, на сколько хватит опыта.</summary>
         public void Grant(FarmerSkill skill, float amount)
         {
             if (amount <= 0f) return;
@@ -122,25 +122,25 @@ namespace Farm.Characters
 
         // ---- что это даёт ----
 
-        /// <summary>Multiplier on harvesting speed.</summary>
+        /// <summary>Множитель скорости сбора.</summary>
         public float HarvestSpeed => 1f + (LevelOf(FarmerSkill.Harvesting) - 1) * 0.14f;
 
-        /// <summary>Chance that one harvest yields an extra unit.</summary>
+        /// <summary>Шанс, что один сбор даст лишнюю единицу.</summary>
         public float BonusYieldChance => Mathf.Min(0.5f, (LevelOf(FarmerSkill.Harvesting) - 1) * 0.05f);
 
-        /// <summary>Multiplier on walking speed.</summary>
+        /// <summary>Множитель скорости ходьбы.</summary>
         public float MoveSpeed => 1f + (LevelOf(FarmerSkill.Legs) - 1) * 0.09f;
 
         /// <summary>
-        /// How many plots he is willing to visit before hauling home.
+        /// Сколько грядок он готов обойти, прежде чем нести домой.
         /// <para>
-        /// At level 1 he walks back after every single plot, which is the whole reason early game
-        /// feels slow. Raising this is the most visible thing legs do.
+        /// На уровне 1 он возвращается после каждой грядки — в этом вся причина, почему ранняя
+        /// игра ощущается медленной. Рост этого числа — самое видимое, что делают ноги.
         /// </para>
         /// </summary>
         public int RouteLength => 1 + (LevelOf(FarmerSkill.Legs) - 1) / 2;
 
-        /// <summary>Extra units of backpack space on top of the base capacity.</summary>
+        /// <summary>Дополнительные единицы рюкзака сверх базовой ёмкости.</summary>
         public int ExtraCapacity
         {
             get
@@ -156,7 +156,7 @@ namespace Farm.Characters
         public bool CanSell => LevelOf(FarmerSkill.Wits) >= SellingLevel;
         public bool CanRestock => LevelOf(FarmerSkill.Wits) >= RestockLevel;
 
-        /// <summary>Russian label, for UI and logs.</summary>
+        /// <summary>Русское имя навыка — для UI и логов.</summary>
         public static string NameOf(FarmerSkill skill)
         {
             switch (skill)
@@ -169,7 +169,7 @@ namespace Farm.Characters
             }
         }
 
-        /// <summary>What the next level of this skill will change, in one line for the player.</summary>
+        /// <summary>Что изменит следующий уровень навыка — одной строкой для игрока.</summary>
         public string NextRewardOf(FarmerSkill skill)
         {
             int next = LevelOf(skill) + 1;

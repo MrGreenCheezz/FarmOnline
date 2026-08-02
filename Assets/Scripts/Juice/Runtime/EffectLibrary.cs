@@ -2,7 +2,7 @@ using UnityEngine;
 
 namespace Farm.Juice
 {
-    /// <summary>Which particle prefab belongs to which moment. One asset, easy to swap wholesale.</summary>
+    /// <summary>Какой префаб частиц какому моменту принадлежит. Один ассет — легко заменить всё разом.</summary>
     [CreateAssetMenu(menuName = "Farm/Effect Library", fileName = "EffectLibrary")]
     public sealed class EffectLibrary : ScriptableObject
     {

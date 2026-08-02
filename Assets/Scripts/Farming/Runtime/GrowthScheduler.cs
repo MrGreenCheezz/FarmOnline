@@ -3,23 +3,24 @@ using UnityEngine;
 
 namespace Farm.Farming
 {
-    /// <summary>Something that wants a callback at a specific point in time.</summary>
+    /// <summary>Тот, кто хочет получить обратный вызов в конкретный момент времени.</summary>
     public interface IGrowthScheduled
     {
         void OnScheduledDue(double now);
     }
 
     /// <summary>
-    /// Single timer for the whole farm.
+    /// Единственный таймер на всю ферму.
     /// <para>
-    /// Growables never run their own <c>Update</c>. Each one registers once and asks to be woken
-    /// at the moment its next stage is due; the scheduler keeps those wake-ups in a binary min-heap
-    /// and each frame touches only the entries that have actually come due. Idle cost is one
-    /// comparison per frame no matter how many thousands of plots exist.
+    /// Грядки никогда не крутят собственный <c>Update</c>. Каждая регистрируется один раз и
+    /// просит разбудить её в момент, когда наступит следующая стадия; планировщик хранит эти
+    /// побудки в бинарной min-куче и каждый кадр трогает только реально наступившие. Цена
+    /// простоя — одно сравнение за кадр, сколько бы тысяч грядок ни существовало.
     /// </para>
     /// <para>
-    /// Cancelling is lazy: every handle carries a version, bumped on each (re)schedule, so stale
-    /// heap entries are recognised and dropped when popped instead of being searched for and removed.
+    /// Отмена ленивая: у каждого хэндла есть версия, растущая при каждой (пере)постановке,
+    /// поэтому устаревшие записи кучи распознаются и выбрасываются при извлечении, а не
+    /// разыскиваются и не удаляются из середины.
     /// </para>
     /// </summary>
     [DefaultExecutionOrder(-100)]
@@ -43,8 +44,8 @@ namespace Farm.Farming
         private readonly Stack<int> _freeHandles = new Stack<int>();
 
         /// <summary>
-        /// Ceiling on wake-ups processed per frame. Stops a huge time jump (offline catch-up,
-        /// Time.timeScale spike) from stalling one frame; the rest resume next frame.
+        /// Потолок побудок за кадр. Не даёт огромному скачку времени (оффлайн-догон, всплеск
+        /// Time.timeScale) заморозить один кадр; остальные продолжат в следующем.
         /// </summary>
         [SerializeField, Min(1)] private int _maxWakeUpsPerFrame = 256;
 
@@ -52,8 +53,8 @@ namespace Farm.Farming
         public int RegisteredCount => _targets.Count - _freeHandles.Count;
 
         /// <summary>
-        /// The scheduler if one already exists, without creating it. Use this during teardown —
-        /// spawning a GameObject while a scene unloads makes Unity complain.
+        /// Планировщик, если он уже существует, без создания. Используй при разборке сцены —
+        /// Unity ругается на создание GameObject во время выгрузки.
         /// </summary>
         public static GrowthScheduler Existing => _instance;
 
@@ -91,7 +92,7 @@ namespace Farm.Farming
             {
                 int reused = _freeHandles.Pop();
                 _targets[reused] = target;
-                _versions[reused]++;          // invalidate anything left over from the previous owner
+                _versions[reused]++;          // обнуляет всё, что осталось от прошлого владельца
                 return reused;
             }
 
@@ -108,7 +109,7 @@ namespace Farm.Farming
             _freeHandles.Push(handle);
         }
 
-        /// <summary>Wake <paramref name="handle"/> at <paramref name="dueTime"/>, replacing any pending wake-up.</summary>
+        /// <summary>Разбудить <paramref name="handle"/> в <paramref name="dueTime"/>, заменив прежнюю побудку.</summary>
         public void Schedule(int handle, double dueTime)
         {
             if (!IsValid(handle)) return;
@@ -116,7 +117,7 @@ namespace Farm.Farming
             Push(new Entry { Due = dueTime, Handle = handle, Version = _versions[handle] });
         }
 
-        /// <summary>Drop the pending wake-up for <paramref name="handle"/> without unregistering it.</summary>
+        /// <summary>Снять ожидающую побудку <paramref name="handle"/>, не выписывая его из планировщика.</summary>
         public void Cancel(int handle)
         {
             if (!IsValid(handle)) return;
@@ -136,7 +137,7 @@ namespace Farm.Farming
             {
                 Entry e = Pop();
 
-                // Stale entry: the handle was rescheduled, cancelled or recycled after this was queued.
+                // Запись устарела: хэндл перепоставили, отменили или переиспользовали после постановки.
                 if (e.Version != _versions[e.Handle]) continue;
 
                 var target = _targets[e.Handle];
@@ -147,7 +148,7 @@ namespace Farm.Farming
             }
         }
 
-        // ---- binary min-heap over Entry.Due ----
+        // ---- бинарная min-куча по Entry.Due ----
 
         private void Push(Entry e)
         {

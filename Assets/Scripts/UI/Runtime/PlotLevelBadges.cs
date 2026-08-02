@@ -6,11 +6,11 @@ using Farm.Farming;
 namespace Farm.UI
 {
     /// <summary>
-    /// Floats a level badge over every plot so the player can see at a glance what merges with what.
+    /// Вешает плашку уровня над каждой грядкой — игрок с одного взгляда видит, что с чем сливается.
     /// <para>
-    /// One panel with pooled labels rather than a world-space canvas per plot: the badges must stay
-    /// screen-aligned and readable at any camera angle, and a per-plot canvas would add a renderer
-    /// and a draw call to something that is only ever two characters of text.
+    /// Один слой с пулом меток вместо world-space канваса на каждую грядку: плашки должны быть
+    /// выровнены по экрану и читаться под любым углом камеры, а канвас на грядку добавил бы
+    /// рендерер и draw call тому, что всегда было двумя символами текста.
     /// </para>
     /// </summary>
     [RequireComponent(typeof(UIDocument))]

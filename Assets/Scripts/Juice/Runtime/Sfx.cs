@@ -3,9 +3,9 @@ using UnityEngine;
 namespace Farm.Juice
 {
     /// <summary>
-    /// Plays the sound bank. One pooled set of AudioSources rather than an AudioSource per object:
-    /// cues are short and overlap constantly, and spawning a source per shot would churn objects
-    /// during the busiest moments — exactly when the game must not hitch.
+    /// Проигрывает банк звуков. Один пул AudioSource вместо источника на каждый объект:
+    /// кью короткие и постоянно накладываются, а порождать источник на каждый выстрел —
+    /// значит молотить объекты ровно в самые нагруженные моменты, когда игре нельзя дёргаться.
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(-150)]
@@ -34,7 +34,7 @@ namespace Farm.Juice
         public static Sfx Instance { get; private set; }
         public SoundBank Bank => _bank;
 
-        /// <summary>Overall level. Persisted — a volume setting that resets on restart is not a setting.</summary>
+        /// <summary>Общий уровень. Сохраняется — громкость, слетающая при перезапуске, не настройка.</summary>
         public float MasterVolume
         {
             get => _masterVolume;
@@ -45,7 +45,7 @@ namespace Farm.Juice
             }
         }
 
-        /// <summary>Effects level, on top of master. Kept separate so music can slot in later.</summary>
+        /// <summary>Уровень эффектов поверх общего. Отдельно — чтобы позже сюда же встала музыка.</summary>
         public float EffectsVolume
         {
             get => _effectsVolume;
@@ -56,7 +56,7 @@ namespace Farm.Juice
             }
         }
 
-        /// <summary>Write settings to disk. Called when the settings window closes.</summary>
+        /// <summary>Записать настройки на диск. Вызывается при закрытии окна настроек.</summary>
         public void SaveSettings() => PlayerPrefs.Save();
 
         private void Awake()
@@ -82,7 +82,14 @@ namespace Farm.Juice
             if (Instance == this) Instance = null;
         }
 
-        public void Play(SoundBank.Cue cue)
+        public void Play(SoundBank.Cue cue) => Play(cue, 0f);
+
+        /// <summary>
+        /// Проиграть кью со сдвигом высоты тона поверх его обычного случайного разброса.
+        /// Сдвиг нужен звукам, которые обязаны «расти» вместе с событием — например,
+        /// слияние звучит тем выше, чем выше уровень.
+        /// </summary>
+        public void Play(SoundBank.Cue cue, float pitchOffset)
         {
             if (cue == null || _sources == null) return;
 
@@ -97,11 +104,11 @@ namespace Farm.Juice
             var source = _sources[_next];
             _next = (_next + 1) % _sources.Length;
 
-            source.pitch = 1f + Random.Range(-cue.PitchJitter, cue.PitchJitter);
+            source.pitch = 1f + pitchOffset + Random.Range(-cue.PitchJitter, cue.PitchJitter);
             source.PlayOneShot(clip, cue.Volume * _effectsVolume * _masterVolume);
         }
 
-        /// <summary>Convenience so callers do not each need a null check on the singleton.</summary>
+        /// <summary>Удобство, чтобы вызывающим не нужна была своя проверка синглтона на null.</summary>
         public static void Play(System.Func<SoundBank, SoundBank.Cue> select)
         {
             var sfx = Instance;

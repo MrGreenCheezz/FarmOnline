@@ -4,12 +4,12 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// Which building the player is currently inspecting. One slot, farm-wide.
+    /// Какую постройку игрок сейчас рассматривает. Один слот на всю ферму.
     /// <para>
-    /// It lives in the farming assembly rather than in the UI because the two halves of a selection
-    /// sit on opposite sides of the assembly graph: the interaction layer decides what was clicked,
-    /// the UI decides what to draw, and neither references the other. A shared one-slot selection is
-    /// the smallest thing that joins them without inventing a dependency in either direction.
+    /// Живёт в сборке фермы, а не в UI, потому что две половины выбора сидят по разные
+    /// стороны графа сборок: слой взаимодействия решает, по чему кликнули, UI решает,
+    /// что нарисовать, и друг на друга они не ссылаются. Общий однослотовый выбор —
+    /// самое маленькое, что их соединяет, не создавая зависимости ни в одну сторону.
     /// </para>
     /// </summary>
     public static class BuildingSelection
@@ -17,17 +17,19 @@ namespace Farm.Farming
         private static Building _current;
 
         /// <summary>
-        /// Selected building, or null. Reports null once the building is destroyed, so a caller
-        /// never has to think about Unity's fake-null.
+        /// Выбранная постройка или null. После уничтожения постройки возвращает null,
+        /// так что вызывающему не приходится помнить про «фальшивый null» Unity.
         /// </summary>
         public static Building Current => _current != null ? _current : null;
 
-        /// <summary>Selection changed. Argument is the new selection, null when cleared.</summary>
+        /// <summary>Выбор сменился. Аргумент — новый выбор, null при снятии.</summary>
         public static event Action<Building> Changed;
 
         public static void Select(Building building)
         {
-            // Нормализуем разрушенный объект, иначе повторный клик по нему не поменяет выбор.
+            // Ссылка на уничтоженный объект для C# не равна настоящему null, но перегруженный
+            // оператор Unity считает её null. Приводим к настоящему null, иначе повторный клик
+            // по уже снесённой постройке не изменил бы выбор.
             if (building == null) building = null;
             if (ReferenceEquals(_current, building)) return;
 

@@ -3,18 +3,18 @@ using UnityEngine;
 namespace Farm.Characters
 {
     /// <summary>
-    /// How a character gets from A to B. <see cref="FarmerAgent"/> only ever talks to this base
-    /// class, so switching to NavMesh pathfinding later means adding one subclass and swapping the
-    /// component — the behaviour code does not change.
+    /// Как персонаж добирается из точки А в точку Б. <see cref="FarmerAgent"/> общается только
+    /// с этим базовым классом, поэтому переход на NavMesh позже — это один новый подкласс
+    /// и замена компонента; код поведения не меняется.
     /// </summary>
     public abstract class AgentMover : MonoBehaviour
     {
         public abstract float Speed { get; set; }
 
-        /// <summary>Units per second actually being covered right now. 0 when standing still.</summary>
+        /// <summary>Сколько единиц в секунду реально проходит прямо сейчас. 0, когда стоит.</summary>
         public abstract float CurrentSpeed { get; }
 
-        /// <summary>True when there is no destination, or the destination has been reached.</summary>
+        /// <summary>Истина, когда цели нет или она достигнута.</summary>
         public abstract bool HasArrived { get; }
 
         public abstract void SetDestination(Vector3 worldPosition);

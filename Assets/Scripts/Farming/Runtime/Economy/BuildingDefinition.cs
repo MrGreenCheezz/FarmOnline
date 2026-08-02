@@ -4,20 +4,20 @@ using UnityEngine;
 
 namespace Farm.Farming
 {
-    /// <summary>What a building does. The first two serve the character; the rest work on their own.</summary>
+    /// <summary>Что постройка делает. Первые две обслуживают персонажа; остальные работают сами.</summary>
     public enum BuildingService
     {
-        /// <summary>Feeds. Consumes food from world storage.</summary>
+        /// <summary>Кормит. Расходует еду со склада мира.</summary>
         Kitchen = 0,
-        /// <summary>Waters. Costs nothing — water is not a resource, so thirst never deadlocks.</summary>
+        /// <summary>Поит. Бесплатно — вода не ресурс, поэтому жажда никогда не заходит в тупик.</summary>
         Well = 1,
-        /// <summary>Refines raw resources into better ones. Runs itself — see <see cref="Workshop"/>.</summary>
+        /// <summary>Перерабатывает сырьё в лучшее. Работает сама — см. <see cref="Workshop"/>.</summary>
         Workshop = 2,
-        /// <summary>Pays a bonus on every sale. Passive, nothing to visit.</summary>
+        /// <summary>Платит надбавку с каждой продажи. Пассивен, ходить не к чему.</summary>
         Market = 3
     }
 
-    /// <summary>One rung of a building's upgrade ladder.</summary>
+    /// <summary>Одна ступень лестницы улучшений постройки.</summary>
     [Serializable]
     public sealed class BuildingLevel
     {
@@ -37,10 +37,10 @@ namespace Farm.Farming
     }
 
     /// <summary>
-    /// One conversion a workshop can run: so much of one resource becomes so much of another.
+    /// Одно превращение, доступное мастерской: столько-то одного ресурса становится столько-то другого.
     /// <para>
-    /// Recipes live on the building rather than in their own asset because a recipe is meaningless
-    /// without the workshop that runs it — splitting them would only add a reference to keep in sync.
+    /// Рецепты живут на постройке, а не в собственном ассете, потому что рецепт бессмыслен без
+    /// мастерской, которая его крутит, — разделение лишь добавило бы ссылку, которую надо держать в согласии.
     /// </para>
     /// </summary>
     [Serializable]
@@ -62,7 +62,7 @@ namespace Farm.Farming
 
         public bool IsValid => Input != null && Output != null && InputAmount > 0 && OutputAmount > 0;
 
-        /// <summary>Gold the batch is worth. Picks which recipe runs when several are affordable.</summary>
+        /// <summary>Ценность партии в золоте. По ней выбирается рецепт, когда доступно несколько.</summary>
         public int OutputValue => Output != null ? Output.SellPrice * OutputAmount : 0;
 
         public override string ToString()
@@ -73,10 +73,11 @@ namespace Farm.Farming
     }
 
     /// <summary>
-    /// A building the player can place and upgrade. Data only — <see cref="Building"/> runs it.
+    /// Постройка, которую игрок ставит и улучшает. Только данные — работает ею <see cref="Building"/>.
     /// <para>
-    /// Costs are stored per level rather than computed, so any rung can be retuned by hand; the
-    /// generator fills them from <see cref="TierEconomy"/> so the default ladder stays consistent.
+    /// Цены хранятся по уровням, а не считаются: любую ступень можно перекрутить руками;
+    /// генератор заполняет их из <see cref="TierEconomy"/>, чтобы лестница по умолчанию
+    /// оставалась согласованной.
     /// </para>
     /// </summary>
     [CreateAssetMenu(menuName = "Farm/Building", fileName = "Building_")]
@@ -118,7 +119,7 @@ namespace Farm.Farming
 
         public IReadOnlyList<WorkshopRecipe> Recipes => _recipes;
 
-        /// <summary>True when the character has to walk over for this to do anything.</summary>
+        /// <summary>Истина, когда персонажу нужно подойти, чтобы постройка что-то сделала.</summary>
         public bool IsVisited => _service == BuildingService.Kitchen || _service == BuildingService.Well;
 
         public int MaxLevel => _levels != null ? _levels.Length : 0;
@@ -135,14 +136,14 @@ namespace Farm.Farming
             return data != null ? data.Efficiency : 0f;
         }
 
-        /// <summary>Workshop speed or market bonus at this level. 0 when the level does not exist.</summary>
+        /// <summary>Скорость мастерской или надбавка рынка этого уровня. 0, если уровня нет.</summary>
         public float OutputAt(int level)
         {
             var data = GetLevel(level);
             return data != null ? data.Output : 0f;
         }
 
-        /// <summary>Cost to reach <paramref name="level"/>. Null when that level does not exist.</summary>
+        /// <summary>Цена достижения уровня <paramref name="level"/>. Null, если такого уровня нет.</summary>
         public Price? CostOf(int level)
         {
             var data = GetLevel(level);

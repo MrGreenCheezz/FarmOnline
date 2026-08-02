@@ -4,9 +4,9 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// The player's gold. Deliberately separate from <see cref="IInventory"/>: gold has no stack,
-    /// no icon and no storage limit, and folding it into the resource system would mean special
-    /// cases everywhere the inventory is displayed or capped.
+    /// Золото игрока. Нарочно отделено от <see cref="IInventory"/>: у золота нет стека,
+    /// иконки и лимита хранения, и затащить его в систему ресурсов значило бы плодить
+    /// особые случаи везде, где инвентарь рисуется или ограничивается.
     /// </summary>
     [DisallowMultipleComponent]
     [DefaultExecutionOrder(-200)]
@@ -20,13 +20,14 @@ namespace Farm.Farming
 
         public static Wallet Instance { get; private set; }
 
-        /// <summary>Fired on every change; the int is the delta (negative when spent).</summary>
+        /// <summary>Поднимается при каждом изменении; int — дельта (отрицательная при трате).</summary>
         public event Action<Wallet, int> Changed;
 
         public int Gold
         {
             get
             {
+                // Ленивая инициализация нужна тем, кто спрашивает золото раньше нашего Awake.
                 if (!_initialised) { _gold = _startingGold; _initialised = true; }
                 return _gold;
             }
@@ -59,7 +60,7 @@ namespace Farm.Farming
 
         public bool CanAfford(int amount) => Gold >= amount;
 
-        /// <summary>Spend if there is enough. Returns false and changes nothing otherwise.</summary>
+        /// <summary>Потратить, если хватает. Иначе вернёт false и ничего не изменит.</summary>
         public bool TrySpend(int amount)
         {
             if (amount <= 0) return true;

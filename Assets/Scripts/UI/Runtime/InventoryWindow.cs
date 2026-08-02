@@ -6,11 +6,11 @@ using Farm.Farming;
 namespace Farm.UI
 {
     /// <summary>
-    /// Storage as a real grid of cells: every slot is drawn, occupied or not, so the player can see
-    /// how much room is left rather than inferring it from a number.
+    /// Склад как настоящая сетка ячеек: рисуется каждая, занятая или нет, — игрок видит,
+    /// сколько места осталось, а не вычисляет это из числа.
     /// <para>
-    /// Cells are built once and only refilled on change — the grid is stable, so rebuilding elements
-    /// on every delivery would allocate for nothing and make the list flicker.
+    /// Ячейки строятся один раз и лишь перезаполняются при изменениях — сетка стабильна,
+    /// и пересборка элементов на каждую доставку аллоцировала бы впустую и заставляла список мерцать.
     /// </para>
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
@@ -161,7 +161,7 @@ namespace Farm.UI
                 _count.text = used + " / " + cellCount;
         }
 
-        /// <summary>Gold one unit fetches right now. Falls back to the raw price before a shop exists.</summary>
+        /// <summary>Сколько золота даёт единица прямо сейчас. До появления магазина — сырая цена ресурса.</summary>
         private static int UnitPrice(ResourceDefinition resource)
         {
             var shop = Shop.Instance;

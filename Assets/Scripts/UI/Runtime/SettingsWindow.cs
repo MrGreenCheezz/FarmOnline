@@ -5,11 +5,11 @@ using Farm.Juice;
 namespace Farm.UI
 {
     /// <summary>
-    /// Audio settings. Values are applied as the slider moves — a settings panel that only takes
-    /// effect on "apply" makes the player guess what they are choosing.
+    /// Настройки звука. Значения применяются по ходу движения ползунка — панель, которая
+    /// срабатывает только по «применить», заставляет игрока угадывать, что он выбирает.
     /// <para>
-    /// Persistence lives in <see cref="Sfx"/> rather than here: the setting must survive the window
-    /// being closed, the scene reloading, and the UI being replaced entirely.
+    /// Сохранение живёт в <see cref="Sfx"/>, а не здесь: настройка обязана пережить закрытие
+    /// окна, перезагрузку сцены и полную замену интерфейса.
     /// </para>
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
@@ -80,7 +80,7 @@ namespace Farm.UI
             if (evt.target == _overlay) Close();
         }
 
-        /// <summary>Read current values into the sliders — the window may open long after startup.</summary>
+        /// <summary>Считать текущие значения в ползунки — окно может открыться сильно позже старта.</summary>
         private void Pull()
         {
             var sfx = Sfx.Instance;

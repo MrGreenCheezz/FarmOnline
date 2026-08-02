@@ -4,15 +4,15 @@ using Farm.Farming;
 namespace Farm.Juice
 {
     /// <summary>
-    /// A light that keeps its own hours: dark at noon, lit at night, with the unsteadiness of a fire.
+    /// Светильник, живущий по своим часам: тёмный в полдень, зажжённый ночью, с неровностью огня.
     /// <para>
-    /// It reads <see cref="DayNightCycle"/> instead of being switched by something else so a lamp
-    /// works the moment it is dropped on the farm — the shop instantiates props and walks away, and
-    /// a lamp that needed wiring up afterwards would ship dark.
+    /// Читает <see cref="DayNightCycle"/> сам, а не включается кем-то извне, — лампа работает в
+    /// момент, когда её бросили на ферму: магазин ставит покупку и уходит, и лампа, которую надо
+    /// было бы потом подключать, приехала бы тёмной.
     /// </para>
     /// <para>
-    /// The flicker is deliberately slow and shallow. Fast flicker reads as a broken light rather
-    /// than a fire, and on a farm covered in lamps it turns the whole field into a strobe.
+    /// Мерцание нарочно медленное и неглубокое. Быстрое читается как сломанная лампа, а не как
+    /// огонь, и на ферме, уставленной кострами, превращает всё поле в стробоскоп.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -42,7 +42,7 @@ namespace Farm.Juice
         private float _lit;
         private float _phase;
 
-        /// <summary>How lit the lamp is, 0..1. Drives both the light and the glow.</summary>
+        /// <summary>Насколько лампа зажжена, 0..1. Ведёт и свет, и свечение углей.</summary>
         public float Lit => _lit;
 
         private void Awake()

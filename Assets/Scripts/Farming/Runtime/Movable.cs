@@ -4,13 +4,13 @@ using UnityEngine;
 namespace Farm.Farming
 {
     /// <summary>
-    /// Marks something the player may pick up and put down elsewhere — buildings, decorations,
-    /// anything that is not a <see cref="Growable"/> (those are draggable by virtue of being in
-    /// <see cref="GrowableRegistry"/>).
+    /// Метка «это игрок может поднять и переставить» — постройки, декорации, всё,
+    /// что не <see cref="Growable"/> (те перетаскиваются уже потому, что числятся
+    /// в <see cref="GrowableRegistry"/>).
     /// <para>
-    /// Deliberately just a marker with a registry and no input code: dragging lives in the
-    /// interaction layer, and putting it here would drag an input dependency into the farming
-    /// assembly for the sake of one bool.
+    /// Нарочно только маркер с реестром, без кода ввода: перетаскивание живёт в слое
+    /// взаимодействия, а здесь оно притащило бы зависимость от ввода в сборку фермы
+    /// ради одного флажка.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -32,7 +32,7 @@ namespace Farm.Farming
         private void OnDisable() => MovableRegistry.Unregister(this);
     }
 
-    /// <summary>Live index of everything draggable that is not a growable. Same O(1) swap-removal.</summary>
+    /// <summary>Живой список всего перетаскиваемого, кроме грядок. Тот же O(1) swap-removal, что и везде.</summary>
     public static class MovableRegistry
     {
         private static readonly List<Movable> _all = new List<Movable>(32);

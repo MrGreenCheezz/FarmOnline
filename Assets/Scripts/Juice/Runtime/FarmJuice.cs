@@ -4,14 +4,14 @@ using Farm.Farming;
 namespace Farm.Juice
 {
     /// <summary>
-    /// Turns farm events into things you can see and hear. The conductor: it owns no state and
-    /// changes no gameplay, it only listens and reacts — delete it and the game still runs, just
-    /// silently and flatly.
+    /// Превращает события фермы в то, что видно и слышно. Дирижёр: не владеет состоянием
+    /// и не меняет геймплей, только слушает и реагирует — удали его, и игра продолжит
+    /// работать, просто беззвучно и плоско.
     /// <para>
-    /// Effect strength is deliberately uneven. Merging is the decision the whole game is built on,
-    /// so it gets the biggest punch, the brightest burst and a pitch that rises with level; routine
-    /// harvesting gets a small squash. Giving every action the same weight is the same as giving
-    /// none of them any.
+    /// Сила отклика нарочно неравномерна. Слияние — решение, на котором построена вся игра,
+    /// поэтому ему достаётся самый сильный панч, самая яркая вспышка и тон, растущий с
+    /// уровнем; рутинный сбор получает лёгкое сплющивание. Дать каждому действию одинаковый
+    /// вес — то же самое, что не дать веса никакому.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -71,7 +71,7 @@ namespace Farm.Juice
             _farmer = null;
         }
 
-        /// <summary>Coins landing at home — the payoff for the whole walk.</summary>
+        /// <summary>Груз доехал до дома — награда за весь путь.</summary>
         private void OnDelivered(Farm.Characters.FarmerAgent agent, int amount)
         {
             Sfx.Play(b => b.Deliver);
@@ -119,17 +119,14 @@ namespace Farm.Juice
             PlayMergeSound(survivor.Level);
         }
 
-        /// <summary>Higher level, higher pitch — progression you can hear without reading the badge.</summary>
+        /// <summary>Выше уровень — выше тон: прогресс слышен и без чтения плашки.</summary>
         private void PlayMergeSound(int level)
         {
             var sfx = Sfx.Instance;
             if (sfx == null || sfx.Bank == null || sfx.Bank.Merge == null) return;
 
-            var cue = sfx.Bank.Merge;
-            float savedJitter = cue.PitchJitter;
-            cue.PitchJitter = Mathf.Min(0.5f, savedJitter + Mathf.Clamp(level - 1, 0, 6) * _mergePitchPerLevel);
-            sfx.Play(cue);
-            cue.PitchJitter = savedJitter;
+            float pitchOffset = Mathf.Clamp(level - 1, 0, 6) * _mergePitchPerLevel;
+            sfx.Play(sfx.Bank.Merge, pitchOffset);
         }
 
         private void OnWithered(Growable g)
@@ -148,8 +145,8 @@ namespace Farm.Juice
         private void OnRefused(Shop shop, string reason) => Sfx.Play(b => b.Refused);
 
         /// <summary>
-        /// Levelling a building costs as much as a merge and deserves to land as hard — the model
-        /// never changes, so without the punch the only feedback is a number in a panel.
+        /// Уровень постройки стоит как слияние и обязан приземляться так же весомо — модель
+        /// не меняется, и без панча единственной обратной связью была бы цифра в панели.
         /// </summary>
         private void OnBuildingUpgraded(Building building, int level)
         {

@@ -3,18 +3,18 @@ using System.Collections.Generic;
 
 namespace Farm.Farming
 {
-    /// <summary>How an inventory decides that it is full.</summary>
+    /// <summary>Как инвентарь решает, что он полон.</summary>
     public enum InventoryCapacity
     {
-        /// <summary>No limit. World storage starts here.</summary>
+        /// <summary>Без лимита. Склад мира начинает с этого.</summary>
         Unlimited = 0,
-        /// <summary>Capacity counts total units across every resource. A character's carry weight.</summary>
+        /// <summary>Лимит по сумме единиц всех ресурсов. Грузоподъёмность персонажа.</summary>
         Units = 1,
-        /// <summary>Capacity counts distinct resources; each one stacks without limit. Chest-style slots.</summary>
+        /// <summary>Лимит по числу разных ресурсов; каждый стек безразмерен. Ячейки как у сундука.</summary>
         Slots = 2
     }
 
-    /// <summary>One resource and how much of it is held. Immutable — replace, don't mutate.</summary>
+    /// <summary>Один ресурс и сколько его лежит. Неизменяемая — заменяй, а не правь.</summary>
     public readonly struct InventoryEntry
     {
         public readonly ResourceDefinition Resource;
@@ -33,64 +33,64 @@ namespace Farm.Farming
     }
 
     /// <summary>
-    /// A container of resources. Everything that holds stuff implements this — the character's
-    /// backpack today, barns, silos and chests later — so transfer, UI binding and save code are
-    /// written once against the interface rather than per container.
+    /// Контейнер ресурсов. Его реализует всё, что что-то хранит — сегодня рюкзак персонажа,
+    /// позже амбары, силосы и сундуки — чтобы перенос, привязка UI и сохранения писались
+    /// один раз против интерфейса, а не на каждый контейнер.
     /// <para>
-    /// It extends <see cref="IResourceSink"/>, so any inventory can be handed straight to
-    /// <see cref="Growable.TryHarvest(out HarvestResult, IResourceSink)"/> as a harvest destination.
+    /// Расширяет <see cref="IResourceSink"/>, поэтому любой инвентарь можно передать прямо
+    /// в <see cref="Growable.TryHarvest(out HarvestResult, IResourceSink)"/> как приёмник урожая.
     /// </para>
     /// </summary>
     public interface IInventory : IResourceSink
     {
-        /// <summary>How this container decides it is full. The UI needs it to know what to draw.</summary>
+        /// <summary>Как контейнер решает, что полон. UI нужно это, чтобы знать, что рисовать.</summary>
         InventoryCapacity CapacityMode { get; }
 
-        /// <summary>Units or slots depending on <see cref="CapacityMode"/>; meaningless when unlimited.</summary>
+        /// <summary>Единицы или ячейки — смысл зависит от <see cref="CapacityMode"/>; при Unlimited бессмысленно.</summary>
         int Capacity { get; }
 
-        /// <summary>Sum of all amounts.</summary>
+        /// <summary>Сумма всех количеств.</summary>
         int TotalUnits { get; }
 
-        /// <summary>How many different resources are held.</summary>
+        /// <summary>Сколько разных ресурсов лежит.</summary>
         int DistinctCount { get; }
 
         bool IsEmpty { get; }
         bool IsFull { get; }
 
-        /// <summary>Units that still fit. <see cref="int.MaxValue"/> when unlimited.</summary>
+        /// <summary>Сколько единиц ещё влезет. <see cref="int.MaxValue"/> при безлимите.</summary>
         int FreeUnits { get; }
 
-        /// <summary>Live view of the contents. Stable order — safe to drive a UI list from.</summary>
+        /// <summary>Живой вид содержимого. Порядок стабилен — можно напрямую кормить список UI.</summary>
         IReadOnlyList<InventoryEntry> Entries { get; }
 
         int GetAmount(ResourceDefinition resource);
         bool Contains(ResourceDefinition resource, int amount = 1);
 
-        /// <summary>Add up to <paramref name="amount"/>. Returns how much was actually accepted.</summary>
+        /// <summary>Добавить до <paramref name="amount"/>. Возвращает, сколько реально принято.</summary>
         int TryAdd(ResourceDefinition resource, int amount);
 
-        /// <summary>Take up to <paramref name="amount"/>. Returns how much was actually removed.</summary>
+        /// <summary>Забрать до <paramref name="amount"/>. Возвращает, сколько реально изъято.</summary>
         int TryRemove(ResourceDefinition resource, int amount);
 
-        /// <summary>Push everything into a plain sink. Returns units moved.</summary>
+        /// <summary>Перелить всё в простой сток. Возвращает число перенесённых единиц.</summary>
         int TransferTo(IResourceSink target);
 
-        /// <summary>Push into another inventory, respecting its capacity. Returns units moved.</summary>
+        /// <summary>Перелить в другой инвентарь с учётом его лимита. Возвращает число перенесённых единиц.</summary>
         int TransferTo(IInventory target);
 
         void Clear();
 
-        /// <summary>Anything changed. The cheap hook for repainting UI.</summary>
+        /// <summary>Что-то изменилось. Дешёвый крючок для перерисовки UI.</summary>
         event Action<IInventory> Changed;
 
-        /// <summary>Units went in.</summary>
+        /// <summary>Единицы пришли.</summary>
         event Action<IInventory, ResourceDefinition, int> Added;
 
-        /// <summary>Units went out.</summary>
+        /// <summary>Единицы ушли.</summary>
         event Action<IInventory, ResourceDefinition, int> Removed;
 
-        /// <summary>Units did not fit and were dropped. Wire this before players can lose loot silently.</summary>
+        /// <summary>Единицы не влезли и были отброшены. Подключи это раньше, чем игроки смогут молча терять лут.</summary>
         event Action<IInventory, ResourceDefinition, int> Rejected;
     }
 }
