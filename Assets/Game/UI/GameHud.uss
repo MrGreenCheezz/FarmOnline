@@ -209,25 +209,22 @@
 
 /* ---- всплывающие числа ---- */
 
-/* Мысль фермера. Пузырь, а не текст поверх мира: решение должно читаться как
-   его собственное, а не как подпись от игры. */
-.thought {
+/* Облачко с символом над фермером. Круглое и почти без деталей: его должно
+   хватать боковому зрению, читать его никто не обязан. */
+.emote {
     position: absolute;
-    font-size: 13px;
-    -unity-text-align: middle-center;
-    color: rgb(232, 238, 244);
-    background-color: rgba(22, 27, 34, 0.88);
-    border-radius: 10px;
+    background-color: rgba(22, 27, 34, 0.86);
+    border-radius: 50%;
     border-width: 1px;
-    border-color: rgba(150, 175, 200, 0.4);
-    padding: 3px 9px 4px 9px;
-    max-width: 220px;
-    white-space: normal;
+    border-color: rgba(150, 175, 200, 0.45);
+    align-items: center;
+    justify-content: center;
 }
 
-.thought__mood {
-    color: rgb(150, 170, 190);
-    font-size: 11px;
+.emote__icon {
+    width: 78%;
+    height: 78%;
+    -unity-background-scale-mode: scale-to-fit;
 }
 
 .float {

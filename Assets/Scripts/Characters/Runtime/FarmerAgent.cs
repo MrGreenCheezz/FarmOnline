@@ -41,6 +41,27 @@ namespace Farm.Characters
     }
 
     /// <summary>
+    /// Простое чувство, которое фермер показывает облачком над головой.
+    /// <para>
+    /// Нарочно короткий список и только про быт: облачко должно ловиться боковым зрением
+    /// и мгновенно читаться символом. Как только сюда попадут сложные темы, символ придётся
+    /// заменить текстом, а текст над головой перестаёт замечаться и превращается в шум.
+    /// </para>
+    /// </summary>
+    public enum FarmerEmote
+    {
+        None = 0,
+        /// <summary>Проголодался.</summary>
+        Food = 1,
+        /// <summary>Хочет пить.</summary>
+        Drink = 2,
+        /// <summary>Вымотался, идёт спать.</summary>
+        Sleep = 3,
+        /// <summary>Всё хорошо — мурлычет себе под нос.</summary>
+        Happy = 4
+    }
+
+    /// <summary>
     /// Фермер: конечный автомат «что я делаю сейчас». Что делать дальше — решает
     /// <see cref="FarmerBrain"/>, и это разделение здесь главное.
     /// <para>
@@ -131,6 +152,18 @@ namespace Farm.Characters
         [Tooltip("Как быстро осматривается, стоя без дела, градусов в секунду.")]
         [SerializeField, Min(0f)] private float _lookAroundSpeed = 22f;
 
+        [Header("Облачко над головой")]
+        [Tooltip("Не показывать облачко чаще, чем раз в столько секунд.\n" +
+                 "Смысл именно в редкости: то, что висит над головой постоянно, перестают " +
+                 "замечать, и символ превращается в часть силуэта.")]
+        [SerializeField, Min(0f)] private float _emoteCooldown = 25f;
+
+        [Tooltip("Через сколько секунд он может замурлыкать, когда всё хорошо: от и до.")]
+        [SerializeField] private Vector2 _hummingInterval = new Vector2(70f, 160f);
+
+        [Tooltip("Насколько хорошо должно быть, чтобы замурлыкать.")]
+        [SerializeField, Range(0f, 1f)] private float _hummingWellbeing = 0.75f;
+
         [Header("Обустройство")]
         [Tooltip("На каком расстоянии он ставит грядку рядом с её парой.\n" +
                  "Он сводит одинаковые вплотную, но не сливает: слияние остаётся ходом игрока.")]
@@ -166,6 +199,8 @@ namespace Farm.Characters
 
         private float _timer;
         private float _scanTimer;
+        private float _emoteTimer;
+        private float _hummingTimer;
         private float _baseSpeed = 1.5f;
         private int _baseCapacity = 8;
         private int _plotsThisTrip;
@@ -174,8 +209,8 @@ namespace Farm.Characters
         /// <summary>Сменил занятие — удобно для анимации и UI.</summary>
         public event Action<FarmerAgent, FarmerState> StateChanged;
 
-        /// <summary>Появилась новая мысль. Её показывает пузырь над головой.</summary>
-        public event Action<FarmerAgent, string> ThoughtChanged;
+        /// <summary>Показал чувство над головой. Редкое событие — см. <see cref="_emoteCooldown"/>.</summary>
+        public event Action<FarmerAgent, FarmerEmote> Emoted;
 
         /// <summary>Что-то подобрал. Это в рюкзаке, ещё не на складе.</summary>
         public event Action<FarmerAgent, HarvestResult> Collected;
@@ -202,7 +237,10 @@ namespace Farm.Characters
         /// <summary>Его характер, или null — тогда все черты нейтральны.</summary>
         public FarmerTraits Traits => _traits;
 
-        /// <summary>О чём он думает прямо сейчас, одной строкой от первого лица.</summary>
+        /// <summary>
+        /// О чём он думает прямо сейчас, одной строкой от первого лица. Показывается в панели
+        /// HUD, а не над головой: в мире висит только редкий символ, иначе текст становится шумом.
+        /// </summary>
         public string Thought => _thought;
 
         /// <summary>Истина, пока он спит. HUD по этому флагу приглушает себя.</summary>
@@ -280,6 +318,13 @@ namespace Farm.Characters
             _baseCapacity = _inventoryComponent.Capacity;
 
             if (_skills != null) _skills.LevelledUp += OnLevelledUp;
+
+            if (_needs != null)
+            {
+                _needs.BecameHungry += OnBecameHungry;
+                _needs.BecameThirsty += OnBecameThirsty;
+                _needs.BecameTired += OnBecameTired;
+            }
         }
 
         private void OnDisable()
@@ -298,6 +343,13 @@ namespace Farm.Characters
         private void OnDestroy()
         {
             if (_skills != null) _skills.LevelledUp -= OnLevelledUp;
+
+            if (_needs != null)
+            {
+                _needs.BecameHungry -= OnBecameHungry;
+                _needs.BecameThirsty -= OnBecameThirsty;
+                _needs.BecameTired -= OnBecameTired;
+            }
         }
 
         private void Start()
@@ -312,6 +364,11 @@ namespace Farm.Characters
             float radius = _wanderRadius * 0.7f;
             _favouriteSpot = _homePosition + new Vector3(
                 Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+
+            // Со случайной задержки, а не с нуля: иначе он мурлычет на первом же кадре партии
+            // и занятым кулдауном глушит первое же настоящее «проголодался».
+            _hummingTimer = UnityEngine.Random.Range(
+                _hummingInterval.x, Mathf.Max(_hummingInterval.x, _hummingInterval.y));
 
             ApplyCapacity();
             EnterIdle();
@@ -345,6 +402,7 @@ namespace Farm.Characters
             _mover.Speed = _baseSpeed * (_needs != null ? _needs.Productivity01 : 1f) * skillSpeed;
 
             TrackEffort();
+            TickEmotes();
 
             switch (_state)
             {
@@ -510,18 +568,50 @@ namespace Farm.Characters
             }
         }
 
-        private void SetThought(string text)
+        private void SetThought(string text) => _thought = text ?? "";
+
+        #endregion
+
+        #region Чувства
+
+        /// <summary>
+        /// Показать чувство над головой, если облачко успело остыть.
+        /// <para>
+        /// Общий кулдаун на все поводы намеренно один: важно не «сколько раз он проголодался»,
+        /// а то, что над фермером изредка что-то всплывает. Два символа подряд читаются как
+        /// болтовня, один раз в полминуты — как живой человек.
+        /// </para>
+        /// </summary>
+        private void Emote(FarmerEmote emote)
         {
-            string value = text ?? "";
-            if (_thought == value) return;
+            if (emote == FarmerEmote.None || _emoteTimer > 0f) return;
+            _emoteTimer = _emoteCooldown;
 
-            _thought = value;
-
-            var handler = ThoughtChanged;
+            var handler = Emoted;
             if (handler == null) return;
-            try { handler(this, value); }
+            try { handler(this, emote); }
             catch (Exception e) { Debug.LogException(e, this); }
         }
+
+        private void TickEmotes()
+        {
+            if (_emoteTimer > 0f) _emoteTimer -= Time.deltaTime;
+
+            if (_needs == null || _state == FarmerState.Sleeping) return;
+
+            _hummingTimer -= Time.deltaTime;
+            if (_hummingTimer > 0f) return;
+
+            _hummingTimer = UnityEngine.Random.Range(
+                _hummingInterval.x, Mathf.Max(_hummingInterval.x, _hummingInterval.y));
+
+            // Мурлычет только когда действительно всё хорошо — иначе символ обесценится.
+            if (_needs.Wellbeing01 >= _hummingWellbeing) Emote(FarmerEmote.Happy);
+        }
+
+        private void OnBecameHungry(CharacterNeeds needs) => Emote(FarmerEmote.Food);
+        private void OnBecameThirsty(CharacterNeeds needs) => Emote(FarmerEmote.Drink);
+        private void OnBecameTired(CharacterNeeds needs) => Emote(FarmerEmote.Sleep);
 
         #endregion
 
@@ -958,6 +1048,7 @@ namespace Farm.Characters
         private void EnterSleeping()
         {
             _mover.Stop();
+            Emote(FarmerEmote.Sleep);
             Release();   // уснуть с грядкой в руках нельзя — она осталась бы висеть в воздухе
             _target = null;
             _serviceTarget = null;

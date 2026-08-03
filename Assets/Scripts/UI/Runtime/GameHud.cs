@@ -39,6 +39,7 @@ namespace Farm.UI
         private Label _clockValue;
         private Label _storageSummary;
         private Label _farmerState;
+        private Label _farmerThought;
         private Label _satietyLabel;
         private Label _hydrationLabel;
         private Label _energyLabel;
@@ -92,6 +93,7 @@ namespace Farm.UI
             _clockValue = root.Q<Label>("clock-value");
             _storageSummary = root.Q<Label>("storage-summary");
             _farmerState = root.Q<Label>("farmer-state");
+            _farmerThought = root.Q<Label>("farmer-thought");
             _satietyLabel = root.Q<Label>("satiety-label");
             _hydrationLabel = root.Q<Label>("hydration-label");
             _energyLabel = root.Q<Label>("energy-label");
@@ -410,6 +412,10 @@ namespace Farm.UI
             }
 
             if (_farmerState != null) _farmerState.text = Describe(_farmer.State);
+
+            // Мысль живёт здесь, а не над головой: в мире висит только редкий символ,
+            // а текст, постоянно висящий над персонажем, перестают замечать.
+            if (_farmerThought != null) _farmerThought.text = _farmer.Thought;
 
             if (_needs != null)
             {
