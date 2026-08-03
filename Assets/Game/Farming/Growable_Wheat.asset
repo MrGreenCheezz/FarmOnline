@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: wheat
   _displayName: "\u041F\u0448\u0435\u043D\u0438\u0446\u0430"
   _category: 0
-  _defaultStageDuration: 3
+  _defaultStageDuration: 9
   _stages:
   - _name: "\u0412\u0441\u0445\u043E\u0434\u044B"
-    _duration: 3
+    _duration: 9
     _visual: {fileID: 919132149155446097, guid: 6b937e7199589b74abf4d808af548064, type: 3}
   - _name: "\u0421\u043F\u0435\u043B\u0430\u044F"
     _duration: 0
@@ -28,4 +28,5 @@ MonoBehaviour:
   _yieldPerLevel: 2
   _regrows: 0
   _regrowStage: 0
-  _witherAfter: 6
+  _removeWhenEmpty: 1
+  _witherAfter: 18

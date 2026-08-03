@@ -17,6 +17,11 @@ namespace Farm.Farming
     /// никогда ему, потому оно и дороже за единицу, чем всё, что он собирает сам: оно стоит
     /// внимания, а не времени.
     /// </para>
+    /// <para>
+    /// Узлы не выкладываются одним рывком: часть появляется с темнотой, остальное подсыпается
+    /// порциями до рассвета. Ночь, выложенная целиком в первую минуту, снова превращается
+    /// в ожидание — только теперь с пустым полем.
+    /// </para>
     /// </summary>
     [DisallowMultipleComponent]
     [AddComponentMenu("Farm/Night Harvest")]
@@ -36,16 +41,37 @@ namespace Farm.Farming
 
             [Tooltip("Относительная частота.")]
             [Min(0f)] public float Weight = 1f;
+
+            [Tooltip("Радиус разброса именно этого вида. 0 — взять общий радиус компонента.\n" +
+                     "Светлячкам он нужен заметно шире фермы: их ценность не в добыче, а в том, " +
+                     "что ночной мир ожил. Плотная россыпь под ногами превращает атмосферу в задачу.")]
+            [Min(0f)] public float Radius;
+
+            [Tooltip("Не сеять ближе этого к центру. Позволяет вынести вид наружу, оставив " +
+                     "у дома только то, что игрок действительно собирает.")]
+            [Min(0f)] public float InnerRadius;
+
+            [Tooltip("Держать внутри границ фермы. Выключи, чтобы вид уходил и за забор.")]
+            public bool KeepInsideFarm = true;
         }
 
         [SerializeField] private Kind[] _kinds = Array.Empty<Kind>();
 
         [Header("Сколько и где")]
-        [Tooltip("Сколько узлов появляется за ночь.")]
+        [Tooltip("Сколько узлов появляется за всю ночь.")]
         [SerializeField, Min(0)] private int _count = 18;
 
-        [Tooltip("Радиус появления. Держится в пределах фермы: гоняться за светлячками " +
-                 "по всему лесу — работа, а не отдых.")]
+        [Tooltip("Сколько выкладывается сразу с наступлением темноты. Остальное подсыпается " +
+                 "порциями: у ночи должен быть повод вернуться к ней через несколько минут.")]
+        [SerializeField, Min(0)] private int _initialCount = 6;
+
+        [Tooltip("Через сколько секунд подсыпать следующую порцию.")]
+        [SerializeField, Min(1f)] private float _refillInterval = 25f;
+
+        [Tooltip("Сколько узлов в одной порции.")]
+        [SerializeField, Min(1)] private int _refillBatch = 2;
+
+        [Tooltip("Общий радиус появления для видов, у которых свой не задан.")]
         [SerializeField, Min(1f)] private float _radius = 11f;
 
         [Tooltip("Не ближе этого к грядкам и постройкам, чтобы клик не уходил не туда.")]
@@ -57,6 +83,8 @@ namespace Farm.Farming
         private readonly List<Gatherable> _spawned = new List<Gatherable>();
         private Transform _holder;
         private bool _nightActive;
+        private int _spawnedTonight;
+        private float _refillTimer;
 
         /// <summary>Сколько узлов лежит прямо сейчас.</summary>
         public int Active
@@ -69,6 +97,9 @@ namespace Farm.Farming
                 return alive;
             }
         }
+
+        /// <summary>Сколько узлов уже выложено за эту ночь, включая собранные.</summary>
+        public int SpawnedTonight => _spawnedTonight;
 
         /// <summary>
         /// Сверяемся с часами каждый кадр, а не подписываемся на их события.
@@ -84,25 +115,65 @@ namespace Farm.Farming
             var cycle = DayNightCycle.Instance;
             if (cycle == null) return;
 
-            if (cycle.IsNight == _nightActive) return;
-
-            if (cycle.IsNight) Spawn();
-            else
+            if (cycle.IsNight != _nightActive)
             {
-                _nightActive = false;
-                if (_clearAtDawn) Clear();
+                if (cycle.IsNight) BeginNight();
+                else EndNight();
+                return;
             }
+
+            if (_nightActive) Refill();
         }
 
-        /// <summary>Рассыпать ночную порцию узлов. Публичный, чтобы тест мог вызвать не дожидаясь ночи.</summary>
-        public void Spawn()
+        // ---- ночной цикл ----
+
+        private void BeginNight()
         {
-            if (_nightActive) return;
             _nightActive = true;
+            _spawnedTonight = 0;
+            _refillTimer = _refillInterval;
 
             Clear();
+            CreateHolder();
 
-            if (_kinds == null || _kinds.Length == 0 || _count <= 0) return;
+            int first = _initialCount > 0 ? Mathf.Min(_initialCount, _count) : _count;
+            int placed = Spawn(first);
+
+            if (placed > 0) Debug.Log("[Ночь] выставлено сборов: " + placed, this);
+        }
+
+        private void EndNight()
+        {
+            _nightActive = false;
+            if (_clearAtDawn) Clear();
+        }
+
+        /// <summary>Подсыпать очередную порцию, если время пришло и лимит ночи не выбран.</summary>
+        private void Refill()
+        {
+            if (_spawnedTonight >= _count) return;
+
+            _refillTimer -= Time.deltaTime;
+            if (_refillTimer > 0f) return;
+            _refillTimer = _refillInterval;
+
+            if (_holder == null) CreateHolder();
+            Spawn(Mathf.Min(_refillBatch, _count - _spawnedTonight));
+        }
+
+        /// <summary>Выложить ночную порцию целиком. Публичный, чтобы тест мог вызвать не дожидаясь ночи.</summary>
+        public void SpawnAll()
+        {
+            if (!_nightActive) BeginNight();
+            Spawn(_count - _spawnedTonight);
+        }
+
+        // ---- расстановка ----
+
+        /// <summary>Выкладывает до <paramref name="amount"/> узлов. Возвращает, сколько встало.</summary>
+        private int Spawn(int amount)
+        {
+            if (amount <= 0 || _kinds == null || _kinds.Length == 0) return 0;
 
             float totalWeight = 0f;
             foreach (var kind in _kinds)
@@ -111,30 +182,20 @@ namespace Farm.Farming
             if (totalWeight <= 0f)
             {
                 Debug.LogWarning("[Ночь] Нечего рассыпать — не задано ни одного вида", this);
-                return;
+                return 0;
             }
-
-            _holder = new GameObject("NightHarvest").transform;
-            _holder.SetParent(transform, false);
 
             var bounds = FarmBounds.Instance;
             Vector3 center = bounds != null ? bounds.Center : transform.position;
-            float radius = bounds != null ? Mathf.Min(_radius, bounds.UsableRadius) : _radius;
 
-            int attempts = _count * 6;
             int placed = 0;
-
-            while (placed < _count && attempts-- > 0)
+            for (int i = 0; i < amount; i++)
             {
-                float t = UnityEngine.Random.value;
-                float r = Mathf.Sqrt(t) * radius;
-                float angle = UnityEngine.Random.value * Mathf.PI * 2f;
-
-                var point = center + new Vector3(Mathf.Cos(angle) * r, 0f, Mathf.Sin(angle) * r);
-                if (!IsClear(point)) continue;
-
+                // Вид выбираем первым: радиус разброса теперь принадлежит виду, а не компоненту,
+                // и без этого светлячок не смог бы уйти за забор, оставив росу у дома.
                 var kind = Pick(totalWeight);
                 if (kind == null) break;
+                if (!TryFindPoint(kind, center, bounds, out Vector3 point)) continue;
 
                 var instance = Instantiate(kind.Prefab, point,
                     Quaternion.Euler(0f, UnityEngine.Random.value * 360f, 0f), _holder);
@@ -148,9 +209,36 @@ namespace Farm.Farming
 
                 _spawned.Add(node);
                 placed++;
+                _spawnedTonight++;
             }
 
-            if (placed > 0) Debug.Log("[Ночь] выставлено сборов: " + placed, this);
+            return placed;
+        }
+
+        private bool TryFindPoint(Kind kind, Vector3 center, FarmBounds bounds, out Vector3 point)
+        {
+            float outer = kind.Radius > 0f ? kind.Radius : _radius;
+            if (kind.KeepInsideFarm && bounds != null) outer = Mathf.Min(outer, bounds.UsableRadius);
+
+            float inner = Mathf.Clamp(kind.InnerRadius, 0f, Mathf.Max(0f, outer - 0.5f));
+
+            for (int attempt = 0; attempt < 12; attempt++)
+            {
+                // Корень — иначе точки сгущаются к центру: площадь кольца растёт как квадрат
+                // радиуса, а равномерный радиус этого не знает.
+                float t = UnityEngine.Random.value;
+                float r = Mathf.Sqrt(Mathf.Lerp(inner * inner, outer * outer, t));
+                float angle = UnityEngine.Random.value * Mathf.PI * 2f;
+
+                var candidate = center + new Vector3(Mathf.Cos(angle) * r, 0f, Mathf.Sin(angle) * r);
+                if (!IsClear(candidate)) continue;
+
+                point = candidate;
+                return true;
+            }
+
+            point = default;
+            return false;
         }
 
         public void Clear()
@@ -163,6 +251,13 @@ namespace Farm.Farming
 
             _holder = null;
             _spawned.Clear();
+            _spawnedTonight = 0;
+        }
+
+        private void CreateHolder()
+        {
+            _holder = new GameObject("NightHarvest").transform;
+            _holder.SetParent(transform, false);
         }
 
         private Kind Pick(float totalWeight)

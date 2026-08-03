@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: tree_oak
   _displayName: "\u0414\u0443\u0431"
   _category: 0
-  _defaultStageDuration: 13.2
+  _defaultStageDuration: 39.6
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 13.2
+    _duration: 39.6
     _visual: {fileID: 919132149155446097, guid: 8216283c5c2b66a4c9b69b050a2c4b54, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

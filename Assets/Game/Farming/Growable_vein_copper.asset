@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: vein_copper
   _displayName: "\u041C\u0435\u0434\u043D\u0430\u044F \u0436\u0438\u043B\u0430"
   _category: 2
-  _defaultStageDuration: 8
+  _defaultStageDuration: 24
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 8
+    _duration: 24
     _visual: {fileID: 919132149155446097, guid: 8f990f1b25106b6459796abd0fd6d6dd, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

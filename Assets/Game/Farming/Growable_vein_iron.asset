@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: vein_iron
   _displayName: "\u0416\u0435\u043B\u0435\u0437\u043D\u0430\u044F \u0436\u0438\u043B\u0430"
   _category: 2
-  _defaultStageDuration: 13.2
+  _defaultStageDuration: 39.6
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 13.2
+    _duration: 39.6
     _visual: {fileID: 919132149155446097, guid: 883206d5e935dbd4db2c0b80cc5dee89, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

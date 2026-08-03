@@ -91,11 +91,11 @@ namespace Farm.Interaction
 
             if (mouse.leftButton.wasReleasedThisFrame)
             {
-                _gathering = null;
+                SetGathering(null);
                 if (_dragged != null) Drop(screen);
             }
 
-            if (_gathering != null && _gathering.IsEmpty) _gathering = null;
+            if (_gathering != null && _gathering.IsEmpty) SetGathering(null);
 
             // Объект могли уничтожить, пока он в руке (слияние с другой стороны и т.п.)
             if (_dragged == null)
@@ -121,7 +121,7 @@ namespace Farm.Interaction
                 return true;
             }
 
-            _gathering = node;
+            SetGathering(node);
             return true;
         }
 
@@ -130,6 +130,13 @@ namespace Farm.Interaction
             if (_gathering == null) return;
 
             if (_gathering.Hold(Time.deltaTime)) Feedback(_gathering);
+        }
+
+        /// <summary>Держим удерживаемый узел и общий фокус в согласии — по нему рисуется индикатор.</summary>
+        private void SetGathering(Gatherable node)
+        {
+            _gathering = node;
+            GatherFocus.Set(node);
         }
 
         private void Feedback(Gatherable node)
@@ -373,6 +380,7 @@ namespace Farm.Interaction
         private void OnDisable()
         {
             ClearHighlight();
+            SetGathering(null);
             _dragged = null;
             _draggedGrowable = null;
         }

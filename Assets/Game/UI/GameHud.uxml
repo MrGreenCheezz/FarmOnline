@@ -7,6 +7,9 @@
         <!-- ===== плашки уровней над грядками (под панелями) ===== -->
         <ui:VisualElement name="world-badges" class="world-layer" picking-mode="Ignore" />
 
+        <!-- ===== кольцо прогресса над узлом, который держат рукой ===== -->
+        <ui:VisualElement name="gather-ring-layer" class="world-layer" picking-mode="Ignore" />
+
         <!-- ===== всплывающие числа над событиями ===== -->
         <ui:VisualElement name="floating-text" class="world-layer" picking-mode="Ignore" />
 

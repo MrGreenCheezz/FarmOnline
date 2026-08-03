@@ -86,9 +86,15 @@ namespace Farm.Farming
         [Tooltip("На сколько градусов повернуть путь солнца вокруг вертикали.")]
         [SerializeField, Range(0f, 360f)] private float _sunHeading = 35f;
 
-        [Tooltip("Под каким углом стоит «луна». Ночью светильник не уходит под горизонт, а " +
-                 "переезжает сюда: источник из-под земли не освещает ничего, и ночь чернеет в ноль.")]
+        [Tooltip("Под каким углом стоит «луна» в полночь. Ночью светильник не уходит под " +
+                 "горизонт, а поднимается сюда: источник из-под земли не освещает ничего, " +
+                 "и ночь чернеет в ноль.")]
         [SerializeField, Range(10f, 80f)] private float _moonElevation = 42f;
+
+        [Tooltip("Самое низкое положение светила — рассвет и закат.\n" +
+                 "Ноль ставить нельзя: свет, лёгший вдоль земли, не освещает ничего, и кадр " +
+                 "проваливается в черноту ровно в самое красивое время суток.")]
+        [SerializeField, Range(3f, 25f)] private float _minElevation = 9f;
 
         private float _time01;
         private int _day = 1;
@@ -216,18 +222,7 @@ namespace Farm.Farming
             float height = Mathf.Sin((_time01 - 0.25f) * Mathf.PI * 2f);
             float daylight = Mathf.Clamp01(height * 1.15f + 0.42f);
 
-            if (height > -0.02f)
-            {
-                // Полдень — солнце в зените. Смещение на четверть суток переводит долю в угол так,
-                // что 0.5 даёт 90 градусов над горизонтом.
-                _sun.transform.rotation = Quaternion.Euler((_time01 - 0.25f) * 360f, _sunHeading, 0f);
-            }
-            else
-            {
-                // Ночь: тот же светильник работает луной с другой стороны неба.
-                _sun.transform.rotation = Quaternion.Euler(_moonElevation, _sunHeading + 180f, 0f);
-            }
-
+            _sun.transform.rotation = SkyRotation(height);
             _sun.intensity = Mathf.Lerp(_nightIntensity, _dayIntensity, daylight);
 
             // Тёплый на рассвете и закате, нейтральный в полдень, холодный ночью.
@@ -242,6 +237,35 @@ namespace Farm.Farming
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientIntensity = 1f;
             RenderSettings.ambientLight = Color.Lerp(_ambientNightColor, _ambientDayColor, daylight);
+        }
+
+        /// <summary>
+        /// Куда повёрнут светильник. Одна непрерывная дуга на всю ночь и день, без разрыва.
+        /// <para>
+        /// Раньше здесь стоял жёсткий выбор «солнце или луна», и он давал ровно ту ступеньку,
+        /// которую видно глазом: яркость менялась плавно, а поворот прыгал мгновенно. Солнце
+        /// ложилось к горизонту, светило вдоль земли и не освещало почти ничего — кадр чернел;
+        /// в точке переключения светильник телепортировался на другую сторону неба и разом
+        /// заливал ферму сверху. Поэтому «сумерки» приходили <i>после</i> черноты, хотя должны
+        /// быть до неё, а на рассвете то же самое происходило зеркально.
+        /// </para>
+        /// <para>
+        /// Теперь высота никогда не опускается ниже <see cref="_minElevation"/> — свет не ложится
+        /// вдоль земли и кадру неоткуда провалиться, — а «переезд на другую сторону неба» делает
+        /// азимут, проходя полный круг за сутки. Обе величины непрерывны, поэтому взяться
+        /// ступеньке больше неоткуда, и восход с закатом сами оказываются на разных сторонах.
+        /// </para>
+        /// </summary>
+        private Quaternion SkyRotation(float height)
+        {
+            // Днём поднимаемся к зениту, ночью — к высоте луны. На рассвете и закате обе ветви
+            // сходятся ровно в _minElevation, поэтому стыка между ними не видно.
+            float elevation = height >= 0f
+                ? Mathf.Lerp(_minElevation, 90f, height)
+                : Mathf.Lerp(_minElevation, _moonElevation, -height);
+
+            float azimuth = _sunHeading + _time01 * 360f;
+            return Quaternion.Euler(elevation, azimuth, 0f);
         }
 
         private static Light FindSun()

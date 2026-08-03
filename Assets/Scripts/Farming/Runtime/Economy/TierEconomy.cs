@@ -34,7 +34,12 @@ namespace Farm.Farming
         public static int SellPrice(int tier, int baseValue = 3) =>
             Mathf.Max(1, Mathf.RoundToInt(baseValue * Mathf.Pow(ValueStep, Mathf.Max(0, tier - 1))));
 
-        public static float GrowSeconds(int tier, float baseSeconds = 8f) =>
+        /// <summary>
+        /// Сколько секунд растёт ступень. База согласована с длиной суток: сутки идут 600 секунд,
+        /// и культура первой ступени должна успевать примерно десяток циклов за светлое время.
+        /// Меняешь длину суток — меняй и её, иначе день перестанет быть «одним рабочим днём».
+        /// </summary>
+        public static float GrowSeconds(int tier, float baseSeconds = 24f) =>
             baseSeconds * Mathf.Pow(TimeStep, Mathf.Max(0, tier - 1));
 
         /// <summary>Цена в золоте грядки или жилы, производящей эту ступень.</summary>
