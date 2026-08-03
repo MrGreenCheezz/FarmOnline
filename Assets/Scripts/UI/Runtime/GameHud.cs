@@ -25,6 +25,7 @@ namespace Farm.UI
         [SerializeField, Min(0.02f)] private float _refreshInterval = 0.1f;
 
         private const string PrefCollapsed = "hud.collapsed";
+        private const string PrefBadges = "hud.badges";
 
         private UIDocument _document;
         private ShopWindow _shop;
@@ -33,6 +34,9 @@ namespace Farm.UI
         private VisualElement _panels;
         private Button _collapseButton;
         private bool _collapsed;
+
+        private PlotLevelBadges _badges;
+        private Button _badgesButton;
 
         private VisualElement _root;
         private Label _goldValue;
@@ -125,6 +129,15 @@ namespace Farm.UI
             _collapseButton = root.Q<Button>("collapse-button");
             if (_collapseButton != null) _collapseButton.clicked += TogglePanels;
             ApplyCollapsed();
+
+            _badges = GetComponent<PlotLevelBadges>();
+            _badgesButton = root.Q<Button>("badges-button");
+            if (_badgesButton != null) _badgesButton.clicked += ToggleBadges;
+
+            // Выбор игрока должен пережить перезапуск: настройка, слетающая при рестарте,
+            // не настройка.
+            if (_badges != null) _badges.Visible = PlayerPrefs.GetInt(PrefBadges, 1) == 1;
+            ApplyBadges();
 
             if (_farmer == null) _farmer = FindFirstObjectByType<FarmerAgent>();
             if (_farmer != null) _needs = _farmer.GetComponent<CharacterNeeds>();
@@ -382,6 +395,33 @@ namespace Farm.UI
 
             CloseSellMenu();
             Farm.Juice.Sfx.Play(b => _collapsed ? b.UiClose : b.UiOpen);
+        }
+
+        /// <summary>
+        /// Показать или спрятать плашки уровней над грядками.
+        /// <para>
+        /// Плашка висит над каждой грядкой, и на разросшейся ферме их десятки — поле начинает
+        /// читаться как таблица. Уровень нужен, когда прикидываешь, что с чем слить; всё
+        /// остальное время на ферму хочется просто смотреть.
+        /// </para>
+        /// </summary>
+        public void ToggleBadges()
+        {
+            if (_badges != null) _badges.Toggle();
+
+            PlayerPrefs.SetInt(PrefBadges, _badges != null && _badges.Visible ? 1 : 0);
+            ApplyBadges();
+
+            Farm.Juice.Sfx.Play(b => b.UiClick);
+        }
+
+        private void ApplyBadges()
+        {
+            if (_badgesButton == null) return;
+
+            bool on = _badges != null && _badges.Visible;
+            _badgesButton.text = on ? "Уровни" : "Уровни ✕";
+            _badgesButton.EnableInClassList("btn--muted", !on);
         }
 
         private void ApplyCollapsed()

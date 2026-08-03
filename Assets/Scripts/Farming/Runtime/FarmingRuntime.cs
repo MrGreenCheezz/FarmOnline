@@ -39,6 +39,22 @@ namespace Farm.Farming
         void Add(ResourceDefinition resource, int amount);
     }
 
+    /// <summary>
+    /// Откуда узнать высоту земли. Ещё один шов: рельеф рисует слой оформления, а класть по нему
+    /// вещи нужно ядру, и ссылаться на оформление оно не может.
+    /// </summary>
+    public interface IGroundHeight
+    {
+        /// <summary>Высота земли под точкой, в мировых координатах.</summary>
+        float SampleHeight(Vector3 worldPosition);
+    }
+
+    /// <summary>Земля-плоскость. Работает, пока рельефа в сцене нет.</summary>
+    public sealed class FlatGround : IGroundHeight
+    {
+        public float SampleHeight(Vector3 worldPosition) => 0f;
+    }
+
     /// <summary>Сток-заглушка: логирует урожай и ведёт суммарный счёт по каждому ресурсу.</summary>
     public sealed class DebugResourceSink : IResourceSink
     {
@@ -67,6 +83,7 @@ namespace Farm.Farming
     {
         private static IGameClock _clock;
         private static IResourceSink _sink;
+        private static IGroundHeight _ground;
 
         public static IGameClock Clock
         {
@@ -78,6 +95,16 @@ namespace Farm.Farming
         {
             get => _sink ?? (_sink = new DebugResourceSink());
             set => _sink = value ?? throw new ArgumentNullException(nameof(value));
+        }
+
+        /// <summary>
+        /// Рельеф земли. Пока никто не подставил свой — земля считается плоской, и всё работает
+        /// ровно как раньше.
+        /// </summary>
+        public static IGroundHeight Ground
+        {
+            get => _ground ?? (_ground = new FlatGround());
+            set => _ground = value ?? new FlatGround();
         }
 
         /// <summary>Выключить, когда появится настоящий интерфейс инвентаря.</summary>
@@ -92,6 +119,7 @@ namespace Farm.Farming
         {
             _clock = null;
             _sink = null;
+            _ground = null;
             LogHarvests = true;
         }
     }

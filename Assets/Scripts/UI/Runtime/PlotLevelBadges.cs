@@ -25,8 +25,28 @@ namespace Farm.UI
         [Tooltip("Дальше этого расстояния от камеры плашки не рисуются.")]
         [SerializeField, Min(1f)] private float _maxDistance = 45f;
 
+        [Tooltip("Показывать плашки. Переключается кнопкой в HUD.")]
+        [SerializeField] private bool _visible = true;
+
         private VisualElement _layer;
         private readonly List<Label> _pool = new List<Label>();
+
+        /// <summary>
+        /// Видны ли плашки. Выключенные не просто прячутся — вся покадровая работа
+        /// пропускается: на большой ферме это десятки проекций в кадр впустую.
+        /// </summary>
+        public bool Visible
+        {
+            get => _visible;
+            set
+            {
+                if (_visible == value) return;
+                _visible = value;
+                if (!_visible) HideFrom(0);
+            }
+        }
+
+        public void Toggle() => Visible = !_visible;
 
         private void OnEnable()
         {
@@ -42,7 +62,7 @@ namespace Farm.UI
         // LateUpdate: грядки к этому моменту уже сдвинуты перетаскиванием, плашки не отстают на кадр.
         private void LateUpdate()
         {
-            if (_camera == null || _layer == null) return;
+            if (!_visible || _camera == null || _layer == null) return;
 
             var panel = _layer.panel;
             if (panel == null) return;

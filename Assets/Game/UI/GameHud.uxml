@@ -25,6 +25,7 @@
                 <ui:Button name="inventory-button" text="Склад" class="btn" />
                 <ui:Button name="shop-button" text="Магазин" class="btn btn--accent" />
                 <ui:Button name="settings-button" text="Настройки" class="btn" />
+                <ui:Button name="badges-button" text="Уровни" class="btn btn--ghost" />
                 <ui:Button name="collapse-button" text="Скрыть" class="btn btn--ghost" />
             </ui:VisualElement>
 

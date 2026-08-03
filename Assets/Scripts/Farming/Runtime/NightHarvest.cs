@@ -233,6 +233,10 @@ namespace Farm.Farming
                 var candidate = center + new Vector3(Mathf.Cos(angle) * r, 0f, Mathf.Sin(angle) * r);
                 if (!IsClear(candidate)) continue;
 
+                // Ложимся по рельефу: светлячки разлетаются далеко за забор, где земля уже
+                // идёт волнами, и на постоянной высоте половина роя висела бы над склоном.
+                candidate.y = center.y + FarmingRuntime.Ground.SampleHeight(candidate);
+
                 point = candidate;
                 return true;
             }

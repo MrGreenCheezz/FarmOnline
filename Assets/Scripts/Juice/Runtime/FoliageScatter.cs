@@ -136,6 +136,10 @@ namespace Farm.Juice
                         if (!IsClear(point)) continue;
                     }
 
+                    // Ложимся по рельефу: за фермой земля идёт волнами, и трава, посеянная
+                    // на постоянной высоте, там висела бы в воздухе или тонула в холме.
+                    point.y = _groundY + FarmingRuntime.Ground.SampleHeight(point);
+
                     Place(entry, point, random);
                     Placed++;
                 }
