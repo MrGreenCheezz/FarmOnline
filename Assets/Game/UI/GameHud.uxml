@@ -10,6 +10,9 @@
         <!-- ===== кольцо прогресса над узлом, который держат рукой ===== -->
         <ui:VisualElement name="gather-ring-layer" class="world-layer" picking-mode="Ignore" />
 
+        <!-- ===== мысль фермера: видимый момент выбора ===== -->
+        <ui:VisualElement name="thought-layer" class="world-layer" picking-mode="Ignore" />
+
         <!-- ===== всплывающие числа над событиями ===== -->
         <ui:VisualElement name="floating-text" class="world-layer" picking-mode="Ignore" />
 

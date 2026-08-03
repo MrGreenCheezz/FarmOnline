@@ -10859,6 +10859,7 @@ GameObject:
   - component: {fileID: 236242270}
   - component: {fileID: 236242271}
   - component: {fileID: 236242272}
+  - component: {fileID: 236242273}
   m_Layer: 0
   m_Name: HUD
   m_TagString: Untagged
@@ -11018,6 +11019,24 @@ MonoBehaviour:
   _thickness: 5
   _trackColor: {r: 0, g: 0, b: 0, a: 0.35}
   _fillColor: {r: 0.75, g: 0.92, b: 1, a: 0.95}
+--- !u!114 &236242273
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 236242262}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 791409af4e9f27140b68174bea63f48d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Farm.UI::Farm.UI.FarmerThoughtBubble
+  _farmer: {fileID: 0}
+  _camera: {fileID: 0}
+  _worldHeight: 2.1
+  _life: 3.5
+  _maxDistance: 40
+  _showMood: 1
 --- !u!1001 &236268997
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -59663,6 +59682,7 @@ GameObject:
   - component: {fileID: 1400438017}
   - component: {fileID: 1400438023}
   - component: {fileID: 1400438024}
+  - component: {fileID: 1400438025}
   m_Layer: 0
   m_Name: Farmer
   m_TagString: Untagged
@@ -59723,6 +59743,8 @@ MonoBehaviour:
   _harvestDuration: 0.8
   _depositDuration: 0.5
   _scanInterval: 0.25
+  _thinkDuration: 0.45
+  _switchMargin: 1.5
   _filterByCategory: 0
   _category: 0
   _keepFood: 25
@@ -59733,6 +59755,7 @@ MonoBehaviour:
   _maxPlots: 40
   _sellDuration: 1.2
   _sleepAtNight: 1
+  _lookAroundSpeed: 22
 --- !u!114 &1400438020
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -59820,6 +59843,25 @@ MonoBehaviour:
   _capacityMode: 1
   _capacity: 8
   _allowOverflow: 1
+--- !u!114 &1400438025
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1400438016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e1d9eab65d5126c4d94f888d4bdf1ad1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Farm.Characters::Farm.Characters.FarmerTraits
+  _randomize: 1
+  _seed: 0
+  _oreLover: 0.19681707
+  _homebody: 0.25232157
+  _earlyRiser: 0.45692885
+  _tidiness: 0.56367743
+  _nightCourage: 0.33724907
 --- !u!1001 &1400588186
 PrefabInstance:
   m_ObjectHideFlags: 0

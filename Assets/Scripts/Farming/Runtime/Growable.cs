@@ -133,6 +133,16 @@ namespace Farm.Farming
             }
         }
 
+        /// <summary>
+        /// Сколько секунд грядка уже стоит спелой. 0, если она не спелая.
+        /// <para>
+        /// Это память об очереди. Без неё выбор «что собрать» умеет смотреть только на
+        /// расстояние, и дальнее не собирается никогда: рядом с домом всегда что-то поспело.
+        /// </para>
+        /// </summary>
+        public double RipeSeconds =>
+            _phase == GrowthPhase.Ready ? Math.Max(0.0, FarmingRuntime.Now - _readyAt) : 0.0;
+
         /// <summary>Реальные секунды до следующей смены стадии. -1, когда ничего не растёт.</summary>
         public double TimeUntilNextStage
         {

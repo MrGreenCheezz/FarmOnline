@@ -483,6 +483,11 @@ namespace Farm.UI
                 case FarmerState.GoingToMarket: return "идёт на рынок";
                 case FarmerState.AtMarket: return "торгует";
                 case FarmerState.Sleeping: return "спит";
+                case FarmerState.Thinking: return "прикидывает";
+                case FarmerState.Relaxing: return "отдыхает";
+                case FarmerState.Awaiting: return "ждёт урожай";
+                case FarmerState.GoingToTidy: return "идёт прибраться";
+                case FarmerState.Hauling: return "переставляет";
                 default: return state.ToString();
             }
         }

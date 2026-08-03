@@ -187,6 +187,9 @@ namespace Farm.Interaction
             _groundY = found.position.y;
             _pressScreen = screen;
 
+            // Животное, пока его несут, не должно брести по своим делам из-под курсора.
+            DragFocus.Set(found);
+
             Tween.Punch(found, 0.12f, 0.18f);
             Sfx.Play(b => b.PickUp);
 
@@ -206,7 +209,14 @@ namespace Farm.Interaction
         {
             var dragged = _dragged;
             var growable = _draggedGrowable;
-            if (dragged == null) { _dragged = null; _draggedGrowable = null; ClearHighlight(); return; }
+            if (dragged == null)
+            {
+                _dragged = null;
+                _draggedGrowable = null;
+                DragFocus.Clear();
+                ClearHighlight();
+                return;
+            }
 
             // Цель ищем до того, как отпустить ссылки: она нужна и для проверки совместимости.
             var target = FindMergeTarget(screen, growable);
@@ -219,6 +229,7 @@ namespace Farm.Interaction
 
             _dragged = null;
             _draggedGrowable = null;
+            DragFocus.Clear();
             ClearHighlight();
 
             if (target != null && growable != null && target.TryMergeWith(growable)) return;   // growable уничтожен внутри
@@ -381,6 +392,7 @@ namespace Farm.Interaction
         {
             ClearHighlight();
             SetGathering(null);
+            DragFocus.Clear();
             _dragged = null;
             _draggedGrowable = null;
         }

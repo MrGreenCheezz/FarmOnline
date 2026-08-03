@@ -6,7 +6,7 @@ namespace Farm.Characters
 {
     public enum FarmerState
     {
-        /// <summary>Стоит между прогулками.</summary>
+        /// <summary>Стоит между делами.</summary>
         Idle = 0,
         /// <summary>Бредёт к случайной точке вокруг дома.</summary>
         Wandering = 1,
@@ -27,20 +27,37 @@ namespace Farm.Characters
         /// <summary>Стоит на рынке, ведёт дела.</summary>
         AtMarket = 9,
         /// <summary>Спит — ночь или вымотался.</summary>
-        Sleeping = 10
+        Sleeping = 10,
+        /// <summary>Короткая пауза: решение принято, но ещё не начато.</summary>
+        Thinking = 11,
+        /// <summary>Быт: сидит у костра, стоит дома, осматривается.</summary>
+        Relaxing = 12,
+        /// <summary>Ждёт у грядки, которой осталось несколько секунд.</summary>
+        Awaiting = 13,
+        /// <summary>Идёт за грядкой, которую решил переставить.</summary>
+        GoingToTidy = 14,
+        /// <summary>Несёт грядку на новое место.</summary>
+        Hauling = 15
     }
 
     /// <summary>
-    /// Фермер в своей первой форме: бродит → замечает спелое → собирает → несёт домой.
+    /// Фермер: конечный автомат «что я делаю сейчас». Что делать дальше — решает
+    /// <see cref="FarmerBrain"/>, и это разделение здесь главное.
     /// <para>
-    /// Он никогда не сканирует сцену. Спелые грядки приходят из <see cref="GrowableRegistry"/>,
-    /// который система фермы держит актуальным, поэтому цена поиска работы пропорциональна
-    /// количеству работы, а не размеру фермы.
+    /// Раньше обе половины жили одной лестницей <c>if</c>: порядок всегда один, ничто ни с чем
+    /// не взвешивается, передумать нельзя. Каждый новый мотив становился ещё одной веткой в той
+    /// же лестнице, а зритель видел не выбор, а исполнение чеклиста.
     /// </para>
     /// <para>
-    /// Урожай попадает в <see cref="CharacterInventory"/> персонажа у самой грядки и доходит до
-    /// <see cref="FarmingRuntime.Sink"/> только после того, как персонаж физически дошёл домой.
-    /// Урони персонажа на полпути — и груз честно потерян; именно это делает перенос значимым.
+    /// Решение к тому же телеграфируется: перед новым делом он на мгновение замирает и над ним
+    /// появляется мысль. Без этого любая умная система читается как случайность — игрок должен
+    /// видеть сам выбор, а не только его последствия.
+    /// </para>
+    /// <para>
+    /// Он никогда не сканирует сцену. Спелые грядки приходят из <see cref="GrowableRegistry"/>,
+    /// поэтому цена поиска работы пропорциональна количеству работы, а не размеру фермы.
+    /// Урожай попадает в рюкзак у самой грядки и доходит до склада только после того, как
+    /// персонаж физически дошёл домой.
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
@@ -65,8 +82,16 @@ namespace Farm.Characters
         [Tooltip("Сколько секунд занимает выгрузка дома.")]
         [SerializeField, Min(0f)] private float _depositDuration = 0.5f;
 
-        [Tooltip("Как часто искать работу, секунд. Чаще — отзывчивее, но и дороже.")]
+        [Tooltip("Как часто пересматривать решение, секунд. Чаще — отзывчивее, но и дороже.")]
         [SerializeField, Min(0.05f)] private float _scanInterval = 0.25f;
+
+        [Tooltip("Сколько он «думает» перед новым делом. Пауза нужна не ему, а игроку: без неё " +
+                 "решение не видно — персонаж просто оказывается идущим куда-то.")]
+        [SerializeField, Min(0f)] private float _thinkDuration = 0.45f;
+
+        [Tooltip("Насколько новое дело должно быть лучше текущего, чтобы он передумал на ходу. " +
+                 "Ноль заставит его дёргаться между двумя равными грядками.")]
+        [SerializeField, Min(0f)] private float _switchMargin = 1.5f;
 
         [Header("Что собирать")]
         [SerializeField] private bool _filterByCategory;
@@ -84,7 +109,7 @@ namespace Farm.Characters
         [Tooltip("Меньше этого на продажу не ходит — не стоит дороги.")]
         [SerializeField, Min(1)] private int _minSaleBatch = 10;
 
-        [Tooltip("Столько излишка он бросает ради него сбор урожая. Ниже — торгует только в простой.")]
+        [Tooltip("Излишек, при котором торговля становится срочной.")]
         [SerializeField, Min(1)] private int _urgentSurplus = 60;
 
         [Header("Закупка")]
@@ -103,15 +128,42 @@ namespace Farm.Characters
         [Tooltip("Ложится ли спать с наступлением ночи, даже если ещё бодр.")]
         [SerializeField] private bool _sleepAtNight = true;
 
+        [Tooltip("Как быстро осматривается, стоя без дела, градусов в секунду.")]
+        [SerializeField, Min(0f)] private float _lookAroundSpeed = 22f;
+
+        [Header("Обустройство")]
+        [Tooltip("На каком расстоянии он ставит грядку рядом с её парой.\n" +
+                 "Он сводит одинаковые вплотную, но не сливает: слияние остаётся ходом игрока.")]
+        [SerializeField, Min(0.4f)] private float _tidySpacing = 1.3f;
+
+        [Tooltip("На какой высоте несёт груз.")]
+        [SerializeField, Min(0f)] private float _carryHeight = 0.55f;
+
+        [Tooltip("Как далеко перед собой держит несомое.")]
+        [SerializeField, Min(0f)] private float _carryReach = 0.55f;
+
         private AgentMover _mover;
         private CharacterInventory _inventoryComponent;
         private CharacterNeeds _needs;
         private FarmerSkills _skills;
+        private FarmerTraits _traits;
+        private FarmerBrain _brain;
+
         private FarmerState _state = FarmerState.Idle;
+        private FarmerDecision _pending;
+        private FarmerDecision _current;
+        private float _currentScore;
+
         private Growable _target;
         private Building _serviceTarget;
         private Building _market;
+        private Vector3 _relaxSpot;
+        private Vector3 _tidySpot;
+        private float _carryGroundY;
         private Vector3 _homePosition;
+        private Vector3 _favouriteSpot;
+        private string _thought = "";
+
         private float _timer;
         private float _scanTimer;
         private float _baseSpeed = 1.5f;
@@ -121,6 +173,9 @@ namespace Farm.Characters
 
         /// <summary>Сменил занятие — удобно для анимации и UI.</summary>
         public event Action<FarmerAgent, FarmerState> StateChanged;
+
+        /// <summary>Появилась новая мысль. Её показывает пузырь над головой.</summary>
+        public event Action<FarmerAgent, string> ThoughtChanged;
 
         /// <summary>Что-то подобрал. Это в рюкзаке, ещё не на складе.</summary>
         public event Action<FarmerAgent, HarvestResult> Collected;
@@ -144,8 +199,31 @@ namespace Farm.Characters
         /// <summary>Его навыки, или null без компонента — всё деградирует к уровню 1.</summary>
         public FarmerSkills Skills => _skills;
 
+        /// <summary>Его характер, или null — тогда все черты нейтральны.</summary>
+        public FarmerTraits Traits => _traits;
+
+        /// <summary>О чём он думает прямо сейчас, одной строкой от первого лица.</summary>
+        public string Thought => _thought;
+
         /// <summary>Истина, пока он спит. HUD по этому флагу приглушает себя.</summary>
         public bool IsAsleep => _state == FarmerState.Sleeping;
+
+        /// <summary>
+        /// Самочувствие одним словом. Анимаций под настроение пока нет, поэтому оно читается
+        /// подписью — но читается, а это и была задача.
+        /// </summary>
+        public string Mood
+        {
+            get
+            {
+                if (_state == FarmerState.Sleeping) return "спит";
+                if (_needs == null) return "";
+                if (_needs.IsTired) return "вымотан";
+                if (_needs.IsHungry) return "голоден";
+                if (_needs.IsThirsty) return "хочет пить";
+                return _needs.Wellbeing01 > 0.8f ? "бодр" : "в порядке";
+            }
+        }
 
         /// <summary>
         /// Что фермер несёт. Ёмкость живёт на <see cref="CharacterInventory"/>.
@@ -165,6 +243,26 @@ namespace Farm.Characters
 
         public bool IsCarrying => !Inventory.IsEmpty;
 
+        // ---- то, что читает мозг ----
+
+        internal Vector3 Pos => transform.position;
+        internal IInventory Pack => Inventory;
+        internal CharacterNeeds Needs => _needs;
+        internal Vector3 FavouriteSpot => _favouriteSpot;
+        internal float SearchRadius => _searchRadius;
+        internal bool SleepsAtNight => _sleepAtNight;
+        internal bool OnlyOwnCategory => _filterByCategory;
+        internal ResourceCategory Category => _category;
+        internal int KeepFood => _keepFood;
+        internal int KeepMaterials => _keepMaterials;
+        internal int MinSaleBatch => _minSaleBatch;
+        internal int UrgentSurplus => _urgentSurplus;
+        internal int GoldReserve => _goldReserve;
+        internal int MaxPlots => _maxPlots;
+        internal float TidySpacing => _tidySpacing;
+
+        #region Жизненный цикл
+
         private void Awake()
         {
             _mover = GetComponent<AgentMover>();
@@ -175,6 +273,8 @@ namespace Farm.Characters
 
             _needs = GetComponent<CharacterNeeds>();
             _skills = GetComponent<FarmerSkills>();
+            _traits = GetComponent<FarmerTraits>();
+            _brain = new FarmerBrain(this);
 
             if (_mover != null) _baseSpeed = _mover.Speed;
             _baseCapacity = _inventoryComponent.Capacity;
@@ -182,9 +282,39 @@ namespace Farm.Characters
             if (_skills != null) _skills.LevelledUp += OnLevelledUp;
         }
 
+        private void OnDisable()
+        {
+            // Выключили посреди переноски — груз должен остаться на земле, а не зависнуть.
+            if (_state == FarmerState.Hauling && _target != null)
+            {
+                var dropped = _target.transform.position;
+                dropped.y = _carryGroundY;
+                _target.transform.position = dropped;
+            }
+
+            Release();
+        }
+
         private void OnDestroy()
         {
             if (_skills != null) _skills.LevelledUp -= OnLevelledUp;
+        }
+
+        private void Start()
+        {
+            _homePosition = _home != null ? _home.position : transform.position;
+            _lastPosition = transform.position;
+
+            // Любимое место — своё у каждого работника и неизменное от запуска к запуску.
+            // Мелочь, но именно из таких мелочей складывается «он тут живёт».
+            var random = new System.Random(name.GetHashCode());
+            float angle = (float)random.NextDouble() * Mathf.PI * 2f;
+            float radius = _wanderRadius * 0.7f;
+            _favouriteSpot = _homePosition + new Vector3(
+                Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+
+            ApplyCapacity();
+            EnterIdle();
         }
 
         /// <summary>Ёмкость выводится заново, а не инкрементируется, — переживает перезагрузку без потерь.</summary>
@@ -205,14 +335,6 @@ namespace Farm.Characters
             if (_inventoryComponent == null) _inventoryComponent = gameObject.AddComponent<CharacterInventory>();
         }
 
-        private void Start()
-        {
-            _homePosition = _home != null ? _home.position : transform.position;
-            _lastPosition = transform.position;
-            ApplyCapacity();
-            EnterIdle();
-        }
-
         private void Update()
         {
             if (_mover == null) return;
@@ -228,6 +350,11 @@ namespace Farm.Characters
             {
                 case FarmerState.Idle: TickIdle(); break;
                 case FarmerState.Wandering: TickWandering(); break;
+                case FarmerState.Thinking: TickThinking(); break;
+                case FarmerState.Relaxing: TickRelaxing(); break;
+                case FarmerState.Awaiting: TickAwaiting(); break;
+                case FarmerState.GoingToTidy: TickGoingToTidy(); break;
+                case FarmerState.Hauling: TickHauling(); break;
                 case FarmerState.GoingToHarvest: TickGoingToHarvest(); break;
                 case FarmerState.Harvesting: TickHarvesting(); break;
                 case FarmerState.ReturningHome: TickReturningHome(); break;
@@ -260,11 +387,149 @@ namespace Farm.Characters
                 _skills.Grant(FarmerSkill.Legs, moved * 0.25f);
         }
 
+        #endregion
+
+        #region Решение
+
+        /// <summary>
+        /// Спросить мозг и, если нашлось дело лучше текущего, начать его.
+        /// <paramref name="margin"/> — насколько новое должно превосходить нынешнее: на ходу
+        /// без запаса он дёргался бы между двумя одинаковыми грядками каждую четверть секунды.
+        /// </summary>
+        private bool Rethink(float margin = 0f)
+        {
+            _scanTimer -= Time.deltaTime;
+            if (_scanTimer > 0f) return false;
+            _scanTimer = _scanInterval;
+
+            var decision = _brain.Choose();
+            if (!decision.IsSomething) return false;
+
+            // Уже занят ровно этим. Без такой проверки он каждую четверть секунды заново
+            // «решал» продолжать начатое: оценка чуть подросла — и он снова замирал думать,
+            // так и не сходя с места.
+            if (IsSameAsCurrent(decision)) return false;
+
+            if (decision.Score <= _currentScore + margin) return false;
+
+            BeginThinking(decision);
+            return true;
+        }
+
+        /// <summary>То же самое дело с тем же объектом, что он делает прямо сейчас?</summary>
+        private bool IsSameAsCurrent(in FarmerDecision decision)
+        {
+            if (decision.Intent != _current.Intent) return false;
+
+            switch (decision.Intent)
+            {
+                case FarmerIntent.Harvest:
+                case FarmerIntent.Await:
+                    return ReferenceEquals(decision.Plot, _current.Plot);
+
+                case FarmerIntent.Refresh:
+                case FarmerIntent.Trade:
+                    return ReferenceEquals(decision.Place, _current.Place);
+
+                case FarmerIntent.Relax:
+                    // Место могло чуть сместиться — это всё тот же отдых, а не новое решение.
+                    return (decision.Spot - _current.Spot).sqrMagnitude < 1f;
+
+                default:
+                    return true;
+            }
+        }
+
+        /// <summary>Замереть на мгновение с новой мыслью — тот самый видимый момент выбора.</summary>
+        private void BeginThinking(in FarmerDecision decision)
+        {
+            _pending = decision;
+            _mover.Stop();
+            SetThought(decision.Thought);
+
+            if (_thinkDuration <= 0f) { Commit(decision); return; }
+
+            _timer = _thinkDuration;
+            SetState(FarmerState.Thinking);
+        }
+
+        private void TickThinking()
+        {
+            _timer -= Time.deltaTime;
+            if (_timer <= 0f) Commit(_pending);
+        }
+
+        /// <summary>Перевести намерение в состояние автомата.</summary>
+        private void Commit(in FarmerDecision decision)
+        {
+            _current = decision;
+            _currentScore = decision.Score;
+
+            switch (decision.Intent)
+            {
+                case FarmerIntent.Sleep:
+                    EnterSleeping();
+                    break;
+
+                case FarmerIntent.Refresh:
+                    if (decision.Place != null) EnterGoingToService(decision.Place);
+                    else EnterIdle();
+                    break;
+
+                case FarmerIntent.Deliver:
+                    EnterReturningHome();
+                    break;
+
+                case FarmerIntent.Harvest:
+                    if (decision.Plot != null) EnterGoingToHarvest(decision.Plot);
+                    else EnterIdle();
+                    break;
+
+                case FarmerIntent.Await:
+                    if (decision.Plot != null) EnterAwaiting(decision.Plot);
+                    else EnterIdle();
+                    break;
+
+                case FarmerIntent.Trade:
+                    if (decision.Place != null) EnterGoingToMarket(decision.Place);
+                    else EnterIdle();
+                    break;
+
+                case FarmerIntent.Relax:
+                    EnterRelaxing(decision.Spot);
+                    break;
+
+                case FarmerIntent.Tidy:
+                    if (decision.Plot != null) EnterGoingToTidy(decision.Plot, decision.Spot);
+                    else EnterIdle();
+                    break;
+
+                default:
+                    EnterIdle();
+                    break;
+            }
+        }
+
+        private void SetThought(string text)
+        {
+            string value = text ?? "";
+            if (_thought == value) return;
+
+            _thought = value;
+
+            var handler = ThoughtChanged;
+            if (handler == null) return;
+            try { handler(this, value); }
+            catch (Exception e) { Debug.LogException(e, this); }
+        }
+
+        #endregion
+
         #region Состояния
 
         private void TickIdle()
         {
-            if (TryTakeWork()) return;
+            if (Rethink()) return;
 
             _timer -= Time.deltaTime;
             if (_timer <= 0f) EnterWander();
@@ -272,8 +537,116 @@ namespace Farm.Characters
 
         private void TickWandering()
         {
-            if (TryTakeWork()) return;
+            if (Rethink()) return;
             if (_mover.HasArrived) EnterIdle();
+        }
+
+        /// <summary>Быт: дойти до места и осмотреться. Уходит отсюда, как только появится дело.</summary>
+        private void TickRelaxing()
+        {
+            if (Rethink()) return;
+
+            if (!_mover.HasArrived)
+            {
+                _mover.SetDestination(_relaxSpot);
+                return;
+            }
+
+            // Медленно поворачивается: безделье должно читаться как отдых, а не как зависание.
+            transform.Rotate(0f, _lookAroundSpeed * Time.deltaTime, 0f);
+        }
+
+        /// <summary>Ждать у грядки, которой осталось чуть-чуть.</summary>
+        private void TickAwaiting()
+        {
+            if (_target == null || _target.Phase == GrowthPhase.Empty)
+            {
+                _target = null;
+                EnterIdle();
+                return;
+            }
+
+            if (_target.IsReady)
+            {
+                EnterGoingToHarvest(_target);
+                return;
+            }
+
+            if (!_mover.HasArrived)
+            {
+                _mover.SetDestination(_target.transform.position);
+                return;
+            }
+
+            FaceTowards(_target.transform.position);
+            Rethink(_switchMargin);
+        }
+
+        /// <summary>Идём за грядкой, которую решили переставить.</summary>
+        private void TickGoingToTidy()
+        {
+            // Пока шли, грядку могли собрать, снести — или игрок сам взялся её двигать.
+            if (!CanStillTidy())
+            {
+                _target = null;
+                EnterIdle();
+                return;
+            }
+
+            if (_mover.HasArrived)
+            {
+                EnterHauling();
+                return;
+            }
+
+            _mover.SetDestination(_target.transform.position);
+        }
+
+        /// <summary>Несём грядку на новое место.</summary>
+        private void TickHauling()
+        {
+            if (_target == null || !DragFocus.IsDragged(_target.transform))
+            {
+                // Груз перехватили или он исчез — руки пусты, идём заниматься другим.
+                Release();
+                EnterIdle();
+                return;
+            }
+
+            // Груз висит перед фермером и едет вместе с ним.
+            Vector3 carried = transform.position + transform.forward * _carryReach;
+            carried.y = _carryGroundY + _carryHeight;
+            _target.transform.position = carried;
+
+            if (!_mover.HasArrived)
+            {
+                _mover.SetDestination(_tidySpot);
+                return;
+            }
+
+            // Ставим ровно туда, куда несли, и на ту же высоту, с которой взяли.
+            var placed = FarmBounds.ClampToFarm(_tidySpot);
+            placed.y = _carryGroundY;
+            _target.transform.position = placed;
+
+            Release();
+            EnterIdle();
+        }
+
+        /// <summary>Можно ли всё ещё переставлять взятую на прицел грядку.</summary>
+        private bool CanStillTidy()
+        {
+            if (_target == null || _target.Phase == GrowthPhase.Empty) return false;
+
+            // Игрок взялся за неё сам — его ход важнее наведения порядка.
+            return !DragFocus.IsPlayerClaimed(_target.transform);
+        }
+
+        /// <summary>Отпустить груз, чем бы дело ни кончилось.</summary>
+        private void Release()
+        {
+            if (_target != null && DragFocus.IsDragged(_target.transform)) DragFocus.Clear();
+            _target = null;
         }
 
         private void TickGoingToHarvest()
@@ -282,7 +655,7 @@ namespace Farm.Characters
             if (_target == null || !_target.IsReady)
             {
                 _target = null;
-                if (!TryTakeWork()) EnterIdle();
+                EnterIdle();
                 return;
             }
 
@@ -293,6 +666,9 @@ namespace Farm.Characters
                 EnterHarvesting();
                 return;
             }
+
+            // Передумать на ходу можно — но только ради заметно лучшего.
+            if (Rethink(_switchMargin)) return;
 
             _mover.SetDestination(_target.transform.position);
         }
@@ -312,7 +688,7 @@ namespace Farm.Characters
                     _skills.Grant(FarmerSkill.Harvesting, 2.5f + result.Level);
                     _skills.Grant(FarmerSkill.Back, result.Amount * 0.6f);
 
-                    // Намётанный глаз: иногда со грядки снимается лишнее.
+                    // Намётанный глаз: иногда с грядки снимается лишнее.
                     if (result.Resource != null &&
                         UnityEngine.Random.value < _skills.BonusYieldChance)
                     {
@@ -340,10 +716,26 @@ namespace Farm.Characters
             _mover.SetDestination(_homePosition);
         }
 
+        private void TickDepositing()
+        {
+            _timer -= Time.deltaTime;
+            if (_timer > 0f) return;
+
+            int moved = Inventory.TransferTo(FarmingRuntime.Sink);
+            if (moved > 0)
+            {
+                Raise(Delivered, moved);
+                if (_skills != null) _skills.Grant(FarmerSkill.Back, moved * 1.2f);
+            }
+
+            _plotsThisTrip = 0;
+            EnterIdle();
+        }
+
         private void TickGoingToService()
         {
-            // Пока шли, еду могли продать, а постройку — снести
-            if (_serviceTarget == null ||
+            // Пока шли, еду могли продать, а постройку — снести.
+            if (_serviceTarget == null || _needs == null ||
                 !_serviceTarget.CanServe(_needs.Satiety01, _needs.Hydration01))
             {
                 _serviceTarget = null;
@@ -374,28 +766,10 @@ namespace Farm.Characters
             EnterIdle();
         }
 
-        private void TickDepositing()
-        {
-            _timer -= Time.deltaTime;
-            if (_timer > 0f) return;
-
-            int moved = Inventory.TransferTo(FarmingRuntime.Sink);
-            if (moved > 0)
-            {
-                Raise(Delivered, moved);
-                if (_skills != null) _skills.Grant(FarmerSkill.Back, moved * 1.2f);
-            }
-
-            _plotsThisTrip = 0;
-            EnterIdle();
-        }
-
-        // ---- торговля ----
-
         private void TickGoingToMarket()
         {
             // Рынок могли снести, а склад — опустошить, пока он шёл.
-            if (_market == null || !HasMarketErrand())
+            if (_market == null || !_brain.HasMarketErrand())
             {
                 _market = null;
                 EnterIdle();
@@ -408,11 +782,8 @@ namespace Farm.Characters
 
         /// <summary>
         /// Один визит закрывает обе половины сделки: продать излишки и потратить выручку.
-        /// <para>
-        /// Вместе, а не двумя походами, потому что в этом смысл похода — фермер, который сходил
-        /// на рынок, продал, вернулся домой и снова пошёл покупать, выглядит сломанным, а золото
-        /// с продажи — ровно то, чем оплачивается покупка.
-        /// </para>
+        /// Вместе, а не двумя походами, потому что в этом смысл похода — и золото с продажи
+        /// ровно то, чем оплачивается покупка.
         /// </summary>
         private void TickAtMarket()
         {
@@ -421,7 +792,7 @@ namespace Farm.Characters
 
             var shop = Shop.Instance;
 
-            if (shop != null && HasSurplus(out var resource, out int amount))
+            if (shop != null && _brain.HasSurplus(out var resource, out int amount))
             {
                 int gold = shop.TrySell(resource, amount);
                 if (gold > 0)
@@ -431,7 +802,7 @@ namespace Farm.Characters
                 }
             }
 
-            var purchase = PickRestock();
+            var purchase = _brain.PickRestock();
             if (purchase != null && shop != null && shop.TryBuy(purchase))
             {
                 Raise(Restocked, purchase);
@@ -441,8 +812,6 @@ namespace Farm.Characters
             _market = null;
             EnterIdle();
         }
-
-        // ---- сон ----
 
         private void TickSleeping()
         {
@@ -463,6 +832,10 @@ namespace Farm.Characters
         private void EnterIdle()
         {
             _mover.Stop();
+
+            // Свободен: ничем не занят, поэтому любое дело теперь лучше безделья.
+            _current = FarmerDecision.None;
+            _currentScore = 0f;
             _timer = UnityEngine.Random.Range(_idlePauseMin, Mathf.Max(_idlePauseMin, _idlePauseMax));
             SetState(FarmerState.Idle);
         }
@@ -472,6 +845,43 @@ namespace Farm.Characters
             Vector2 offset = UnityEngine.Random.insideUnitCircle * _wanderRadius;
             _mover.SetDestination(_homePosition + new Vector3(offset.x, 0f, offset.y));
             SetState(FarmerState.Wandering);
+        }
+
+        private void EnterRelaxing(Vector3 spot)
+        {
+            _relaxSpot = FarmBounds.ClampToFarm(spot);
+            _mover.SetDestination(_relaxSpot);
+            SetState(FarmerState.Relaxing);
+        }
+
+        private void EnterAwaiting(Growable plot)
+        {
+            _target = plot;
+            _mover.SetDestination(plot.transform.position);
+            SetState(FarmerState.Awaiting);
+        }
+
+        private void EnterGoingToTidy(Growable plot, Vector3 spot)
+        {
+            _target = plot;
+            _tidySpot = spot;
+            _mover.SetDestination(plot.transform.position);
+            SetState(FarmerState.GoingToTidy);
+        }
+
+        /// <summary>
+        /// Взять грядку в руки. Занимаем тот же слот, что и мышь игрока: нести её одновременно
+        /// вдвоём нельзя, а животное по дороге должно перестать брести само.
+        /// </summary>
+        private void EnterHauling()
+        {
+            if (_target == null) { EnterIdle(); return; }
+
+            _carryGroundY = _target.transform.position.y;
+            DragFocus.Set(_target.transform, byPlayer: false);
+
+            _mover.SetDestination(_tidySpot);
+            SetState(FarmerState.Hauling);
         }
 
         private void EnterGoingToHarvest(Growable target)
@@ -516,13 +926,7 @@ namespace Farm.Characters
         private void EnterUsingService()
         {
             _mover.Stop();
-
-            if (_serviceTarget != null)
-            {
-                Vector3 look = _serviceTarget.transform.position - transform.position;
-                look.y = 0f;
-                if (look.sqrMagnitude > 0.0001f) transform.rotation = Quaternion.LookRotation(look, Vector3.up);
-            }
+            if (_serviceTarget != null) FaceTowards(_serviceTarget.transform.position);
 
             _timer = _serviceTarget != null && _serviceTarget.Definition != null
                 ? _serviceTarget.Definition.ServiceDuration
@@ -546,9 +950,15 @@ namespace Farm.Characters
             SetState(FarmerState.AtMarket);
         }
 
+        /// <summary>
+        /// Спит там, где стоит. Ничто на ферме не зависит от места его сна, а фермер,
+        /// свалившийся у дальнего забора и бредущий домой, прежде чем ему позволят отдохнуть,
+        /// читается как наказание за решение, которого игрок не принимал.
+        /// </summary>
         private void EnterSleeping()
         {
             _mover.Stop();
+            Release();   // уснуть с грядкой в руках нельзя — она осталась бы висеть в воздухе
             _target = null;
             _serviceTarget = null;
             _market = null;
@@ -571,229 +981,6 @@ namespace Farm.Characters
             if (handler == null) return;
             try { handler(this, state); }
             catch (Exception e) { Debug.LogException(e, this); }
-        }
-
-        #endregion
-
-        #region Решения
-
-        /// <summary>
-        /// Поискать занятие. Возвращает true, если состояние сменилось.
-        /// С тайм-аутом: опрашивать каждый кадр бессмысленно, когда урожай зреет секундами.
-        /// </summary>
-        private bool TryTakeWork()
-        {
-            _scanTimer -= Time.deltaTime;
-            if (_scanTimer > 0f) return false;
-            _scanTimer = _scanInterval;
-
-            // Сон раньше всего: работать без сил — значит работать медленно и всё равно уснуть.
-            if (TryGoToBed()) return true;
-
-            // Собственные нужды раньше работы: голодный фермер работает медленнее, и чем дольше
-            // он терпит, тем меньше успевает. Сходить поесть — это не пауза, это вложение.
-            if (TryTakeCare()) return true;
-
-            if (Inventory.IsFull)
-            {
-                EnterReturningHome();
-                return true;
-            }
-
-            // Склад забит настолько, что дальше собирать бессмысленно — сначала на рынок.
-            // Без этой проверки продажа стоит в очереди после сбора и на живой ферме
-            // не выполняется никогда: спелое есть всегда.
-            if (Inventory.IsEmpty && TryGoToMarket(_urgentSurplus)) return true;
-
-            var target = FindTarget();
-            if (target != null)
-            {
-                EnterGoingToHarvest(target);
-                return true;
-            }
-
-            // Спелого в досягаемости нет — таскать недогруз дальше незачем.
-            if (!Inventory.IsEmpty)
-            {
-                EnterReturningHome();
-                return true;
-            }
-
-            // Урожая нет, руки свободны — самое время отнести излишки на рынок.
-            if (TryGoToMarket(0)) return true;
-
-            return false;
-        }
-
-        /// <summary>
-        /// Лечь спать с приходом ночи или когда вымотался. Возвращает true при смене состояния.
-        /// <para>
-        /// Спит там, где стоит, а не идёт сначала домой. Ничто на ферме не зависит от места его
-        /// сна, а фермер, свалившийся у дальнего забора и бредущий домой, прежде чем ему позволят
-        /// отдохнуть, читается как наказание за решение, которого игрок не принимал.
-        /// </para>
-        /// </summary>
-        private bool TryGoToBed()
-        {
-            if (_needs == null) return false;
-
-            bool night = _sleepAtNight && DayNightCycle.Instance != null && DayNightCycle.Instance.IsNight;
-            if (!night && !_needs.IsTired) return false;
-
-            // С полным рюкзаком сначала разгрузиться: уснуть с урожаем на руках — потерять день.
-            if (!Inventory.IsEmpty && _state != FarmerState.ReturningHome)
-            {
-                EnterReturningHome();
-                return true;
-            }
-
-            if (!Inventory.IsEmpty) return false;
-
-            EnterSleeping();
-            return true;
-        }
-
-        /// <summary>
-        /// Пойти на рынок, когда там есть дела.
-        /// <paramref name="minimum"/> поднимает планку продажи, чтобы срочная проверка игнорировала
-        /// мелкие кучки; покупка похода стоит всегда и этой планкой не ограничивается.
-        /// </summary>
-        private bool TryGoToMarket(int minimum)
-        {
-            if (_skills == null || !_skills.CanSell) return false;
-            if (Shop.Instance == null) return false;
-
-            bool worthSelling = HasSurplus(out _, out int amount) && amount >= minimum;
-            if (!worthSelling && PickRestock() == null) return false;
-
-            var market = FindMarket();
-            if (market == null) return false;
-
-            EnterGoingToMarket(market);
-            return true;
-        }
-
-        /// <summary>Осталось ли на рынке хоть какое-то дело.</summary>
-        private bool HasMarketErrand() => HasSurplus(out _, out _) || PickRestock() != null;
-
-        /// <summary>
-        /// Лучшая грядка, которую он готов купить себе, или null.
-        /// <para>
-        /// Два правила не дают его тратам растоптать планы игрока. Он никогда не опускается ниже
-        /// золотого резерва и покупает только то, что стоит чистое золото, — запас материалов
-        /// игрок копит на постройки, и потратить доски на саженцы «за него» — это на шаг дальше,
-        /// чем помощь. Постройки он не покупает вовсе: где встанет кухня — решение, а не рутина.
-        /// </para>
-        /// </summary>
-        private ShopItemDefinition PickRestock()
-        {
-            if (_skills == null || !_skills.CanRestock) return null;
-            if (GrowableRegistry.Count >= _maxPlots) return null;
-
-            var shop = Shop.Instance;
-            var catalog = shop != null ? shop.Catalog : null;
-            if (catalog == null) return null;
-
-            int gold = shop.Wallet != null ? shop.Wallet.Gold : 0;
-
-            ShopItemDefinition best = null;
-            int bestPrice = 0;
-
-            var items = catalog.Items;
-            for (int i = 0; i < items.Count; i++)
-            {
-                var item = items[i];
-                if (item == null || item.Kind != ShopItemKind.Plot) continue;
-
-                var price = item.Price;
-                if (price.Resources != null && price.Resources.Length > 0) continue;
-                if (gold - price.Gold < _goldReserve) continue;
-                if (!shop.CanBuy(item, out _)) continue;
-
-                // Самое дорогое из посильного: ферма растёт вверх по ступеням, а не вширь
-                // одной пшеницей.
-                if (best != null && price.Gold <= bestPrice) continue;
-
-                best = item;
-                bestPrice = price.Gold;
-            }
-
-            return best;
-        }
-
-        private static Building FindMarket()
-        {
-            var all = BuildingRegistry.All;
-            for (int i = 0; i < all.Count; i++)
-                if (all[i] != null && all[i].Service == BuildingService.Market) return all[i];
-            return null;
-        }
-
-        /// <summary>
-        /// Самая крупная стопка, которую стоит продать, или false, когда ничего не подходит.
-        /// <para>
-        /// У еды запас нарочно больше, чем у материалов: кухня ест из того же склада, и фермер,
-        /// продавший последнюю пшеницу, только что сделал себя некормимым.
-        /// </para>
-        /// </summary>
-        private bool HasSurplus(out ResourceDefinition resource, out int amount)
-        {
-            resource = null;
-            amount = 0;
-
-            var storage = FarmingRuntime.Sink as IInventory;
-            if (storage == null) return false;
-
-            int bestValue = 0;
-            var entries = storage.Entries;
-
-            for (int i = 0; i < entries.Count; i++)
-            {
-                var r = entries[i].Resource;
-                if (r == null || r.SellPrice <= 0 || !r.FarmerMaySell) continue;
-
-                int keep = r.IsFood ? _keepFood : _keepMaterials;
-                int spare = entries[i].Amount - keep;
-                if (spare < _minSaleBatch) continue;
-
-                int value = spare * r.SellPrice;
-                if (value <= bestValue) continue;
-
-                bestValue = value;
-                resource = r;
-                amount = spare;
-            }
-
-            return resource != null;
-        }
-
-        /// <summary>
-        /// Сходить поесть или попить, если нужда просела и что-то реально может помочь.
-        /// Возвращает true при смене состояния.
-        /// </summary>
-        private bool TryTakeCare()
-        {
-            if (_needs == null) return false;
-            if (!_needs.IsHungry && !_needs.IsThirsty) return false;
-
-            // Когда просело только одно — идём к нужной постройке; когда оба, берём что ближе.
-            BuildingService? want = null;
-            if (_needs.IsThirsty && !_needs.IsHungry) want = BuildingService.Well;
-            else if (_needs.IsHungry && !_needs.IsThirsty) want = BuildingService.Kitchen;
-
-            var building = BuildingRegistry.FindNearestUseful(
-                transform.position, _needs.Satiety01, _needs.Hydration01, want);
-
-            if (building == null) return false;
-
-            EnterGoingToService(building);
-            return true;
-        }
-
-        private Growable FindTarget()
-        {
-            ResourceCategory? filter = _filterByCategory ? _category : (ResourceCategory?)null;
-            return GrowableRegistry.FindNearestReady(transform.position, filter, _searchRadius);
         }
 
         private void Raise<T>(Action<FarmerAgent, T> handler, T arg)

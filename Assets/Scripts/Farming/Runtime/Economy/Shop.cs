@@ -148,6 +148,12 @@ namespace Farm.Farming
 
                     var growable = plot.AddComponent<Growable>();
                     plot.AddComponent<GrowableVisuals>();
+
+                    // Скотина должна пастись, а не стоять столбом. Компонент вешается здесь,
+                    // а не в определении: определение — это данные, а «оно живое» — поведение.
+                    if (item.Growable.Category == ResourceCategory.Livestock)
+                        plot.AddComponent<GrazingAnimal>();
+
                     growable.Plant(item.Growable, 1);
 
                     _placed.Add(plot.transform);

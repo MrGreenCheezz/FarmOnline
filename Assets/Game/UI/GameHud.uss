@@ -209,6 +209,27 @@
 
 /* ---- всплывающие числа ---- */
 
+/* Мысль фермера. Пузырь, а не текст поверх мира: решение должно читаться как
+   его собственное, а не как подпись от игры. */
+.thought {
+    position: absolute;
+    font-size: 13px;
+    -unity-text-align: middle-center;
+    color: rgb(232, 238, 244);
+    background-color: rgba(22, 27, 34, 0.88);
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: rgba(150, 175, 200, 0.4);
+    padding: 3px 9px 4px 9px;
+    max-width: 220px;
+    white-space: normal;
+}
+
+.thought__mood {
+    color: rgb(150, 170, 190);
+    font-size: 11px;
+}
+
 .float {
     position: absolute;
     font-size: 18px;
