@@ -201,7 +201,11 @@ namespace Farm.Interaction
             if (_dragged == null) return;
             if (!TryGroundPoint(screen, _groundY, out Vector3 point)) return;
 
-            _dragged.position = new Vector3(point.x, _groundY + _liftHeight, point.z);
+            // Над рельефом, а не над своей исходной высотой: иначе на пологом склоне предмет
+            // в руке то ныряет в землю, то взлетает.
+            float ground = FarmingRuntime.Ground.SampleHeight(point);
+            _dragged.position = new Vector3(point.x, ground + _liftHeight, point.z);
+
             Highlight(FindMergeTarget(screen, _draggedGrowable));
         }
 
@@ -240,7 +244,8 @@ namespace Farm.Interaction
             // Дуга вниз и приземление со сплющиванием — предмет должен ощущаться тяжёлым,
             // а не телепортироваться на землю. И только внутрь фермы: земля бесконечна,
             // а забор — нет, иначе грядку можно закинуть за горизонт и не достать.
-            var landing = FarmBounds.ClampToFarm(new Vector3(point.x, _groundY, point.z));
+            var landing = FarmBounds.ClampToFarm(new Vector3(point.x, 0f, point.z));
+            landing.y = FarmingRuntime.Ground.SampleHeight(landing);
             Tween.HopTo(dragged, landing, 0.22f, 0.18f, () =>
             {
                 if (dragged == null) return;

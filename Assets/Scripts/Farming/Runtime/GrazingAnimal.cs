@@ -58,6 +58,7 @@ namespace Farm.Farming
         private static readonly int RestingId = Animator.StringToHash("Resting");
 
         private Phase _phase = Phase.Chewing;
+        private float _groundY;
         private Vector3 _anchor;
         private Vector3 _destination;
         private float _timer;
@@ -70,6 +71,10 @@ namespace Farm.Farming
         private void OnEnable()
         {
             _anchor = transform.position;
+
+            // Смещение относительно рельефа: животное могло стоять не на нулевой отметке.
+            _groundY = transform.position.y - FarmingRuntime.Ground.SampleHeight(transform.position);
+
             EnterChewing();
         }
 
@@ -123,6 +128,7 @@ namespace Farm.Farming
             if (DragFocus.IsDragged(transform))
             {
                 _anchor = transform.position;   // отпустят — пастись будет уже здесь
+                _groundY = 0f;                  // высоту задаёт тот, кто несёт
                 Animate(0f);
                 return;
             }
@@ -169,8 +175,11 @@ namespace Farm.Farming
                 Quaternion.LookRotation(direction, Vector3.up),
                 _turnSpeed * Time.deltaTime);
 
+            Vector3 next = transform.position + direction * Mathf.Min(_speed * Time.deltaTime, distance);
+            next.y = _groundY + FarmingRuntime.Ground.SampleHeight(next);
+            transform.position = next;
+
             float step = Mathf.Min(_speed * Time.deltaTime, distance);
-            transform.position += direction * step;
 
             Animate(Time.deltaTime > 0f ? step / Time.deltaTime / Mathf.Max(0.01f, _speed) : 0f);
         }
@@ -202,7 +211,7 @@ namespace Farm.Farming
 
             // За забор не уходим: животное, забредшее к горизонту, фермеру уже не собрать.
             _destination = FarmBounds.ClampToFarm(target);
-            _destination.y = transform.position.y;
+            _destination.y = _groundY + FarmingRuntime.Ground.SampleHeight(_destination);
         }
 
         private void EnterResting()

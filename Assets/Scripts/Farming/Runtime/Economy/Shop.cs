@@ -216,6 +216,8 @@ namespace Farm.Farming
 
                 if (IsClear(candidate))
                 {
+                    // Кладём по рельефу — иначе покупка появится над землёй или в ней.
+                    candidate.y = FarmingRuntime.Ground.SampleHeight(candidate);
                     position = candidate;
                     return true;
                 }

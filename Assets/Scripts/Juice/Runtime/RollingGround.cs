@@ -54,6 +54,15 @@ namespace Farm.Juice
 
         [SerializeField, Min(0.001f)] private float _detailScale = 0.12f;
 
+        [Header("Неровность самой фермы")]
+        [Tooltip("Лёгкая волна, которая идёт и по игровому полю тоже.\n" +
+                 "Держи её маленькой: всё, что стоит на ферме, кладётся по этой высоте, и чем " +
+                 "она больше, тем заметнее любой объект, который забыли положить по рельефу.")]
+        [SerializeField, Range(0f, 0.6f)] private float _innerHeight = 0.18f;
+
+        [Tooltip("Крупность этой волны. 0.09 — примерно два-три пологих переката на всю ферму.")]
+        [SerializeField, Min(0.001f)] private float _innerScale = 0.09f;
+
         [Tooltip("Один и тот же номер — один и тот же рельеф.")]
         [SerializeField] private int _seed = 8041;
 
@@ -173,23 +182,28 @@ namespace Farm.Juice
             if (collider != null) collider.sharedMesh = _updateCollider ? _mesh : null;
         }
 
-        /// <summary>Высота в точке участка. Ноль внутри ровной площадки.</summary>
+        /// <summary>Высота в точке участка.</summary>
         private float Height(float x, float z)
         {
+            float offset = _seed * 0.137f;
+
+            // Лёгкая волна идёт везде, включая ферму: совсем ровное поле читается как стол,
+            // даже когда вокруг холмы. Она мала намеренно — по ней кладётся всё игровое.
+            float inner = Signed(Mathf.PerlinNoise(x * _innerScale + offset * 7f,
+                                                   z * _innerScale + offset * 7f)) * _innerHeight;
+
             float distance = Mathf.Sqrt(x * x + z * z);
-            if (distance <= _flatRadius) return 0f;
+            if (distance <= _flatRadius) return inner;
 
             // Плавная ступень, а не линейная: у линейной на границе площадки виден излом.
             float k = Mathf.Clamp01((distance - _flatRadius) / _blend);
             float mask = k * k * (3f - 2f * k);
 
-            float offset = _seed * 0.137f;
-
             float hills = Signed(Mathf.PerlinNoise(x * _hillScale + offset, z * _hillScale + offset));
             float detail = Signed(Mathf.PerlinNoise(x * _detailScale + offset * 3f,
                                                     z * _detailScale + offset * 3f));
 
-            return (hills * _hillHeight + detail * _detailHeight) * mask;
+            return inner + (hills * _hillHeight + detail * _detailHeight) * mask;
         }
 
         /// <summary>Шум Unity даёт 0..1, а холмам нужно уходить и вниз.</summary>

@@ -1,4 +1,5 @@
 using UnityEngine;
+using Farm.Farming;
 
 namespace Farm.Characters
 {
@@ -20,6 +21,9 @@ namespace Farm.Characters
 
         [Tooltip("Держать исходную высоту — цели задаются в плоскости XZ.")]
         [SerializeField] private bool _lockToStartHeight = true;
+
+        [Tooltip("Идти по рельефу земли. Выключи, если персонаж должен держаться одной высоты.")]
+        [SerializeField] private bool _followGround = true;
 
         private Vector3 _destination;
         private bool _hasDestination;
@@ -78,7 +82,13 @@ namespace Farm.Characters
                 _turnSpeed * Time.deltaTime);
 
             float step = Mathf.Min(_speed * Time.deltaTime, distance);
-            transform.position = position + direction * step;
+            Vector3 next = position + direction * step;
+
+            // По рельефу: без этого персонаж идёт по своей исходной высоте и на пологой
+            // волне то уходит в землю по колено, то шагает над ней.
+            if (_followGround) next.y = _groundY + FarmingRuntime.Ground.SampleHeight(next);
+
+            transform.position = next;
 
             _currentSpeed = Time.deltaTime > 0f ? step / Time.deltaTime : 0f;
         }

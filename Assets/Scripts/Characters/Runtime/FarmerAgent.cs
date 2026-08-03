@@ -192,7 +192,6 @@ namespace Farm.Characters
         private Building _market;
         private Vector3 _relaxSpot;
         private Vector3 _tidySpot;
-        private float _carryGroundY;
         private Vector3 _homePosition;
         private Vector3 _favouriteSpot;
         private string _thought = "";
@@ -333,7 +332,7 @@ namespace Farm.Characters
             if (_state == FarmerState.Hauling && _target != null)
             {
                 var dropped = _target.transform.position;
-                dropped.y = _carryGroundY;
+                dropped.y = FarmingRuntime.Ground.SampleHeight(dropped);
                 _target.transform.position = dropped;
             }
 
@@ -703,9 +702,9 @@ namespace Farm.Characters
                 return;
             }
 
-            // Груз висит перед фермером и едет вместе с ним.
+            // Груз висит перед фермером и едет вместе с ним, по рельефу под ногами.
             Vector3 carried = transform.position + transform.forward * _carryReach;
-            carried.y = _carryGroundY + _carryHeight;
+            carried.y = FarmingRuntime.Ground.SampleHeight(carried) + _carryHeight;
             _target.transform.position = carried;
 
             if (!_mover.HasArrived)
@@ -714,9 +713,9 @@ namespace Farm.Characters
                 return;
             }
 
-            // Ставим ровно туда, куда несли, и на ту же высоту, с которой взяли.
+            // Ставим ровно туда, куда несли, и по земле в этой точке.
             var placed = FarmBounds.ClampToFarm(_tidySpot);
-            placed.y = _carryGroundY;
+            placed.y = FarmingRuntime.Ground.SampleHeight(placed);
             _target.transform.position = placed;
 
             Release();
@@ -967,7 +966,6 @@ namespace Farm.Characters
         {
             if (_target == null) { EnterIdle(); return; }
 
-            _carryGroundY = _target.transform.position.y;
             DragFocus.Set(_target.transform, byPlayer: false);
 
             _mover.SetDestination(_tidySpot);
