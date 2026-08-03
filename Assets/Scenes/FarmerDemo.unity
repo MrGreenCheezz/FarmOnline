@@ -58243,7 +58243,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Farm.Farming::Farm.Farming.WorldStorage
   _capacityMode: 2
-  _capacity: 24
+  _capacity: 48
 --- !u!4 &1358375450
 Transform:
   m_ObjectHideFlags: 0
