@@ -20,6 +20,9 @@ namespace Farm.Game
         [Serializable]
         public sealed class HelpPayload
         {
+            /// <summary>Стабильное имя грядки; пустое — событие от клиента без GUID-ов.</summary>
+            public string Uid;
+
             public Vector3 Position;
             public string GrowableId;
             public int Level;
@@ -73,6 +76,7 @@ namespace Farm.Game
 
             var help = JsonUtility.ToJson(new HelpPayload
             {
+                Uid = report.Uid,
                 Position = report.Position,
                 GrowableId = report.GrowableId,
                 Level = report.Level,
@@ -251,12 +255,26 @@ namespace Farm.Game
         }
 
         /// <summary>
-        /// Найти у себя грядку, которую собрал гость: та же культура, тот же уровень,
-        /// всё ещё спелая и в полуметре от записанной точки.
+        /// Найти у себя грядку, которую собрал гость. Главный ключ — стабильный Uid;
+        /// событие без него (старый клиент) ищется по культуре, уровню и полуметру
+        /// от записанной точки. Спелость обязательна в обоих путях: неспелая под тем же
+        /// uid значит «хозяин успел собрать сам» — событие честно протухло.
         /// </summary>
         private static Growable FindHelpedPlot(HelpPayload help)
         {
             var all = GrowableRegistry.All;
+
+            if (!string.IsNullOrEmpty(help.Uid))
+            {
+                for (int i = 0; i < all.Count; i++)
+                {
+                    var plot = all[i];
+                    if (plot == null || plot.Uid != help.Uid) continue;
+                    return plot.IsReady ? plot : null;
+                }
+                return null;
+            }
+
             float bestSqr = HelpMatchRadius * HelpMatchRadius;
             Growable best = null;
 

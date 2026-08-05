@@ -12,6 +12,9 @@ namespace Farm.Game
         public int Level = 1;
         public bool Ready;
 
+        /// <summary>Стабильное имя грядки — по нему её находят события друзей. Пустое у старых сейвов.</summary>
+        public string Uid;
+
         /// <summary>Наработанные секунды роста, а не таймстамп — см. <see cref="Growable.CaptureState"/>.</summary>
         public double ElapsedGrowth;
 

@@ -836,6 +836,13 @@ namespace Farm.Characters
                 spot = _agent.FavouriteSpot;
                 thought = "передохну";
             }
+            else if (!_agent.MayHarvest && GrowableRegistry.ReadyCount > 0)
+            {
+                // Стоять посреди спелого поля без объяснения — читаться сломанным.
+                // Названная причина превращает то же безделье в уговор с хозяином.
+                spot = _agent.FavouriteSpot;
+                thought = "урожай хозяйский — без найма не трону";
+            }
             else
             {
                 spot = _agent.FavouriteSpot;

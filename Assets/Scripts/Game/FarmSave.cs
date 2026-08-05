@@ -176,6 +176,7 @@ namespace Farm.Game
                     GrowableId = plot.Definition.Id,
                     Level = plot.Level,
                     Ready = plot.IsReady,
+                    Uid = plot.Uid,
                     ElapsedGrowth = elapsed,
                     RipeSeconds = ripe,
                     OwnGrowthSpeed = ownSpeed,
@@ -442,7 +443,7 @@ namespace Farm.Game
 
                 growable.RestoreState(definition, save.Level, save.Ready,
                                       save.ElapsedGrowth, save.RipeSeconds, save.OwnGrowthSpeed,
-                                      offlineSeconds);
+                                      offlineSeconds, save.Uid);
 
                 if (shop != null) shop.RegisterPlaced(go.transform);
             }

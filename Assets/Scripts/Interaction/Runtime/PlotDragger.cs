@@ -144,6 +144,7 @@ namespace Farm.Interaction
 
             // Всё нужное — до сбора: однолетку TryHarvest уничтожает вместе с определением.
             var definition = plot.Definition;
+            string uid = plot.Uid;
             Vector3 at = plot.transform.position;
             int level = plot.Level;
 
@@ -155,6 +156,7 @@ namespace Farm.Interaction
             Sfx.Play(b => b.Harvest);
 
             GuestMode.ReportHelp(new HelpReport(
+                uid,
                 at,
                 definition != null ? definition.Id : "",
                 level,

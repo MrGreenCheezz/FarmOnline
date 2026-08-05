@@ -29,6 +29,9 @@ namespace Farm.Game
         private Label _netStatus;
         private TextField _nameField;
         private VisualElement _confirm;
+        private VisualElement _codeOverlay;
+        private TextField _codeValue;
+        private TextField _codeInput;
 
         /// <summary>Сетевой разговор уже идёт — второй клик по «Играть» не должен начать новый.</summary>
         private bool _busy;
@@ -63,9 +66,23 @@ namespace Farm.Game
             if (confirmYes != null) confirmYes.clicked += OnConfirmNewGame;
             if (confirmNo != null) confirmNo.clicked += HideConfirm;
 
+            _codeOverlay = _root.Q<VisualElement>("menu-code-overlay");
+            _codeValue = _root.Q<TextField>("menu-code-value");
+            _codeInput = _root.Q<TextField>("menu-code-input");
+
+            var codeButton = _root.Q<Button>("menu-code");
+            if (codeButton != null) codeButton.clicked += ShowCode;
+
+            var codeClose = _root.Q<Button>("menu-code-close");
+            if (codeClose != null) codeClose.clicked += HideCode;
+
+            var codeLogin = _root.Q<Button>("menu-code-login");
+            if (codeLogin != null) codeLogin.clicked += OnCodeLogin;
+
             NetStatus.Changed += OnNetStatusChanged;
 
             HideConfirm();
+            HideCode();
             Refresh();
         }
 
@@ -238,6 +255,85 @@ namespace Farm.Game
         private void HideConfirm()
         {
             if (_confirm != null) _confirm.style.display = DisplayStyle.None;
+        }
+
+        // ---- код фермы ----
+
+        /// <summary>
+        /// Код фермы — это гостевой токен, показанный игроку в руки. Он решает две беды
+        /// гостевого входа разом: потерю браузерного хранилища и второе устройство, —
+        /// и переживёт будущий переезд на https, когда PlayerPrefs старого origin пропадут.
+        /// </summary>
+        private void ShowCode()
+        {
+            if (_codeOverlay == null) return;
+
+            if (_codeValue != null)
+                _codeValue.value = NetSession.HasToken
+                    ? NetSession.Token
+                    : "кода ещё нет — сыграй онлайн один раз";
+
+            if (_codeInput != null) _codeInput.value = "";
+            _codeOverlay.style.display = DisplayStyle.Flex;
+        }
+
+        private void HideCode()
+        {
+            if (_codeOverlay == null) return;
+            _codeOverlay.style.display = DisplayStyle.None;
+        }
+
+        private async void OnCodeLogin()
+        {
+            if (_busy) return;
+
+            string code = _codeInput != null ? _codeInput.value.Trim() : "";
+            if (code.Length < 20)
+            {
+                Status("код слишком короткий — проверь, всё ли скопировалось", bad: true);
+                return;
+            }
+
+            _busy = true;
+            SetInteractable(false);
+
+            // Свой вход придержим: если чужой код не подойдёт, это устройство обязано
+            // остаться прежним хозяином, а не разбитым корытом.
+            string previous = NetSession.HasToken ? NetSession.Token : null;
+            string previousName = NetSession.PlayerName;
+            int previousId = NetSession.PlayerId;
+
+            try
+            {
+                Status("проверяю код…");
+                NetSession.Clear();
+                NetSession.Token = code;
+
+                var login = await ApiClient.LoginAsync();
+                if (login.Transport && login.Value != null && login.Value.ok)
+                {
+                    HideCode();
+                    Refresh();
+                    Status("вход по коду: " + NetSession.PlayerName);
+                }
+                else
+                {
+                    NetSession.Clear();
+                    if (previous != null)
+                    {
+                        NetSession.Token = previous;
+                        NetSession.PlayerName = previousName;
+                        NetSession.PlayerId = previousId;
+                    }
+                    Refresh();
+                    Status(login.Transport ? "код не подошёл" : "сервер недоступен — код не проверить", bad: true);
+                }
+            }
+            finally
+            {
+                _busy = false;
+                SetInteractable(true);
+            }
         }
 
         // ---- мелочи ----

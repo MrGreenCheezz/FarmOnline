@@ -1,0 +1,397 @@
+{
+    "generatedAtUtc": "2026-08-05T13:28:17.1964951Z",
+    "resources": [
+        {
+            "id": "adamant",
+            "tier": 7,
+            "sellPrice": 1446
+        },
+        {
+            "id": "antler",
+            "tier": 5,
+            "sellPrice": 184
+        },
+        {
+            "id": "bacon",
+            "tier": 1,
+            "sellPrice": 8
+        },
+        {
+            "id": "bamboo",
+            "tier": 4,
+            "sellPrice": 66
+        },
+        {
+            "id": "beam",
+            "tier": 3,
+            "sellPrice": 24
+        },
+        {
+            "id": "cheese",
+            "tier": 1,
+            "sellPrice": 6
+        },
+        {
+            "id": "copper",
+            "tier": 1,
+            "sellPrice": 3
+        },
+        {
+            "id": "corn",
+            "tier": 1,
+            "sellPrice": 3
+        },
+        {
+            "id": "crimsonwood",
+            "tier": 7,
+            "sellPrice": 1446
+        },
+        {
+            "id": "down",
+            "tier": 4,
+            "sellPrice": 66
+        },
+        {
+            "id": "ebony",
+            "tier": 6,
+            "sellPrice": 516
+        },
+        {
+            "id": "eggs",
+            "tier": 2,
+            "sellPrice": 8
+        },
+        {
+            "id": "firefly",
+            "tier": 3,
+            "sellPrice": 24
+        },
+        {
+            "id": "ginseng",
+            "tier": 5,
+            "sellPrice": 184
+        },
+        {
+            "id": "gold",
+            "tier": 4,
+            "sellPrice": 66
+        },
+        {
+            "id": "goldbloom",
+            "tier": 6,
+            "sellPrice": 516
+        },
+        {
+            "id": "honey",
+            "tier": 3,
+            "sellPrice": 24
+        },
+        {
+            "id": "ingot_copper",
+            "tier": 2,
+            "sellPrice": 8
+        },
+        {
+            "id": "ingot_iron",
+            "tier": 3,
+            "sellPrice": 24
+        },
+        {
+            "id": "iron",
+            "tier": 2,
+            "sellPrice": 8
+        },
+        {
+            "id": "ironwood",
+            "tier": 3,
+            "sellPrice": 24
+        },
+        {
+            "id": "maple",
+            "tier": 4,
+            "sellPrice": 66
+        },
+        {
+            "id": "meat",
+            "tier": 1,
+            "sellPrice": 5
+        },
+        {
+            "id": "melon",
+            "tier": 3,
+            "sellPrice": 24
+        },
+        {
+            "id": "mithril",
+            "tier": 6,
+            "sellPrice": 516
+        },
+        {
+            "id": "moondew",
+            "tier": 3,
+            "sellPrice": 24
+        },
+        {
+            "id": "oak",
+            "tier": 2,
+            "sellPrice": 8
+        },
+        {
+            "id": "plank",
+            "tier": 2,
+            "sellPrice": 8
+        },
+        {
+            "id": "platinum",
+            "tier": 5,
+            "sellPrice": 184
+        },
+        {
+            "id": "pumpkin",
+            "tier": 2,
+            "sellPrice": 8
+        },
+        {
+            "id": "silver",
+            "tier": 3,
+            "sellPrice": 24
+        },
+        {
+            "id": "spiritwood",
+            "tier": 8,
+            "sellPrice": 4048
+        },
+        {
+            "id": "starmetal",
+            "tier": 8,
+            "sellPrice": 4048
+        },
+        {
+            "id": "wheat",
+            "tier": 1,
+            "sellPrice": 2
+        },
+        {
+            "id": "wood",
+            "tier": 1,
+            "sellPrice": 3
+        },
+        {
+            "id": "yew",
+            "tier": 5,
+            "sellPrice": 184
+        }
+    ],
+    "growables": [
+        {
+            "id": "bamboo",
+            "resourceId": "bamboo",
+            "tier": 4,
+            "growSeconds": 5400.0,
+            "baseYield": 1
+        },
+        {
+            "id": "bee",
+            "resourceId": "honey",
+            "tier": 3,
+            "growSeconds": 2400.0,
+            "baseYield": 1
+        },
+        {
+            "id": "chicken",
+            "resourceId": "eggs",
+            "tier": 2,
+            "growSeconds": 900.0,
+            "baseYield": 1
+        },
+        {
+            "id": "corn",
+            "resourceId": "corn",
+            "tier": 1,
+            "growSeconds": 300.0,
+            "baseYield": 1
+        },
+        {
+            "id": "cow",
+            "resourceId": "cheese",
+            "tier": 1,
+            "growSeconds": 300.0,
+            "baseYield": 1
+        },
+        {
+            "id": "deer",
+            "resourceId": "antler",
+            "tier": 5,
+            "growSeconds": 10800.0,
+            "baseYield": 1
+        },
+        {
+            "id": "ginseng",
+            "resourceId": "ginseng",
+            "tier": 5,
+            "growSeconds": 10800.0,
+            "baseYield": 1
+        },
+        {
+            "id": "goldbloom",
+            "resourceId": "goldbloom",
+            "tier": 6,
+            "growSeconds": 18000.0,
+            "baseYield": 1
+        },
+        {
+            "id": "melon",
+            "resourceId": "melon",
+            "tier": 3,
+            "growSeconds": 2400.0,
+            "baseYield": 1
+        },
+        {
+            "id": "pig",
+            "resourceId": "bacon",
+            "tier": 1,
+            "growSeconds": 300.0,
+            "baseYield": 1
+        },
+        {
+            "id": "pumpkin",
+            "resourceId": "pumpkin",
+            "tier": 2,
+            "growSeconds": 900.0,
+            "baseYield": 1
+        },
+        {
+            "id": "rabbit",
+            "resourceId": "down",
+            "tier": 4,
+            "growSeconds": 5400.0,
+            "baseYield": 1
+        },
+        {
+            "id": "sheep",
+            "resourceId": "meat",
+            "tier": 1,
+            "growSeconds": 300.0,
+            "baseYield": 1
+        },
+        {
+            "id": "tree_crimsonwood",
+            "resourceId": "crimsonwood",
+            "tier": 7,
+            "growSeconds": 28800.0,
+            "baseYield": 1
+        },
+        {
+            "id": "tree_ebony",
+            "resourceId": "ebony",
+            "tier": 6,
+            "growSeconds": 18000.0,
+            "baseYield": 1
+        },
+        {
+            "id": "tree_ironwood",
+            "resourceId": "ironwood",
+            "tier": 3,
+            "growSeconds": 2400.0,
+            "baseYield": 1
+        },
+        {
+            "id": "tree_maple",
+            "resourceId": "maple",
+            "tier": 4,
+            "growSeconds": 5400.0,
+            "baseYield": 1
+        },
+        {
+            "id": "tree_oak",
+            "resourceId": "oak",
+            "tier": 2,
+            "growSeconds": 900.0,
+            "baseYield": 1
+        },
+        {
+            "id": "tree_spiritwood",
+            "resourceId": "spiritwood",
+            "tier": 8,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
+            "id": "tree_wood",
+            "resourceId": "wood",
+            "tier": 1,
+            "growSeconds": 300.0,
+            "baseYield": 1
+        },
+        {
+            "id": "tree_yew",
+            "resourceId": "yew",
+            "tier": 5,
+            "growSeconds": 10800.0,
+            "baseYield": 1
+        },
+        {
+            "id": "vein_adamant",
+            "resourceId": "adamant",
+            "tier": 7,
+            "growSeconds": 28800.0,
+            "baseYield": 1
+        },
+        {
+            "id": "vein_copper",
+            "resourceId": "copper",
+            "tier": 1,
+            "growSeconds": 300.0,
+            "baseYield": 1
+        },
+        {
+            "id": "vein_gold",
+            "resourceId": "gold",
+            "tier": 4,
+            "growSeconds": 5400.0,
+            "baseYield": 1
+        },
+        {
+            "id": "vein_iron",
+            "resourceId": "iron",
+            "tier": 2,
+            "growSeconds": 900.0,
+            "baseYield": 1
+        },
+        {
+            "id": "vein_mithril",
+            "resourceId": "mithril",
+            "tier": 6,
+            "growSeconds": 18000.0,
+            "baseYield": 1
+        },
+        {
+            "id": "vein_platinum",
+            "resourceId": "platinum",
+            "tier": 5,
+            "growSeconds": 10800.0,
+            "baseYield": 1
+        },
+        {
+            "id": "vein_silver",
+            "resourceId": "silver",
+            "tier": 3,
+            "growSeconds": 2400.0,
+            "baseYield": 1
+        },
+        {
+            "id": "vein_starmetal",
+            "resourceId": "starmetal",
+            "tier": 8,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
+            "id": "wheat",
+            "resourceId": "wheat",
+            "tier": 1,
+            "growSeconds": 300.0,
+            "baseYield": 3
+        }
+    ]
+}

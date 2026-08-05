@@ -6,14 +6,18 @@ namespace Farm.Farming
     /// <summary>Запись об одной собранной в гостях грядке — уезжает событием хозяину.</summary>
     public readonly struct HelpReport
     {
+        /// <summary>Стабильное имя грядки — главный ключ поиска у хозяина.</summary>
+        public readonly string Uid;
+
         public readonly Vector3 Position;
         public readonly string GrowableId;
         public readonly int Level;
         public readonly string ResourceId;
         public readonly int Amount;
 
-        public HelpReport(Vector3 position, string growableId, int level, string resourceId, int amount)
+        public HelpReport(string uid, Vector3 position, string growableId, int level, string resourceId, int amount)
         {
+            Uid = uid;
             Position = position;
             GrowableId = growableId;
             Level = level;

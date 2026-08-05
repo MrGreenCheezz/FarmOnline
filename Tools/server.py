@@ -30,6 +30,7 @@ import secrets
 import socket
 import socketserver
 import sqlite3
+import ssl
 import sys
 import threading
 import time
@@ -83,10 +84,11 @@ CREATE TABLE IF NOT EXISTS players(
 );
 CREATE INDEX IF NOT EXISTS players_token ON players(token_hash);
 CREATE TABLE IF NOT EXISTS farms(
-    player_id INTEGER PRIMARY KEY REFERENCES players(id),
-    state     TEXT NOT NULL,
-    saved_at  REAL NOT NULL,
-    rev       INTEGER NOT NULL
+    player_id  INTEGER PRIMARY KEY REFERENCES players(id),
+    state      TEXT NOT NULL,
+    saved_at   REAL NOT NULL,
+    rev        INTEGER NOT NULL,
+    suspicious INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS friends(
     requester  INTEGER NOT NULL REFERENCES players(id),
@@ -106,6 +108,105 @@ CREATE TABLE IF NOT EXISTS events(
 );
 CREATE INDEX IF NOT EXISTS events_inbox ON events(to_player, consumed);
 """
+
+
+#: Потолки здравого смысла для снимка фермы. Это не баланс, а граница мусора:
+#: честный клиент до них не доберётся никогда, а сломанный или подделанный —
+#: не должен доехать до базы.
+MAX_GOLD = 1_000_000_000
+MAX_PLOTS = 500
+MAX_LEVEL = 30
+
+
+def _reject_const(name):
+    """NaN и Infinity в снимке — всегда порча: JsonUtility их не пишет."""
+    raise ValueError("bad constant: " + name)
+
+
+class Catalog:
+    """Цены и тайминги из Tools/catalog.json — те же числа, что в ассетах клиента.
+
+    Экспортируется из редактора (Farm → Онлайн → Экспортировать каталог для сервера).
+    Без него сервер хранит снимки вслепую; с ним — умеет оценить, мог ли игрок честно
+    заработать столько за столько. Оценка нарочно мягкая: она ПОМЕЧАЕТ (suspicious),
+    а не отклоняет — подарки друзей и разовые распродажи дают всплески, и резать по
+    эвристике живых игроков нельзя. Решение по помеченным — за человеком.
+    """
+
+    def __init__(self, path):
+        self.prices = {}   # resourceId -> цена продажи за единицу
+        self.rates = {}    # growableId -> золото/сек с грядки 1-го уровня
+        self.loaded = False
+        self.generated = "?"
+
+        try:
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+
+        for row in data.get("resources", []):
+            self.prices[row.get("id", "")] = row.get("sellPrice", 0)
+
+        for row in data.get("growables", []):
+            grow = row.get("growSeconds") or 0
+            price = self.prices.get(row.get("resourceId", ""), 0)
+            if grow > 0:
+                self.rates[row.get("id", "")] = price * row.get("baseYield", 1) / grow
+
+        self.generated = data.get("generatedAtUtc", "?")
+        self.loaded = True
+
+    def wealth(self, doc):
+        """Богатство снимка: золото + склад по ценам продажи."""
+        total = float(doc.get("Gold") or 0)
+        storage = doc.get("Storage") or {}
+        for entry in storage.get("Entries") or []:
+            if not isinstance(entry, dict):
+                continue
+            amount = entry.get("Amount", 0)
+            if isinstance(amount, (int, float)) and amount > 0:
+                total += self.prices.get(entry.get("ResourceId", ""), 0) * amount
+        return total
+
+    def income_ceiling(self, doc):
+        """Потолок честного дохода фермы, золота в секунду.
+
+        Урожай удваивается с уровнем слияния — как в GrowableDefinition.YieldFor,
+        и это главный множитель; ауры и рынок покрываются общим запасом снаружи.
+        """
+        rate = 0.0
+        for plot in doc.get("Plots") or []:
+            if not isinstance(plot, dict):
+                continue
+            level = plot.get("Level", 1)
+            if not isinstance(level, int):
+                level = 1
+            level = max(1, min(MAX_LEVEL, level))
+            rate += self.rates.get(plot.get("GrowableId", ""), 0.0) * (2 ** (level - 1))
+        return rate
+
+
+def validate_state(doc):
+    """Жёсткая проверка снимка. None — годен; иначе код отказа для 400."""
+    if not isinstance(doc, dict):
+        return "bad_state"
+
+    gold = doc.get("Gold", 0)
+    if not isinstance(gold, int) or gold < 0 or gold > MAX_GOLD:
+        return "bad_gold"
+
+    plots = doc.get("Plots") or []
+    if not isinstance(plots, list) or len(plots) > MAX_PLOTS:
+        return "bad_plots"
+
+    for plot in plots:
+        if not isinstance(plot, dict):
+            return "bad_plots"
+        level = plot.get("Level", 1)
+        if not isinstance(level, int) or level < 1 or level > MAX_LEVEL:
+            return "bad_plots"
+
+    return None
 
 
 class ApiError(Exception):
@@ -142,6 +243,13 @@ class Db:
         self._conn.isolation_level = None
         with self._lock:
             self._conn.executescript(SCHEMA)
+            # База, заведённая до появления пометок: колонку доращиваем на месте.
+            # На свежей базе ALTER честно падает «уже есть» — это и есть успех.
+            try:
+                self._conn.execute(
+                    "ALTER TABLE farms ADD COLUMN suspicious INTEGER NOT NULL DEFAULT 0")
+            except sqlite3.OperationalError:
+                pass
 
     # --- игроки ---
 
@@ -183,6 +291,13 @@ class Db:
         with self._lock:
             return self._conn.execute(
                 "SELECT * FROM farms WHERE player_id = ?", (player_id,)).fetchone()
+
+    def mark_suspicious(self, player_id):
+        """Пометить ферму: снимок разбогател быстрее теоретического потолка."""
+        with self._lock:
+            self._conn.execute(
+                "UPDATE farms SET suspicious = suspicious + 1 WHERE player_id = ?",
+                (player_id,))
 
     def put_farm(self, player_id, state, expected_rev, now):
         """(True, новый rev) или (False, текущий rev) при расхождении ревизий.
@@ -318,6 +433,7 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
     #: сервер работает «только API» (сборки на диске может не быть вовсе).
     static_root = None
     db = None
+    catalog = None
 
     extensions_map = {
         **http.server.SimpleHTTPRequestHandler.extensions_map,
@@ -481,9 +597,16 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
         raw = self._read_body(MAX_STATE_BYTES)
         try:
             state = raw.decode("utf-8")
-            json.loads(state)  # результат не нужен: только защита от мусора в базе
+            # parse_constant режет NaN/Infinity: JsonUtility их не пишет, а в базе
+            # они дождались бы чужого клиента на визите.
+            doc = json.loads(state, parse_constant=_reject_const)
         except (UnicodeDecodeError, ValueError):
             raise ApiError(400, "bad_json")
+
+        # Жёсткая граница мусора: снимок за потолками не принимается вовсе.
+        bad = validate_state(doc)
+        if bad is not None:
+            raise ApiError(400, bad)
 
         expected = None
         header = self.headers.get("X-Farm-Rev")
@@ -496,11 +619,39 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
                 expected = None  # «-1 — не проверять» из контракта
 
         now = time.time()
+
+        # Мягкая экономическая проверка — ДО записи, пока прежний снимок жив.
+        # Потолок дохода считается по СТАРОМУ составу фермы: заработать могли только
+        # те грядки, что стояли в начале периода. Запас ×3 покрывает ауры и рынок,
+        # добавка — стартовый капитал и мелкие подарки; крупный подарок даст ложное
+        # срабатывание, и потому это пометка с логом, а не отказ.
+        suspicion = None
+        if self.catalog is not None and self.catalog.loaded:
+            prev = self.db.get_farm(player["id"])
+            if prev is not None:
+                try:
+                    prev_doc = json.loads(prev["state"])
+                except ValueError:
+                    prev_doc = None
+                if isinstance(prev_doc, dict):
+                    dt = max(0.0, now - prev["saved_at"])
+                    allowance = self.catalog.income_ceiling(prev_doc) * dt * 3.0 + 500.0
+                    gain = self.catalog.wealth(doc) - self.catalog.wealth(prev_doc)
+                    if gain > allowance:
+                        suspicion = (gain, allowance, dt)
+
         ok, rev = self.db.put_farm(player["id"], state, expected, now)
         if not ok:
             # Текущий rev в ответе обязателен: по нему клиент понимает, насколько
             # он отстал, и громко останавливает автосейв («ферма открыта в другом окне»).
             raise ApiError(409, "rev_conflict", rev=rev)
+
+        if suspicion is not None:
+            self.db.mark_suspicious(player["id"])
+            sys.stderr.write(
+                "ПОДОЗРЕНИЕ: игрок %d (%s) разбогател на %.0f при потолке %.0f за %.0f с\n"
+                % (player["id"], player["name"], suspicion[0], suspicion[1], suspicion[2]))
+
         return {"ok": True, "rev": rev, "savedAt": now, "serverNow": now}
 
     def _api_friends_request(self):
@@ -744,7 +895,15 @@ def main():
     parser.add_argument("--no-open", action="store_true", help="не открывать браузер")
     parser.add_argument("--local", action="store_true",
                         help="слушать только 127.0.0.1 — никто снаружи не достучится")
+    # TLS: оба ключа сразу — и сервер говорит по https. Сертификат добывает владелец
+    # (win-acme/certbot), см. docs/ONLINE.md «Переезд на https».
+    parser.add_argument("--cert", help="fullchain.pem — включает https (вместе с --key)")
+    parser.add_argument("--key", help="privkey.pem к сертификату")
     args = parser.parse_args()
+
+    if bool(args.cert) != bool(args.key):
+        print("Для https нужны оба ключа сразу: --cert и --key.")
+        return 1
 
     repo_root = Path(__file__).resolve().parent.parent
 
@@ -772,6 +931,16 @@ def main():
     FarmHandler.static_root = static_root
     FarmHandler.db = Db(db_path)
 
+    # Каталог цен и таймингов — для экономической проверки снимков. Его отсутствие —
+    # не ошибка, но сказано вслух: сервер-хранилище и сервер-сторож — разные режимы.
+    FarmHandler.catalog = Catalog(repo_root / "Tools" / "catalog.json")
+    if FarmHandler.catalog.loaded:
+        print(f"Каталог загружен ({FarmHandler.catalog.generated}): "
+              f"{len(FarmHandler.catalog.rates)} растимых — экономическая проверка включена.")
+    else:
+        print("ВНИМАНИЕ: Tools/catalog.json не найден — экономическая проверка выключена.")
+        print("Экспортируй из редактора: Farm → Онлайн → Экспортировать каталог для сервера.")
+
     host = LOOPBACK if args.local else ALL_INTERFACES
 
     try:
@@ -781,8 +950,19 @@ def main():
         print("Похоже, сервер уже запущен. Останови его или возьми другой порт: --port 8001")
         return 1
 
+    scheme = "http"
+    if args.cert:
+        try:
+            context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+            context.load_cert_chain(args.cert, args.key)
+        except (OSError, ssl.SSLError) as e:
+            print(f"Сертификат не загрузился: {e}")
+            return 1
+        httpd.socket = context.wrap_socket(httpd.socket, server_side=True)
+        scheme = "https"
+
     with httpd:
-        url = f"http://localhost:{args.port}/"
+        url = f"{scheme}://localhost:{args.port}/"
         if static_root is not None:
             print(f"Раздаю {static_root}")
         print(f"База: {db_path}")

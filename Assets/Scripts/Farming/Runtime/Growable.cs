@@ -37,6 +37,13 @@ namespace Farm.Farming
         private float _ownGrowthSpeed = 1f;
         private bool _ownSpeedCaptured;
 
+        /// <summary>
+        /// Стабильное имя грядки между клиентами и сейвами. Позиция и индекс в массиве
+        /// ссылками быть не могут: грядку двигают и сливают, — а «друг собрал грядку N»
+        /// обязано находить ровно её. Родится лениво, переживает сохранение.
+        /// </summary>
+        private string _uid;
+
         // Служебные индексы, которыми владеет GrowableRegistry, — держат его операции O(1).
         internal int RegistryIndex = -1;
         internal int ReadyIndex = -1;
@@ -67,6 +74,16 @@ namespace Farm.Farming
         #endregion
 
         #region Состояние
+
+        /// <summary>Стабильный идентификатор грядки; см. поле <c>_uid</c>.</summary>
+        public string Uid
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_uid)) _uid = Guid.NewGuid().ToString("N");
+                return _uid;
+            }
+        }
 
         public GrowableDefinition Definition => _definition;
         public GrowthPhase Phase => _phase;
@@ -362,9 +379,12 @@ namespace Farm.Farming
         /// </param>
         public void RestoreState(GrowableDefinition definition, int level, bool ready,
                                  double elapsedGrowth, double ripeSeconds, float ownGrowthSpeed,
-                                 double offlineSeconds = 0.0)
+                                 double offlineSeconds = 0.0, string uid = null)
         {
             if (definition == null || definition.StageCount == 0) return;
+
+            // Идентичность — из сейва: под этим именем грядку знают события друзей.
+            if (!string.IsNullOrEmpty(uid)) _uid = uid;
 
             _definition = definition;
             _level = Mathf.Max(1, level);
