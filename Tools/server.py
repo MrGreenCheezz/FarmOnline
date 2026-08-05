@@ -22,6 +22,7 @@ http.server нет типов для .wasm и .data, а сжатую сборк�
 
 import argparse
 import hashlib
+import hmac
 import http.server
 import json
 import os
@@ -68,21 +69,54 @@ FARM_VISIT_RE = re.compile(r"/api/farm/(\d+)\Z")
 #: «путь есть, метод не тот» (405): честный статус и здесь.
 KNOWN_API_PATHS = frozenset({
     "/api/time", "/api/farm", "/api/friends", "/api/events",
-    "/api/register", "/api/login", "/api/friends/request", "/api/friends/accept",
+    "/api/register", "/api/login", "/api/session", "/api/password", "/api/logout",
+    "/api/friends/request", "/api/friends/accept", "/api/friends/remove",
     "/api/events/ack",
 })
 
+#: Поле password — не пароль, а предварительный хеш sha256(имя_в_нижнем_регистре + ':' + пароль):
+#: сам пароль по сети не ходит никогда (docs/ONLINE.md, «Пароли»). Ровно 64 hex в нижнем
+#: регистре — что угодно другое пришло не от нашего клиента, и молчать об этом нельзя.
+PASSWORD_RE = re.compile(r"[0-9a-f]{64}\Z")
+
+#: PBKDF2 поверх присланного хеша. 600 000 итераций — примерно 0.3 с на попытку: столько
+#: же стоит и подбор. Число и соль лежат в базе рядом с хешем, поэтому поднять стоимость
+#: завтра можно, не ломая сегодняшние записи, — они пересчитаются при следующем входе.
+PBKDF2_ITERATIONS = 600_000
+PBKDF2_SALT_BYTES = 16
+
+#: Вторая стена против подбора: PBKDF2 делает попытку дорогой, счётчик — редкой.
+#: Ключ — имя в нижнем регистре, а не id: имени в базе может и не быть, а долбить
+#: несуществующее имя ничем не лучше существующего.
+LOGIN_MAX_FAILURES = 10
+LOGIN_LOCK_SECONDS = 60
+
 #: Схема из ONLINE.md. IF NOT EXISTS — миграций нет и до Ф4 не будет: база на этой
 #: машине, при смене схемы проще перенести данные руками, чем содержать механизм.
+#: Новые колонки к существующей базе доращиваются ALTER'ами в Db.__init__.
+#:
+#: players.token_hash — покойник эпохи гостевых токенов: токены переехали в sessions,
+#: и никто эту колонку больше не читает. Оставлена намеренно: ALTER TABLE DROP COLUMN
+#: старые sqlite не умеют, а ронять сервер ради удаления мёртвого поля незачем. На
+#: старой базе она объявлена NOT NULL без умолчания — потому INSERT и пишет туда ''.
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS players(
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    name       TEXT NOT NULL COLLATE NOCASE UNIQUE,
-    token_hash TEXT NOT NULL,
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    token_hash    TEXT NOT NULL,
+    pw_hash       TEXT,
+    pw_salt       TEXT,
+    pw_iterations INTEGER,
+    created_at    REAL NOT NULL,
+    last_seen     REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sessions(
+    token_hash TEXT PRIMARY KEY,
+    player_id  INTEGER NOT NULL REFERENCES players(id),
     created_at REAL NOT NULL,
     last_seen  REAL NOT NULL
 );
-CREATE INDEX IF NOT EXISTS players_token ON players(token_hash);
+CREATE INDEX IF NOT EXISTS sessions_player ON sessions(player_id);
 CREATE TABLE IF NOT EXISTS farms(
     player_id  INTEGER PRIMARY KEY REFERENCES players(id),
     state      TEXT NOT NULL,
@@ -179,11 +213,21 @@ class Catalog:
             if not isinstance(plot, dict):
                 continue
             level = plot.get("Level", 1)
-            if not isinstance(level, int):
+            if not is_int(level):
                 level = 1
             level = max(1, min(MAX_LEVEL, level))
             rate += self.rates.get(plot.get("GrowableId", ""), 0.0) * (2 ** (level - 1))
         return rate
+
+
+def is_int(value):
+    """Целое — и не булево.
+
+    `isinstance(True, int)` в Python истинно: bool наследует int, и обычная проверка
+    молча пропускает `{"playerId": true}`, превращая его в единицу. Для чисел, пришедших
+    из чужого JSON, это разница между «отказано» и «событие ушло игроку №1».
+    """
+    return type(value) is int
 
 
 def validate_state(doc):
@@ -192,7 +236,7 @@ def validate_state(doc):
         return "bad_state"
 
     gold = doc.get("Gold", 0)
-    if not isinstance(gold, int) or gold < 0 or gold > MAX_GOLD:
+    if not is_int(gold) or gold < 0 or gold > MAX_GOLD:
         return "bad_gold"
 
     plots = doc.get("Plots") or []
@@ -203,7 +247,7 @@ def validate_state(doc):
         if not isinstance(plot, dict):
             return "bad_plots"
         level = plot.get("Level", 1)
-        if not isinstance(level, int) or level < 1 or level > MAX_LEVEL:
+        if not is_int(level) or level < 1 or level > MAX_LEVEL:
             return "bad_plots"
 
     return None
@@ -223,6 +267,91 @@ class ApiError(Exception):
         self.extra = extra
 
 
+class LoginGuard:
+    """Счётчик неудачных входов — в памяти процесса, не в базе.
+
+    В базе ему делать нечего: переживать перезапуск сервера этой защите не нужно
+    (перезапуск и так реже, чем минута блокировки), а лишняя запись на каждую
+    опечатку пароля — трата под глобальным замком БД. Свой замок нужен потому,
+    что сервер многопоточный, а dict под одновременной правкой не обещает ничего.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._fails = {}  # имя в нижнем регистре -> (число неудач подряд, время последней)
+
+    def check(self, key, now):
+        """Бросает 429, пока имя в блокировке. Истёкшую блокировку заодно снимает."""
+        with self._lock:
+            count, last = self._fails.get(key, (0, 0.0))
+            if count < LOGIN_MAX_FAILURES:
+                return
+            if now - last < LOGIN_LOCK_SECONDS:
+                raise ApiError(429, "too_many_attempts")
+            self._fails.pop(key, None)
+
+    def failed(self, key, now):
+        with self._lock:
+            count, _ = self._fails.get(key, (0, 0.0))
+            self._fails[key] = (count + 1, now)
+
+    def passed(self, key):
+        """Удачный вход стирает счётчик: серия оборвалась, значит это был хозяин."""
+        with self._lock:
+            self._fails.pop(key, None)
+
+
+def _check_password_field(value):
+    """Присланный предварительный хеш или 400 bad_password.
+
+    Молчаливое «не подошло» тут было бы худшим отказом: клиент со сломанным
+    хешированием получал бы неотличимое от неверного пароля, и искали бы годами.
+    """
+    if not isinstance(value, str) or PASSWORD_RE.fullmatch(value) is None:
+        raise ApiError(400, "bad_password")
+    return value
+
+
+def _derive_password(password_hex, salt_hex, iterations):
+    """PBKDF2 от присланного хеша. Зовётся ВНЕ замка БД — он держит весь сервер,
+    а 600 тысяч итераций под ним заперли бы ферму всем на треть секунды за вход."""
+    return hashlib.pbkdf2_hmac(
+        "sha256", password_hex.encode("ascii"), bytes.fromhex(salt_hex), iterations).hex()
+
+
+def _new_password_record(password_hex):
+    """(хеш, соль, итерации) для записи в базу. Соль своя у каждого игрока —
+    иначе одинаковые пароли видны по одинаковым хешам."""
+    salt = secrets.token_bytes(PBKDF2_SALT_BYTES).hex()
+    return _derive_password(password_hex, salt, PBKDF2_ITERATIONS), salt, PBKDF2_ITERATIONS
+
+
+def _sql_lower(value):
+    """lower() питона внутри sqlite: тот же, каким клиент солит хеш имени."""
+    return value.lower() if isinstance(value, str) else value
+
+
+def _password_matches(row, password_hex):
+    """Сверка с записью игрока. False и для аккаунтов без пароля (гости старой эпохи).
+
+    compare_digest, а не ==: сравнение по первому несовпавшему байту рассказывает
+    время ответа, а хеш подбирается посимвольно.
+    """
+    if row is None:
+        return False
+    stored, salt = row["pw_hash"], row["pw_salt"]
+    iterations = row["pw_iterations"]
+    if not stored or not salt or not iterations:
+        return False
+    try:
+        actual = _derive_password(password_hex, salt, int(iterations))
+    except ValueError:
+        # Соль в базе испорчена — войти нельзя, но и упасть 500-й нельзя.
+        sys.stderr.write("ОШИБКА: испорченная соль у игрока %s\n" % row["id"])
+        return False
+    return hmac.compare_digest(actual, stored)
+
+
 class Db:
     """Одно соединение на процесс и глобальный замок вокруг каждой операции.
 
@@ -238,47 +367,115 @@ class Db:
         self._lock = threading.Lock()
         self._conn = sqlite3.connect(str(path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        # COLLATE NOCASE в sqlite складывает регистр только у латиницы: «Алиса» и
+        # «алиса» для него разные имена. Игра русская, имя фермы — оно же логин, и
+        # игрок, набравший своё имя с другой буквы, получил бы «неверный пароль»
+        # навсегда. Поэтому все поиски по имени идут через питоновский lower().
+        # Сканирование без индекса тут не жалко: игроков десятки, а не миллионы.
+        self._conn.create_function("pylower", 1, _sql_lower, deterministic=True)
         # Автокоммит: атомарность многошаговых операций даёт замок, а не транзакции,
         # и незакрытых транзакций, держащих файл, при таком режиме не бывает.
         self._conn.isolation_level = None
         with self._lock:
             self._conn.executescript(SCHEMA)
-            # База, заведённая до появления пометок: колонку доращиваем на месте.
+            # База, заведённая до появления колонки: доращиваем на месте.
             # На свежей базе ALTER честно падает «уже есть» — это и есть успех.
-            try:
-                self._conn.execute(
-                    "ALTER TABLE farms ADD COLUMN suspicious INTEGER NOT NULL DEFAULT 0")
-            except sqlite3.OperationalError:
-                pass
+            for ddl in (
+                "ALTER TABLE farms ADD COLUMN suspicious INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE players ADD COLUMN pw_hash TEXT",
+                "ALTER TABLE players ADD COLUMN pw_salt TEXT",
+                "ALTER TABLE players ADD COLUMN pw_iterations INTEGER",
+            ):
+                try:
+                    self._conn.execute(ddl)
+                except sqlite3.OperationalError:
+                    pass
 
     # --- игроки ---
 
-    def register(self, name, token_hash, now):
-        """None — имя занято (сравнение без учёта регистра даёт COLLATE NOCASE)."""
+    def passwordless_count(self):
+        """Сколько аккаунтов осталось от эпохи гостевых токенов — им вход закрыт."""
+        with self._lock:
+            return self._conn.execute(
+                "SELECT COUNT(*) AS n FROM players"
+                " WHERE pw_hash IS NULL OR pw_hash = ''").fetchone()["n"]
+
+    def create_player(self, name, pw_hash, pw_salt, iterations, now):
+        """None — имя занято (без учёта регистра, кириллица тоже — см. pylower).
+
+        Проверка и вставка под одним замком — иначе двое с одинаковым именем,
+        нажавшие «войти» разом, оба прошли бы SELECT. UNIQUE в схеме тут не
+        страховка: он умеет только латиницу.
+
+        token_hash = '' — дань мёртвой колонке: на старой базе она NOT NULL без
+        умолчания, а значение её никто не читает (см. комментарий к SCHEMA).
+        """
         with self._lock:
             row = self._conn.execute(
-                "SELECT id FROM players WHERE name = ?", (name,)).fetchone()
+                "SELECT id FROM players WHERE pylower(name) = pylower(?)", (name,)).fetchone()
             if row is not None:
                 return None
             cur = self._conn.execute(
-                "INSERT INTO players(name, token_hash, created_at, last_seen)"
-                " VALUES (?, ?, ?, ?)", (name, token_hash, now, now))
+                "INSERT INTO players(name, token_hash, pw_hash, pw_salt, pw_iterations,"
+                " created_at, last_seen) VALUES (?, '', ?, ?, ?, ?, ?)",
+                (name, pw_hash, pw_salt, iterations, now, now))
             return cur.lastrowid
 
+    def credentials(self, name):
+        """Запись игрока для сверки пароля. Считать хеш — уже снаружи, без замка.
+
+        ORDER BY id — на случай старой базы, где до pylower успели завестись
+        «Алиса» и «алиса»: право на имя остаётся за тем, кто пришёл первым.
+        """
+        with self._lock:
+            return self._conn.execute(
+                "SELECT * FROM players WHERE pylower(name) = pylower(?)"
+                " ORDER BY id LIMIT 1", (name,)).fetchone()
+
+    def set_password(self, player_id, pw_hash, pw_salt, iterations):
+        with self._lock:
+            self._conn.execute(
+                "UPDATE players SET pw_hash = ?, pw_salt = ?, pw_iterations = ?"
+                " WHERE id = ?", (pw_hash, pw_salt, iterations, player_id))
+
+    # --- сессии ---
+
+    def open_session(self, player_id, token_hash, now):
+        """Новая строка на устройство: вход с телефона не выкидывает из игры за столом."""
+        with self._lock:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO sessions(token_hash, player_id, created_at, last_seen)"
+                " VALUES (?, ?, ?, ?)", (token_hash, player_id, now, now))
+
+    def close_session(self, token_hash):
+        with self._lock:
+            self._conn.execute("DELETE FROM sessions WHERE token_hash = ?", (token_hash,))
+
+    def close_all_sessions(self, player_id):
+        """Смена пароля обязана выгонять того, кто его подсмотрел, — со всех устройств."""
+        with self._lock:
+            self._conn.execute("DELETE FROM sessions WHERE player_id = ?", (player_id,))
+
     def auth(self, token_hash, now):
-        """Игрок по хэшу токена; заодно отмечает last_seen — этим оно и живо."""
+        """Игрок по хэшу токена сессии; заодно отмечает last_seen — этим оно и живо."""
         with self._lock:
             row = self._conn.execute(
-                "SELECT * FROM players WHERE token_hash = ?", (token_hash,)).fetchone()
+                "SELECT p.* FROM sessions s JOIN players p ON p.id = s.player_id"
+                " WHERE s.token_hash = ?", (token_hash,)).fetchone()
             if row is not None:
+                self._conn.execute(
+                    "UPDATE sessions SET last_seen = ? WHERE token_hash = ?", (now, token_hash))
                 self._conn.execute(
                     "UPDATE players SET last_seen = ? WHERE id = ?", (now, row["id"]))
             return row
 
     def player_by_name(self, name):
+        """Поиск друга по имени — тем же регистронезависимым правилом, что и вход:
+        игрок зовёт друга ровно тем именем, под которым тот входит."""
         with self._lock:
             return self._conn.execute(
-                "SELECT * FROM players WHERE name = ?", (name,)).fetchone()
+                "SELECT * FROM players WHERE pylower(name) = pylower(?)"
+                " ORDER BY id LIMIT 1", (name,)).fetchone()
 
     def player_by_id(self, player_id):
         with self._lock:
@@ -327,11 +524,13 @@ class Db:
             return row["status"] if row is not None else None
 
     def friend_request(self, me, other, now):
-        """Итоговый статус заявки: 'pending' или 'accepted'.
+        """Итоговый статус: 'pending', 'incoming_exists' или 'already_friends'.
 
-        Встречная pending-заявка превращается в дружбу обновлением существующей
-        строки — обе стороны уже высказались, ждать нажатия «принять» нечего,
-        а вторая строка на ту же пару только запутала бы выборки.
+        Заявка НИКОГДА не создаёт дружбу сама. Раньше встречная заявка молча
+        превращалась в accepted — «обе стороны высказались, чего ждать», — и это
+        оказалось дефектом: игрок нажимал «добавить» на том, кто уже стучался, и
+        получал друга, не увидев ни его имени, ни решения. Дружбу заводит ровно
+        одно действие — accept; здесь мы только называем, что мешает.
         """
         with self._lock:
             row = self._conn.execute(
@@ -343,13 +542,32 @@ class Db:
                     " VALUES (?, ?, 'pending', ?)", (me, other, now))
                 return "pending"
             if row["status"] == "accepted":
-                return "accepted"
+                return "already_friends"
             if row["requester"] == me:
                 return "pending"  # повторная своя заявка — не отказ, просто ждём
+            # Встречная заявка лежит и ждёт ответа — база не меняется вовсе, клиенту
+            # остаётся показать её и предложить принять.
+            return "incoming_exists"
+
+    def friend_remove(self, me, other):
+        """Рвёт ЛЮБУЮ связь и говорит какую: 'friend', 'incoming', 'outgoing'.
+
+        None — связи не было. Один эндпоинт на три жеста (расторгнуть дружбу,
+        отклонить чужую заявку, отозвать свою) потому, что строка в базе одна и та
+        же; называть удалённое обязан ответ — иначе клиент не знает, что сказать игроку.
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT requester, status FROM friends WHERE (requester = ? AND addressee = ?)"
+                " OR (requester = ? AND addressee = ?)", (me, other, other, me)).fetchone()
+            if row is None:
+                return None
             self._conn.execute(
-                "UPDATE friends SET status = 'accepted' WHERE requester = ? AND addressee = ?",
-                (other, me))
-            return "accepted"
+                "DELETE FROM friends WHERE (requester = ? AND addressee = ?)"
+                " OR (requester = ? AND addressee = ?)", (me, other, other, me))
+            if row["status"] == "accepted":
+                return "friend"
+            return "outgoing" if row["requester"] == me else "incoming"
 
     def friend_accept(self, me, requester):
         """False — принимать нечего (нет pending-заявки от этого игрока ко мне)."""
@@ -434,6 +652,8 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
     static_root = None
     db = None
     catalog = None
+    #: Счётчик неудачных входов общий на процесс — блокировка по имени, а не по соединению.
+    guard = LoginGuard()
 
     extensions_map = {
         **http.server.SimpleHTTPRequestHandler.extensions_map,
@@ -449,6 +669,7 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
 
     def __init__(self, *args, **kwargs):
         self._encoding = None
+        self._session_hash = None
         directory = str(self.static_root) if self.static_root is not None else None
         super().__init__(*args, directory=directory, **kwargs)
 
@@ -526,10 +747,18 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
                 return self._api_register()
             if path == "/api/login":
                 return self._api_login()
+            if path == "/api/session":
+                return self._api_session()
+            if path == "/api/password":
+                return self._api_password()
+            if path == "/api/logout":
+                return self._api_logout()
             if path == "/api/friends/request":
                 return self._api_friends_request()
             if path == "/api/friends/accept":
                 return self._api_friends_accept()
+            if path == "/api/friends/remove":
+                return self._api_friends_remove()
             if path == "/api/events":
                 return self._api_events_post()
             if path == "/api/events/ack":
@@ -555,18 +784,92 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
         # чужих клиентов, и \n или \x1b там — это уже не имя, а инъекция в чужой HUD.
         if not (2 <= len(name) <= 24) or not name.isprintable():
             raise ApiError(400, "bad_name")
-        token = secrets.token_hex(24)
+        password = _check_password_field(data.get("password"))
+
         now = time.time()
-        player_id = self.db.register(name, _hash_token(token), now)
+        # Регистрация под тем же счётчиком, что и вход, и по той же причине наоборот:
+        # каждая попытка стоит 0.3 с процессорного времени ДО всякой проверки прав, а
+        # сервер раздаёт с этого же процесса саму игру. Без счётчика сотня запросов
+        # на занятое имя укладывает раздачу сборки — отказ в регистрации дешевле.
+        key = name.lower()
+        self.guard.check(key, now)
+
+        # Считаем ДО обращения к базе: замок БД и 600 тысяч итераций рядом стоять
+        # не должны. Занятое имя обойдётся в лишние 0.3 с — плата за то, что
+        # регистрация никого не задерживает.
+        pw_hash, salt, iterations = _new_password_record(password)
+        player_id = self.db.create_player(name, pw_hash, salt, iterations, now)
         if player_id is None:
+            self.guard.failed(key, now)
             raise ApiError(409, "name_taken")
-        return {"ok": True, "playerId": player_id, "name": name,
-                "token": token, "serverNow": now}
+
+        self.guard.passed(key)
+        return self._start_session(player_id, name, now)
 
     def _api_login(self):
+        data = self._json_body()
+        name = data.get("name")
+        if not isinstance(name, str) or not name.strip():
+            raise ApiError(400, "bad_name")
+        name = name.strip()
+        password = _check_password_field(data.get("password"))
+
+        now = time.time()
+        key = name.lower()
+        self.guard.check(key, now)
+
+        # Достать запись — под замком БД, посчитать PBKDF2 — уже без него: 600 тысяч
+        # итераций под глобальным замком заперли бы весь сервер на каждый вход.
+        # Несуществующее имя отвечает быстрее существующего, и это принято: то же
+        # самое и так рассказывает /api/friends/request своим 404 no_such_player.
+        row = self.db.credentials(name)
+        if not _password_matches(row, password):
+            self.guard.failed(key, now)
+            # Имя и пароль в одном коде намеренно: «такого игрока нет» — подсказка
+            # тому, кто перебирает имена. Пароли и хеши не логируем нигде.
+            raise ApiError(401, "bad_credentials")
+
+        self.guard.passed(key)
+        return self._start_session(row["id"], row["name"], time.time())
+
+    def _api_session(self):
+        """Продление сеанса по токену — вход без пароля с уже знакомого устройства."""
         player = self._auth()
         return {"ok": True, "playerId": player["id"], "name": player["name"],
                 "serverNow": time.time()}
+
+    def _api_password(self):
+        player = self._auth()
+        data = self._json_body()
+        current = _check_password_field(data.get("current"))
+        following = _check_password_field(data.get("next"))
+
+        # Сверяемся с записью, которую принёс токен, а не с повторным поиском по
+        # имени: меняем пароль ровно тому аккаунту, чья это сессия.
+        if not _password_matches(player, current):
+            raise ApiError(401, "bad_credentials")
+
+        pw_hash, salt, iterations = _new_password_record(following)
+        self.db.set_password(player["id"], pw_hash, salt, iterations)
+        # Гасим ВСЕ сессии, включая свою: смена пароля тем и ценна, что выгоняет
+        # подсмотревшего. Взамен тут же выдаём новый токен — хозяин не заметит выхода.
+        self.db.close_all_sessions(player["id"])
+        answer = self._start_session(player["id"], player["name"], time.time())
+        # Знание старого пароля доказано — держать на имени блокировку не за что.
+        self.guard.passed(player["name"].lower())
+        return answer
+
+    def _api_logout(self):
+        """Гасит только эту сессию: остальные устройства игрока продолжают играть."""
+        self._auth()
+        self.db.close_session(self._session_hash)
+        return {"ok": True, "serverNow": time.time()}
+
+    def _start_session(self, player_id, name, now):
+        token = secrets.token_hex(24)
+        self.db.open_session(player_id, _hash_token(token), now)
+        return {"ok": True, "playerId": player_id, "name": name,
+                "token": token, "serverNow": now}
 
     def _api_farm_get(self):
         player = self._auth()
@@ -672,11 +975,24 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
         player = self._auth()
         data = self._json_body()
         requester = data.get("playerId")
-        if not isinstance(requester, int):
+        if not is_int(requester):
             raise ApiError(400, "bad_request")
         if not self.db.friend_accept(player["id"], requester):
             raise ApiError(404, "no_request")
         return {"ok": True, "serverNow": time.time()}
+
+    def _api_friends_remove(self):
+        player = self._auth()
+        data = self._json_body()
+        other = data.get("playerId")
+        if not is_int(other):
+            raise ApiError(400, "bad_request")
+        removed = self.db.friend_remove(player["id"], other)
+        if removed is None:
+            # Отказ обязан быть заметным: «кнопка нажалась, и ничего» клиент
+            # обязан отличить от «связь удалена».
+            raise ApiError(404, "no_relation")
+        return {"ok": True, "removed": removed, "serverNow": time.time()}
 
     def _api_friends(self):
         player = self._auth()
@@ -691,7 +1007,7 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
         player = self._auth()
         data = self._json_body()
         to_player = data.get("toPlayerId")
-        if not isinstance(to_player, int):
+        if not is_int(to_player):
             raise ApiError(400, "bad_request")
         if data.get("type") not in ("gift", "help", "help_reward"):
             raise ApiError(400, "bad_type")
@@ -720,7 +1036,7 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
         player = self._auth()
         data = self._json_body()
         ids = data.get("ids")
-        if not isinstance(ids, list) or not all(isinstance(i, int) for i in ids):
+        if not isinstance(ids, list) or not all(is_int(i) for i in ids):
             raise ApiError(400, "bad_request")
         self.db.ack_events(player["id"], ids)
         return {"ok": True, "serverNow": time.time()}
@@ -728,11 +1044,17 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
     # --- общее для обработчиков ---
 
     def _auth(self):
-        """Игрок по X-Farm-Token; заодно обновляется last_seen (внутри Db.auth)."""
+        """Игрок по X-Farm-Token; заодно обновляется last_seen (внутри Db.auth).
+
+        Хеш токена запоминается в _session_hash: logout гасит именно эту строку
+        сессий, и второй раз считать его неоткуда — сам токен дальше не нужен.
+        """
         token = self.headers.get("X-Farm-Token", "")
         if token:
-            player = self.db.auth(_hash_token(token), time.time())
+            token_hash = _hash_token(token)
+            player = self.db.auth(token_hash, time.time())
             if player is not None:
+                self._session_hash = token_hash
                 return player
         raise ApiError(401, "bad_token")
 
@@ -930,6 +1252,15 @@ def main():
 
     FarmHandler.static_root = static_root
     FarmHandler.db = Db(db_path)
+
+    # Аккаунты эпохи гостевых токенов паролем не откроешь: пароля у них нет и взяться
+    # ему неоткуда (хеш нельзя восстановить из токена). Молчать об этом нельзя — иначе
+    # владелец узнает о них от игрока, который не может войти.
+    orphans = FarmHandler.db.passwordless_count()
+    if orphans:
+        print(f"ВНИМАНИЕ: в базе {orphans} аккаунт(ов) без пароля — из эпохи гостевых токенов.")
+        print("Войти паролем они не смогут никогда. Если фермы не жалко, "
+              f"проще завести базу заново: удали {db_path}.")
 
     # Каталог цен и таймингов — для экономической проверки снимков. Его отсутствие —
     # не ошибка, но сказано вслух: сервер-хранилище и сервер-сторож — разные режимы.

@@ -4,9 +4,14 @@ namespace Farm.Net
 {
     /// <summary>
     /// Кто мы для сервера. Две половины с разной судьбой: токен, номер и имя переживают
-    /// перезапуск (PlayerPrefs — в вебе это и есть «аккаунт», пароля нет), а состояние
-    /// текущего сеанса — вход, известная ревизия фермы, блокировка сохранения — живёт
-    /// только до закрытия игры и стартует чистым.
+    /// перезапуск (PlayerPrefs), а состояние текущего сеанса — вход, известная ревизия фермы,
+    /// блокировка сохранения — живёт только до закрытия игры и стартует чистым.
+    /// <para>
+    /// Аккаунт — это имя и пароль, и они здесь не хранятся вовсе. Токен — сессия <b>этого
+    /// устройства</b>: одна строка на браузер, поэтому вход с телефона не выкидывает из игры
+    /// на компьютере. Чистка браузерного хранилища больше не значит потерю фермы — игрок
+    /// входит паролем заново.
+    /// </para>
     /// </summary>
     public static class NetSession
     {
@@ -20,7 +25,10 @@ namespace Farm.Net
         private static int? _playerId;
         private static string _playerName;
 
-        /// <summary>Секрет доступа к своей ферме. Пустая строка — аккаунта ещё нет.</summary>
+        /// <summary>
+        /// Секрет текущей сессии. Пустая строка — на этом устройстве ещё не входили;
+        /// ферма от этого не пропадает, она за именем и паролем.
+        /// </summary>
         public static string Token
         {
             get => _token ?? (_token = PlayerPrefs.GetString(TokenKey, ""));
@@ -32,10 +40,10 @@ namespace Farm.Net
             }
         }
 
-        /// <summary>Есть ли с чем идти на /api/login.</summary>
+        /// <summary>Есть ли с чем идти на /api/session, минуя экран пароля.</summary>
         public static bool HasToken => !string.IsNullOrEmpty(Token);
 
-        /// <summary>Серверный номер игрока. 0 — ещё не регистрировались.</summary>
+        /// <summary>Серверный номер игрока. 0 — на этом устройстве ещё не входили.</summary>
         public static int PlayerId
         {
             get => _playerId ?? (_playerId = PlayerPrefs.GetInt(PlayerIdKey, 0)).Value;
@@ -61,7 +69,7 @@ namespace Farm.Net
 
         // ---- сеанс (не в prefs) ----
 
-        /// <summary>Сервер подтвердил токен в этом сеансе. Без входа PUT не имеет смысла.</summary>
+        /// <summary>Сервер подтвердил нас в этом сеансе (паролем или токеном). Без входа PUT не имеет смысла.</summary>
         public static bool LoggedIn;
 
         /// <summary>
@@ -77,7 +85,10 @@ namespace Farm.Net
         /// </summary>
         public static bool PutBlocked;
 
-        /// <summary>Забыть аккаунт целиком: prefs, кэши и состояние сеанса.</summary>
+        /// <summary>
+        /// Забыть себя на этом устройстве: prefs, кэши и состояние сеанса. Аккаунт при этом
+        /// цел — ферма живёт на сервере и открывается тем же именем с паролем.
+        /// </summary>
         public static void Clear()
         {
             PlayerPrefs.DeleteKey(TokenKey);

@@ -148,9 +148,18 @@ namespace Farm.Game
             if (_inboxOverlay != null) _inboxOverlay.style.display = DisplayStyle.None;
         }
 
-        private async void RefreshFriends()
+        private void RefreshFriends() => RefreshFriends(null);
+
+        /// <summary>
+        /// Перерисовать списки. <paramref name="keep"/> — строка про только что сделанное:
+        /// её показываем сразу и переживаем ею перерисовку. Иначе итог действия смывался бы
+        /// собственным обновлением, и «Удалить» выглядело бы как «ничего не произошло».
+        /// </summary>
+        private async void RefreshFriends(string keep)
         {
-            if (_friendsList == null || _refreshing) return;
+            if (_friendsList == null) return;
+            if (!string.IsNullOrEmpty(keep)) Message(keep);
+            if (_refreshing) return;
 
             if (!NetSession.LoggedIn)
             {
@@ -160,7 +169,7 @@ namespace Farm.Game
             }
 
             _refreshing = true;
-            Message("загружаю…");
+            if (string.IsNullOrEmpty(keep)) Message("загружаю…");
 
             try
             {
@@ -172,7 +181,7 @@ namespace Farm.Game
                 }
 
                 _friendsList.Clear();
-                Message("");
+                Message(keep ?? "");
 
                 var incoming = res.Value.incoming;
                 if (incoming != null && incoming.Length > 0)
@@ -180,8 +189,13 @@ namespace Farm.Game
                     Section("ПРОСЯТСЯ В ДРУЗЬЯ");
                     foreach (var entry in incoming)
                     {
-                        var row = Row(entry.name, "");
-                        row.Add(ActionButton("Принять", "btn btn--accent", () => Accept(entry.playerId)));
+                        int id = entry.playerId;
+                        string name = entry.name;
+
+                        var row = Row(name, "");
+                        row.Add(ActionButton("Принять", "btn btn--accent", () => Accept(id, name)));
+                        // Отказ — такое же решение, как согласие: без него заявка висит вечно.
+                        row.Add(ActionButton("Отклонить", "btn friend__drop", () => Drop(id, name)));
                         _friendsList.Add(row);
                     }
                 }
@@ -202,6 +216,9 @@ namespace Farm.Game
                             OnlineFlow.Visit(id, name);
                         }));
                         row.Add(ActionButton("Подарить", "btn", () => ShowGiftPicker(id, name)));
+                        // Без диалога подтверждения: дружбу можно позвать обратно одной строкой,
+                        // а лишний вопрос на каждый жест утомляет сильнее, чем спасает.
+                        row.Add(ActionButton("Удалить", "btn friend__drop", () => Drop(id, name)));
                         _friendsList.Add(row);
                     }
                 }
@@ -211,12 +228,20 @@ namespace Farm.Game
                 {
                     Section("ЖДУТ ОТВЕТА");
                     foreach (var entry in outgoing)
-                        _friendsList.Add(Row(entry.name, "позван(а)"));
+                    {
+                        int id = entry.playerId;
+                        string name = entry.name;
+
+                        var row = Row(name, "позван(а)");
+                        row.Add(ActionButton("Отменить", "btn friend__drop", () => Drop(id, name)));
+                        _friendsList.Add(row);
+                    }
                 }
 
                 if ((incoming == null || incoming.Length == 0) &&
                     (friends == null || friends.Length == 0) &&
-                    (outgoing == null || outgoing.Length == 0))
+                    (outgoing == null || outgoing.Length == 0) &&
+                    string.IsNullOrEmpty(keep))
                 {
                     Message("пока никого — позови друга по имени его фермы");
                 }
@@ -229,6 +254,10 @@ namespace Farm.Game
 
         private async void OnInvite()
         {
+            // Второй клик по «Позвать», пока летит первый, шлёт вторую заявку и вторую
+            // перерисовку наперегонки с первой. Вреда игроку нет, беспорядка — много.
+            if (_refreshing) return;
+
             string name = _friendsName != null ? _friendsName.value.Trim() : "";
             if (name.Length < 2) { Message("имя — от 2 символов"); return; }
 
@@ -238,21 +267,79 @@ namespace Farm.Game
             if (res.Value != null && res.Value.ok)
             {
                 if (_friendsName != null) _friendsName.value = "";
-                Message("заявка отправлена: " + name);
-                RefreshFriends();
+
+                // Сервер отвечает не «да», а чем именно кончилась заявка: встречная заявка
+                // теперь не превращается в дружбу сама, и молчать об этом нельзя — игрок
+                // остался бы гадать, почему друг не появился.
+                switch (res.Value.status)
+                {
+                    case "already_friends":
+                        RefreshFriends("вы уже друзья");
+                        break;
+                    case "incoming_exists":
+                        RefreshFriends(name + " уже позвал(а) тебя — прими заявку ниже");
+                        break;
+                    default:
+                        RefreshFriends("заявка отправлена: " + name);
+                        break;
+                }
             }
             else
             {
                 string error = res.Value != null ? res.Value.error : "непонятный ответ";
-                Message(error == "no_such_player" ? "нет игрока с именем «" + name + "»" : "не получилось: " + error);
+                switch (error)
+                {
+                    case "no_such_player": Message("нет игрока с именем «" + name + "»"); break;
+                    case "self_request": Message("это же ты и есть"); break;
+                    default: Message("не получилось: " + error); break;
+                }
             }
         }
 
-        private async void Accept(int playerId)
+        private async void Accept(int playerId, string name)
         {
             var res = await ApiClient.AcceptFriendAsync(playerId);
-            if (res.Transport && res.Value != null && res.Value.ok) RefreshFriends();
-            else Message("не получилось принять заявку");
+            if (!res.Transport) { Message("сеть молчит — попробуй ещё раз"); return; }
+
+            if (res.Value != null && res.Value.ok) { RefreshFriends("теперь вы друзья: " + name); return; }
+
+            // Коды сервера — не для глаз игрока: заявку могли отозвать с той стороны,
+            // пока список висел с прошлой перерисовки, и это надо сказать словами.
+            string error = res.Value != null ? res.Value.error : "непонятный ответ";
+            RefreshFriends(error == "no_request"
+                ? "заявку уже отозвали"
+                : "не получилось принять заявку: " + error);
+        }
+
+        /// <summary>
+        /// Разрыв связи любой формы — дружбы, чужой заявки, своей. Ручка на сервере одна,
+        /// и разбираться, что именно снялось, ей же и положено: клиент про свежие заявки
+        /// знает ровно столько, сколько было в последней перерисовке.
+        /// <para>
+        /// Поэтому и говорим по ответу сервера, а не по нажатой кнопке: пока список висел,
+        /// друг мог удалиться и прислать заявку заново — «больше не в друзьях» на месте
+        /// отклонённой заявки было бы уверенным враньём.
+        /// </para>
+        /// </summary>
+        private async void Drop(int playerId, string name)
+        {
+            var res = await ApiClient.RemoveFriendAsync(playerId);
+            if (!res.Transport) { Message("сеть молчит — попробуй ещё раз"); return; }
+
+            if (res.Value != null && res.Value.ok)
+            {
+                switch (res.Value.removed)
+                {
+                    case "incoming": RefreshFriends("заявка от " + name + " отклонена"); break;
+                    case "outgoing": RefreshFriends("заявка к " + name + " отозвана"); break;
+                    default: RefreshFriends(name + " больше не в друзьях"); break;
+                }
+                return;
+            }
+
+            string error = res.Value != null ? res.Value.error : "непонятный ответ";
+            // Связи уже нет (успели с той стороны) — не спорить, а показать, как стало.
+            RefreshFriends(error == "no_relation" ? "тут уже нечего разрывать" : "не получилось: " + error);
         }
 
         // ---- подарки ----

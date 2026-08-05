@@ -199,7 +199,7 @@
 
         <!-- ================= ДРУЗЬЯ ================= -->
         <ui:VisualElement name="friends-overlay" class="overlay" style="display: none;">
-            <ui:VisualElement name="friends-window" class="window window--narrow">
+            <ui:VisualElement name="friends-window" class="window friends-window">
                 <ui:VisualElement class="window__header">
                     <ui:Label name="friends-title" text="ДРУЗЬЯ" class="window__title" />
                     <ui:Button name="friends-close" text="✕" class="btn btn--icon" />

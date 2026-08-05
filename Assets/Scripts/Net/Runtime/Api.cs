@@ -8,16 +8,21 @@ namespace Farm.Net
     // Типы по контракту: id/playerId/rev — int, времена — unix-секунды double,
     // state/payload — непрозрачные json-строки (произвольную вложенность JsonUtility не умеет).
 
-    /// <summary>POST /api/register — тело.</summary>
+    /// <summary>
+    /// Тело POST /api/register и POST /api/login — они различаются только смыслом, не формой.
+    /// В <c>password</c> лежит не пароль, а предварительный хеш (см. <see cref="ApiClient.HashPassword"/>):
+    /// сам пароль по сети не ходит никогда.
+    /// </summary>
     [Serializable]
-    public class RegisterRequest
+    public class AuthRequest
     {
         public string name;
+        public string password;
     }
 
-    /// <summary>POST /api/register — ответ.</summary>
+    /// <summary>Ответ /api/register и /api/login: аккаунт плюс новый токен сессии этого устройства.</summary>
     [Serializable]
-    public class RegisterResponse
+    public class AuthResponse
     {
         public bool ok;
         public int playerId;
@@ -27,14 +32,37 @@ namespace Farm.Net
         public string error;
     }
 
-    /// <summary>POST /api/login — ответ.</summary>
+    /// <summary>
+    /// POST /api/session — ответ. Токена здесь нет намеренно: сеанс продлевается тем же
+    /// токеном, что уже лежит в <see cref="NetSession"/>, новый выдаёт только вход паролем.
+    /// </summary>
     [Serializable]
-    public class LoginResponse
+    public class SessionResponse
     {
         public bool ok;
         public int playerId;
         public string name;
         public double serverNow;
+        public string error;
+    }
+
+    /// <summary>POST /api/password — тело. Оба поля — предварительные хеши, не пароли.</summary>
+    [Serializable]
+    public class PasswordRequest
+    {
+        public string current;
+        public string next;
+    }
+
+    /// <summary>
+    /// POST /api/password — ответ. Токен приходит новый: смена пароля гасит все прочие сессии,
+    /// и старый токен этого устройства вместе с ними.
+    /// </summary>
+    [Serializable]
+    public class PasswordResponse
+    {
+        public bool ok;
+        public string token;
         public string error;
     }
 
@@ -98,11 +126,45 @@ namespace Farm.Net
         public string name;
     }
 
+    /// <summary>
+    /// POST /api/friends/request — ответ. <c>status</c> называет, что вышло из заявки:
+    /// <c>pending</c> — ушла и ждёт, <c>incoming_exists</c> — встречная уже была (примите её),
+    /// <c>already_friends</c> — вы и так друзья. Разные исходы требуют разных слов игроку,
+    /// поэтому голого <c>ok</c> здесь мало.
+    /// </summary>
+    [Serializable]
+    public class FriendRequestResponse
+    {
+        public bool ok;
+        public string status;
+        public string error;
+    }
+
     /// <summary>POST /api/friends/accept — тело.</summary>
     [Serializable]
     public class FriendAcceptBody
     {
         public int playerId;
+    }
+
+    /// <summary>POST /api/friends/remove — тело. Одна кнопка на три случая, их различает сервер.</summary>
+    [Serializable]
+    public class FriendRemoveBody
+    {
+        public int playerId;
+    }
+
+    /// <summary>
+    /// POST /api/friends/remove — ответ. <c>removed</c> говорит, что именно оборвали:
+    /// <c>friend</c> — дружбу, <c>incoming</c> — отклонили чужую заявку, <c>outgoing</c> —
+    /// отозвали свою. Игроку это разные поступки, и сообщение о них разное.
+    /// </summary>
+    [Serializable]
+    public class FriendRemoveResponse
+    {
+        public bool ok;
+        public string removed;
+        public string error;
     }
 
     /// <summary>Одно входящее событие (подарок, помощь) в /api/events.</summary>

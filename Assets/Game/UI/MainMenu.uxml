@@ -10,11 +10,27 @@
 
             <ui:Label name="menu-save-info" text="—" class="menu__info" />
 
-            <ui:TextField name="menu-name" class="menu__input" max-length="24" />
+            <!-- Форма входа. Видна ровно пока нет токена: у кого он есть, тому нечего вводить,
+                 а лишние поля на главном экране читаются как незаконченная работа. -->
+            <ui:VisualElement name="menu-auth" class="menu__auth">
+                <ui:Label text="имя фермы" class="menu__setting-label" />
+                <ui:TextField name="menu-name" class="menu__input" max-length="24" />
+
+                <ui:Label text="пароль" class="menu__setting-label" />
+                <ui:TextField name="menu-password" class="menu__input" max-length="64" />
+
+                <ui:Button name="menu-login" text="Войти" class="menu__button menu__button--primary" />
+                <ui:Button name="menu-register" text="Завести ферму" class="menu__button" />
+
+                <ui:Label text="сервер пока работает без https — пароль идёт по сети открытым. Возьми здесь отдельный, не тот, что от почты."
+                          class="menu__hint" />
+            </ui:VisualElement>
+
             <ui:Button name="menu-continue" text="Играть" class="menu__button menu__button--primary" />
             <ui:Button name="menu-new" text="Новая игра" class="menu__button" />
             <ui:Button name="menu-settings" text="Звук" class="menu__button" />
-            <ui:Button name="menu-code" text="Код фермы" class="menu__button menu__button--quiet" />
+            <ui:Button name="menu-password-change" text="Сменить пароль" class="menu__button menu__button--quiet" />
+            <ui:Button name="menu-switch" text="Сменить игрока" class="menu__button menu__button--quiet" />
             <ui:Button name="menu-quit" text="Выход" class="menu__button menu__button--quiet" />
 
             <ui:Label name="menu-net-status" text="" class="menu__net-status" />
@@ -39,18 +55,26 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
-        <ui:VisualElement name="menu-code-overlay" class="menu__overlay">
+        <ui:VisualElement name="menu-password-overlay" class="menu__overlay">
             <ui:VisualElement class="menu__dialog">
-                <ui:Label text="Код фермы" class="menu__dialog-title" />
-                <ui:Label text="Код — единственный ключ к ферме. Запиши его: по нему входят с другого устройства и после чистки браузера. Кто знает код — тот и хозяин."
+                <ui:Label text="Смена пароля" class="menu__dialog-title" />
+                <ui:Label text="Новый пароль выгонит остальные устройства: тот, кто подсмотрел старый, останется за воротами."
                           class="menu__dialog-text" />
-                <ui:TextField name="menu-code-value" readonly="true" class="menu__input" />
-                <ui:Label text="Войти по другому коду (вход на этом устройстве перепишется — свой код сначала запиши):"
-                          class="menu__setting-label" />
-                <ui:TextField name="menu-code-input" max-length="64" class="menu__input" />
+
+                <ui:Label text="текущий пароль" class="menu__setting-label" />
+                <ui:TextField name="menu-pass-current" max-length="64" class="menu__input" />
+
+                <ui:Label text="новый пароль" class="menu__setting-label" />
+                <ui:TextField name="menu-pass-next" max-length="64" class="menu__input" />
+
+                <ui:Label text="новый ещё раз" class="menu__setting-label" />
+                <ui:TextField name="menu-pass-repeat" max-length="64" class="menu__input" />
+
+                <ui:Label name="menu-pass-message" text="" class="menu__net-status" />
+
                 <ui:VisualElement class="menu__dialog-row">
-                    <ui:Button name="menu-code-close" text="Закрыть" class="menu__button menu__button--quiet" />
-                    <ui:Button name="menu-code-login" text="Войти по коду" class="menu__button menu__button--primary" />
+                    <ui:Button name="menu-pass-close" text="Закрыть" class="menu__button menu__button--quiet" />
+                    <ui:Button name="menu-pass-apply" text="Сменить" class="menu__button menu__button--primary" />
                 </ui:VisualElement>
             </ui:VisualElement>
         </ui:VisualElement>

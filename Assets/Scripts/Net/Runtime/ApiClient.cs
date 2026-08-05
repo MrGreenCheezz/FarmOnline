@@ -1,4 +1,5 @@
 using System;
+using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -97,20 +98,81 @@ namespace Farm.Net
             return result;
         }
 
+        // ---- пароль ----
+
+        /// <summary>
+        /// Предварительный хеш пароля: <c>sha256(имя_в_нижнем_регистре + ":" + пароль)</c>,
+        /// 64 шестнадцатеричных символа в нижнем регистре. Именно он уходит в поле
+        /// <c>password</c> — сам пароль не покидает устройство никогда.
+        /// <para>
+        /// Это <b>не замена https</b>: перехваченный хеш — тот же ключ к ферме. Смысл в другом —
+        /// не дать утечь самому паролю, который игрок почти наверняка повторил на почте и ещё
+        /// в трёх местах. Имя как соль лишает трафик и второй подсказки: одинаковые пароли
+        /// разных игроков выглядят по-разному.
+        /// </para>
+        /// <para>
+        /// Регистр имени снимается тем же способом, что и на сервере (уникальность имени
+        /// без учёта регистра), иначе «Маша» и «маша» дали бы разные хеши одного пароля.
+        /// </para>
+        /// </summary>
+        public static string HashPassword(string name, string password)
+        {
+            string source = (name ?? "").Trim().ToLowerInvariant() + ":" + (password ?? "");
+
+            using (var sha = SHA256.Create())
+            {
+                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(source));
+                var hex = new StringBuilder(hash.Length * 2);
+                foreach (byte b in hash) hex.Append(b.ToString("x2"));
+                return hex.ToString();
+            }
+        }
+
         // ---- аккаунт ----
 
         /// <summary>
-        /// Завести аккаунт. При удаче токен, номер и имя сразу ложатся в <see cref="NetSession"/> —
-        /// потерять токен между ответом и записью значит потерять ферму навсегда.
+        /// Завести аккаунт. При удаче токен, номер и имя сразу ложатся в <see cref="NetSession"/>.
+        /// <para>
+        /// <paramref name="password"/> — <b>уже хеш</b> из <see cref="HashPassword"/>: вызывающий
+        /// хеширует сам. Так видно на месте вызова, что открытый пароль дальше поля ввода не идёт,
+        /// и так эти методы можно проверить, не заводя ни одного настоящего пароля.
+        /// </para>
         /// </summary>
-        public static async Awaitable<NetResult<RegisterResponse>> RegisterAsync(string name)
+        public static async Awaitable<NetResult<AuthResponse>> RegisterAsync(string name, string password)
         {
-            string body = JsonUtility.ToJson(new RegisterRequest { name = name });
-            var result = Report(await Send<RegisterResponse>("POST", "/api/register", body, auth: false), "регистрация");
+            string body = JsonUtility.ToJson(new AuthRequest { name = name, password = password });
+            var result = Report(await Send<AuthResponse>("POST", "/api/register", body, auth: false), "регистрация");
+            AdoptAccount(result);
+            return result;
+        }
+
+        /// <summary>
+        /// Войти по имени и паролю. Ответ несёт <b>новый</b> токен сессии этого устройства —
+        /// вход с телефона не выгоняет из игры на компьютере.
+        /// <para>
+        /// <paramref name="password"/> — <b>уже хеш</b> из <see cref="HashPassword"/>, см.
+        /// <see cref="RegisterAsync"/>.
+        /// </para>
+        /// </summary>
+        public static async Awaitable<NetResult<AuthResponse>> LoginAsync(string name, string password)
+        {
+            string body = JsonUtility.ToJson(new AuthRequest { name = name, password = password });
+            var result = Report(await Send<AuthResponse>("POST", "/api/login", body, auth: false), "вход");
+            AdoptAccount(result);
+            return result;
+        }
+
+        /// <summary>
+        /// Продолжить сеанс сохранённым токеном, не спрашивая пароль, — обычный путь запуска.
+        /// <c>401 bad_token</c> здесь не беда, а ответ: токен протух, надо показать вход паролем.
+        /// Тело пустое, но не null: сервер ждёт JSON.
+        /// </summary>
+        public static async Awaitable<NetResult<SessionResponse>> ResumeSessionAsync()
+        {
+            var result = Report(await Send<SessionResponse>("POST", "/api/session", "{}", auth: true), "сеанс");
 
             if (result.Transport && result.Value != null && result.Value.ok)
             {
-                NetSession.Token = result.Value.token;
                 NetSession.PlayerId = result.Value.playerId;
                 NetSession.PlayerName = result.Value.name;
                 NetSession.LoggedIn = true;
@@ -120,20 +182,54 @@ namespace Farm.Net
             return result;
         }
 
-        /// <summary>Войти по токену из <see cref="NetSession"/>. Тело пустое, но не null: сервер ждёт JSON.</summary>
-        public static async Awaitable<NetResult<LoginResponse>> LoginAsync()
+        /// <summary>
+        /// Сменить пароль. Сервер гасит <b>все</b> сессии игрока, включая эту, и тут же выдаёт ей
+        /// новый токен — он немедленно ложится в <see cref="NetSession"/>, иначе следующий же
+        /// запрос ушёл бы с погашенным.
+        /// <para>
+        /// <paramref name="current"/> и <paramref name="next"/> — <b>уже хеши</b> из
+        /// <see cref="HashPassword"/>, оба посолены именем игрока. Имени в подписи нет намеренно:
+        /// в теле запроса оно не участвует (игрока называет токен), а три строковых параметра
+        /// подряд — приглашение однажды перепутать их местами.
+        /// </para>
+        /// </summary>
+        public static async Awaitable<NetResult<PasswordResponse>> ChangePasswordAsync(
+            string current, string next)
         {
-            var result = Report(await Send<LoginResponse>("POST", "/api/login", "{}", auth: true), "вход");
+            string body = JsonUtility.ToJson(new PasswordRequest { current = current, next = next });
+            var result = Report(
+                await Send<PasswordResponse>("POST", "/api/password", body, auth: true), "смена пароля");
 
-            if (result.Transport && result.Value != null && result.Value.ok)
-            {
-                NetSession.PlayerId = result.Value.playerId;
-                NetSession.PlayerName = result.Value.name;
-                NetSession.LoggedIn = true;
-                ServerClock.ApplyServerTime(result.Value.serverNow);
-            }
+            if (result.Transport && result.Value != null && result.Value.ok
+                && !string.IsNullOrEmpty(result.Value.token))
+                NetSession.Token = result.Value.token;
 
             return result;
+        }
+
+        /// <summary>
+        /// Погасить эту сессию на сервере. Забыть аккаунт локально — отдельное решение вызывающего
+        /// (<see cref="NetSession.Clear"/>): «выйти сейчас» и «стереть ферму с этого устройства» —
+        /// разные намерения, и сшивать их здесь нельзя.
+        /// </summary>
+        public static async Awaitable<NetResult<OkResponse>> LogoutAsync()
+        {
+            return Report(await Send<OkResponse>("POST", "/api/logout", "{}", auth: true), "выход");
+        }
+
+        /// <summary>
+        /// Общий хвост register/login: удачный ответ — это и есть аккаунт. Токен пишется первым:
+        /// потерять его между ответом и записью значит потерять доступ к только что заведённой ферме.
+        /// </summary>
+        private static void AdoptAccount(NetResult<AuthResponse> result)
+        {
+            if (!result.Transport || result.Value == null || !result.Value.ok) return;
+
+            NetSession.Token = result.Value.token;
+            NetSession.PlayerId = result.Value.playerId;
+            NetSession.PlayerName = result.Value.name;
+            NetSession.LoggedIn = true;
+            ServerClock.ApplyServerTime(result.Value.serverNow);
         }
 
         // ---- время ----
@@ -188,11 +284,17 @@ namespace Farm.Net
             return Report(await Send<FriendsResponse>("GET", "/api/friends", null, auth: true), "список друзей");
         }
 
-        /// <summary>Позвать в друзья по имени. Встречную заявку сервер сразу превращает в дружбу.</summary>
-        public static async Awaitable<NetResult<OkResponse>> RequestFriendAsync(string name)
+        /// <summary>
+        /// Позвать в друзья по имени. Заявка именно ждёт ответа — дружба сама собой не случается;
+        /// что вышло, называет <c>status</c> в <see cref="FriendRequestResponse"/>, и сказать это
+        /// игроку обязан вызывающий: «уже друзья» и «заявка ушла» — разные новости.
+        /// </summary>
+        public static async Awaitable<NetResult<FriendRequestResponse>> RequestFriendAsync(string name)
         {
             string body = JsonUtility.ToJson(new FriendRequestBody { name = name });
-            return Report(await Send<OkResponse>("POST", "/api/friends/request", body, auth: true), "заявка в друзья");
+            return Report(
+                await Send<FriendRequestResponse>("POST", "/api/friends/request", body, auth: true),
+                "заявка в друзья");
         }
 
         /// <summary>Принять входящую заявку.</summary>
@@ -200,6 +302,19 @@ namespace Farm.Net
         {
             string body = JsonUtility.ToJson(new FriendAcceptBody { playerId = playerId });
             return Report(await Send<OkResponse>("POST", "/api/friends/accept", body, auth: true), "подтверждение дружбы");
+        }
+
+        /// <summary>
+        /// Оборвать связь с игроком: дружбу, чужую заявку или свою. Что именно оборвалось,
+        /// сервер называет в <c>removed</c> — три разных поступка за одной кнопкой, и слова
+        /// игроку нужны разные.
+        /// </summary>
+        public static async Awaitable<NetResult<FriendRemoveResponse>> RemoveFriendAsync(int playerId)
+        {
+            string body = JsonUtility.ToJson(new FriendRemoveBody { playerId = playerId });
+            return Report(
+                await Send<FriendRemoveResponse>("POST", "/api/friends/remove", body, auth: true),
+                "разрыв дружбы");
         }
 
         // ---- события ----
