@@ -23,6 +23,10 @@ namespace Farm.Juice
     /// </summary>
     [ExecuteAlways]
     [DisallowMultipleComponent]
+    // Раньше всех, кто по земле что-то раскладывает: забор и трава берут высоту из
+    // FarmingRuntime.Ground, и на выросшей ферме обязаны спрашивать её уже у новой площадки.
+    // Порядок подписки на RadiusChanged — это порядок OnEnable, то есть вот это число.
+    [DefaultExecutionOrder(-180)]
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     [AddComponentMenu("Farm/Rolling Ground")]
     public sealed class RollingGround : MonoBehaviour, IGroundHeight
@@ -35,8 +39,9 @@ namespace Farm.Juice
         [SerializeField, Range(16, 300)] private int _resolution = 140;
 
         [Header("Ровная площадка")]
-        [Tooltip("Радиус, внутри которого земля идеально плоская. Держи его не меньше рабочего " +
-                 "радиуса FarmBounds, иначе грядки на краю фермы повиснут над склоном.")]
+        [Tooltip("Радиус, внутри которого земля идеально плоская.\n" +
+                 "Значение из сцены живёт только до первого сообщения FarmBounds: дальше площадка " +
+                 "следует за радиусом фермы сама, и разъехаться им уже нечем.")]
         [SerializeField, Min(0f)] private float _flatRadius = 13f;
 
         [Tooltip("За сколько единиц рельеф выходит на полную высоту после ровной площадки.")]
@@ -78,6 +83,12 @@ namespace Farm.Juice
             return Height(local.x, local.z);
         }
 
+        /// <summary>
+        /// На сколько ровная площадка выступает за забор. Забор стоит ровно на радиусе фермы, и
+        /// склон, начинающийся прямо под ним, читается как провал; метр запаса прячет стык.
+        /// </summary>
+        private const float FlatOverhang = 1f;
+
         private void OnEnable()
         {
             Rebuild();
@@ -85,11 +96,34 @@ namespace Farm.Juice
             // Ядро кладёт вещи по земле через этот шов: ночной сбор, трава и всё, что появится
             // за пределами ровной площадки, иначе висело бы на постоянной высоте.
             FarmingRuntime.Ground = this;
+
+            FarmBounds.RadiusChanged += OnFarmRadiusChanged;
         }
 
         private void OnDisable()
         {
+            FarmBounds.RadiusChanged -= OnFarmRadiusChanged;
+
             if (ReferenceEquals(FarmingRuntime.Ground, this)) FarmingRuntime.Ground = null;
+        }
+
+        /// <summary>
+        /// Ферма выросла — площадка обязана вырасти вместе с ней, иначе купленная земля окажется
+        /// склоном, а грядки на ней повиснут в воздухе.
+        /// <para>
+        /// Перестроение честно полное: 151x151 вершин пересчитываются целиком, замер на этой сцене —
+        /// 20–22 мс (весь рост края, вместе с забором и пересевом травы, — 77 мс). Это заметно в
+        /// кадре, но случается ровно шесть раз за партию, на покупке уровня, где кадр и так уходит
+        /// под всплывающую награду. Резать на куски незачем.
+        /// </para>
+        /// </summary>
+        private void OnFarmRadiusChanged(float radius)
+        {
+            float flat = radius + FlatOverhang;
+            if (Mathf.Approximately(flat, _flatRadius)) return;
+
+            _flatRadius = flat;
+            Rebuild();
         }
 
         private void OnValidate()
@@ -113,6 +147,12 @@ namespace Farm.Juice
         [ContextMenu("Перестроить рельеф")]
         public void Rebuild()
         {
+            // Ферма доросла до края участка: за площадкой не осталось места на холмы, и мир
+            // обрывается ровной плитой. Тихо это не переживают — увеличивать надо _size.
+            if (_flatRadius > _size * 0.5f)
+                Debug.LogWarning("[Ground] Ровная площадка " + _flatRadius.ToString("F1") +
+                                 " м не помещается в участок " + _size + " м — рельеф за фермой срезан", this);
+
             int side = Mathf.Max(2, _resolution) + 1;
             int count = side * side;
 

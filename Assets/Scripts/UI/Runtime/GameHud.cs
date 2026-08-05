@@ -64,6 +64,15 @@ namespace Farm.UI
         /// <summary>Пока идёт — в строке найма висит отказ, и Refresh её не затирает.</summary>
         private float _hireMessageTimer;
         private string _hireMessage;
+
+        private Label _farmLevel;
+        private Label _farmLevelNote;
+        private Button _farmExpand;
+
+        /// <summary>То же самое для строки уровня фермы: один механизм на оба сообщения.</summary>
+        private float _farmMessageTimer;
+        private string _farmMessage;
+
         private VisualElement _satietyFill;
         private VisualElement _hydrationFill;
         private VisualElement _energyFill;
@@ -121,6 +130,10 @@ namespace Farm.UI
             _farmerHire = root.Q<Label>("farmer-hire");
             _hireButton = root.Q<Button>("hire-button");
             if (_hireButton != null) _hireButton.clicked += OnHireClicked;
+            _farmLevel = root.Q<Label>("farm-level");
+            _farmLevelNote = root.Q<Label>("farm-level-note");
+            _farmExpand = root.Q<Button>("farm-expand");
+            if (_farmExpand != null) _farmExpand.clicked += OnExpandClicked;
             _skillNext = root.Q<Label>("skill-next");
             _satietyFill = root.Q<VisualElement>("satiety-fill");
             _hydrationFill = root.Q<VisualElement>("hydration-fill");
@@ -175,6 +188,10 @@ namespace Farm.UI
             NetStatus.Changed += OnNetStatusChanged;
             RefreshNetStatus(NetStatus.Line);
 
+            // Уровень меняется и без нажатия этой кнопки — например, когда партия только
+            // загрузилась. Подписка, а не одна отрисовка в OnEnable.
+            FarmLevels.Changed += OnFarmLevelChanged;
+
             Bind();
             Refresh();
         }
@@ -189,6 +206,7 @@ namespace Farm.UI
             DragFocus.Changed -= OnCarryChanged;
             GatherFocus.Changed -= OnGatherChanged;
             NetStatus.Changed -= OnNetStatusChanged;
+            FarmLevels.Changed -= OnFarmLevelChanged;
 
             _storage = null;
             _wallet = null;
@@ -646,6 +664,8 @@ namespace Farm.UI
 
         private void RefreshFarm()
         {
+            RefreshFarmLevel();
+
             if (_plotsReady != null)
                 _plotsReady.text = "Готово к сбору: " + GrowableRegistry.ReadyCount + " из " + GrowableRegistry.Count;
 
@@ -663,6 +683,103 @@ namespace Farm.UI
             _plotsNext.text = soonest < double.MaxValue
                 ? "Следующая через " + FormatDuration(soonest)
                 : "Всё поспело";
+        }
+
+        // ---- уровень фермы ----
+
+        private void OnFarmLevelChanged(int level) => RefreshFarmLevel();
+
+        /// <summary>
+        /// Строка уровня, обещание следующей ступени и кнопка расширения.
+        /// <para>
+        /// Цена стоит в строке, а не в кнопке: она из трёх частей, и кнопка с такой подписью
+        /// перестала бы быть кнопкой. Кнопка называет то, что игрок получит, — новый край.
+        /// </para>
+        /// </summary>
+        private void RefreshFarmLevel()
+        {
+            if (_farmLevel != null)
+                _farmLevel.text = "Ферма: уровень " + FarmLevels.Current + " из " + FarmLevels.MaxLevel;
+
+            // В гостях кнопки нет вовсе: чужую ферму не расширяют, и предлагать это — врать.
+            bool canBuy = !GuestMode.IsGuest && !FarmLevels.IsMax;
+            if (_farmExpand != null)
+            {
+                _farmExpand.style.display = canBuy ? DisplayStyle.Flex : DisplayStyle.None;
+                if (canBuy) _farmExpand.text = "Расширить до " + Meters(Mathf.RoundToInt(FarmLevels.Next.Radius));
+            }
+
+            if (_farmLevelNote == null) return;
+
+            // Пока висит ответ на нажатие (успех или отказ) — обещание ждёт: перебивать
+            // названную причину обратно ценой значит прятать отказ.
+            if (_farmMessageTimer > 0f)
+            {
+                _farmMessageTimer -= _refreshInterval;
+                _farmLevelNote.text = _farmMessage;
+                return;
+            }
+
+            if (FarmLevels.IsMax) { _farmLevelNote.text = "ферма выросла во всю долину"; return; }
+
+            var next = FarmLevels.Next;
+            _farmLevelNote.text = "дальше: " + PriceOf(next) + " — " + next.Promise;
+        }
+
+        /// <summary>Цена ступени одной строкой; даровые части (нулевые) молчат.</summary>
+        private static string PriceOf(FarmLevels.Step step)
+        {
+            var text = new System.Text.StringBuilder();
+
+            if (step.Gold > 0) text.Append(step.Gold).Append(" зол.");
+            if (step.Boards > 0) Plus(text).Append(step.Boards).Append(" досок");
+            if (step.Dew > 0) Plus(text).Append(step.Dew).Append(" росы");
+
+            return text.Length > 0 ? text.ToString() : "даром";
+
+            static System.Text.StringBuilder Plus(System.Text.StringBuilder b) =>
+                b.Length > 0 ? b.Append(" + ") : b;
+        }
+
+        /// <summary>
+        /// Метры по-русски: 21 метр, 22 метра, 25 метров. Число, не согласованное с
+        /// существительным, читается как вывод программы, а не как речь про свою ферму.
+        /// </summary>
+        private static string Meters(int value)
+        {
+            int hundreds = value % 100;
+            if (hundreds >= 11 && hundreds <= 14) return value + " метров";
+
+            int last = value % 10;
+            if (last == 1) return value + " метр";
+            if (last >= 2 && last <= 4) return value + " метра";
+            return value + " метров";
+        }
+
+        private void OnExpandClicked()
+        {
+            // Кнопки в гостях не видно, но событие можно прислать и мимо неё — правило
+            // держится здесь, а не одной только видимостью.
+            if (GuestMode.IsGuest) return;
+
+            if (FarmLevels.TryBuyNext(out string refusal))
+            {
+                _farmMessage = "ферма выросла: " + Meters(Mathf.RoundToInt(FarmLevels.Radius));
+                _farmMessageTimer = 2f;
+                Punch(_farmLevel, 0.28f);
+                Farm.Juice.Sfx.Play(b => b.UiOpen);
+            }
+            else
+            {
+                // Отказ обязан быть заметным: показываем ровно ту причину, которую назвала
+                // лестница, — «не хватает 20 — доска» точнее любого общего «нельзя».
+                _farmMessage = refusal;
+                _farmMessageTimer = 2.5f;
+                Farm.Juice.Sfx.Play(b => b.UiClose);
+            }
+
+            // Не ждать очередного тика: отклик на своё же нажатие обязан быть мгновенным.
+            RefreshFarmLevel();
         }
 
         /// <summary>

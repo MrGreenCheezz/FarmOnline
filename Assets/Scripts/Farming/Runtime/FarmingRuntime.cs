@@ -122,6 +122,41 @@ namespace Farm.Farming
 
         public static double Now => Clock.Now;
 
+        /// <summary>
+        /// Партия сейчас раскладывается из снимка. Ферма в этот момент лжёт о себе: старое
+        /// уже уничтожено (но отложенным <c>Destroy</c>, поэтому ещё числится в реестрах),
+        /// а новое ещё не создано.
+        /// <para>
+        /// Всё, что оформляет ферму по её содержимому — заросли, тропинки, подсказки, — обязано
+        /// это время переждать, иначе рассыплет траву там, где через миг встанут грядки.
+        /// Ставит флаг сохранение (сборка Farm.Game), а живёт он здесь, потому что читать его
+        /// нужно из сборок, которые про сохранение ничего не знают.
+        /// </para>
+        /// </summary>
+        public static bool Restoring { get; private set; }
+
+        /// <summary>Партия разложена и достоверна — можно оформлять.</summary>
+        public static event Action Restored;
+
+        /// <summary>Открыть и закрыть окно восстановления. Зовёт только сохранение.</summary>
+        public static void BeginRestore() => Restoring = true;
+
+        public static void EndRestore()
+        {
+            if (!Restoring) return;
+            Restoring = false;
+
+            var handler = Restored;
+            if (handler == null) return;
+
+            foreach (Action single in handler.GetInvocationList())
+            {
+                // Упавший оформитель не должен оставить остальных с фермой из прошлой партии.
+                try { single(); }
+                catch (Exception e) { Debug.LogException(e); }
+            }
+        }
+
         // Статики переживают перезапуск Play Mode при отключённом domain reload —
         // чистим явно, иначе второй запуск играет на мусоре первого.
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -131,6 +166,8 @@ namespace Farm.Farming
             _sink = null;
             _ground = null;
             LogHarvests = true;
+            Restoring = false;
+            Restored = null;
         }
     }
 }

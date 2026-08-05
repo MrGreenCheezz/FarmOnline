@@ -27,11 +27,52 @@ namespace Farm.Farming
         public float Radius => _radius;
         public float UsableRadius => Mathf.Max(0.5f, _radius - _margin);
 
+        /// <summary>
+        /// Территория изменилась. На это событие подписаны все, кто рисует ферму по её краю:
+        /// забор, рельеф, заросли, кольцо расстановки покупок. Событие статическое, потому что
+        /// подписчики живут в разных сборках и появляются раньше самих границ.
+        /// </summary>
+        public static event System.Action<float> RadiusChanged;
+
+        /// <summary>
+        /// Раздвинуть (или сузить) территорию. Зовётся уровнем фермы, а не игроком напрямую:
+        /// радиус — следствие купленного уровня, и других причин ему меняться нет.
+        /// </summary>
+        public void SetRadius(float radius)
+        {
+            float value = Mathf.Max(1f, radius);
+            if (Mathf.Approximately(value, _radius)) return;
+
+            _radius = value;
+            RaiseChanged(value);
+        }
+
+        /// <summary>Сообщить подписчикам текущий радиус — например, когда они появились позже границ.</summary>
+        public void Announce() => RaiseChanged(_radius);
+
+        private static void RaiseChanged(float radius)
+        {
+            var handler = RadiusChanged;
+            if (handler == null) return;
+
+            // Исключение одного оформителя не должно оставить остальных со старым краем.
+            foreach (System.Action<float> single in handler.GetInvocationList())
+            {
+                try { single(radius); }
+                catch (System.Exception e) { Debug.LogException(e); }
+            }
+        }
+
         private void Awake()
         {
             if (Instance != null && Instance != this) { enabled = false; return; }
             Instance = this;
         }
+
+        // Статическое событие переживает смену сцены при выключенном domain reload: подписчики
+        // прошлой партии остались бы висеть и красить чужой забор.
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetStatics() => RadiusChanged = null;
 
         private void OnDestroy()
         {

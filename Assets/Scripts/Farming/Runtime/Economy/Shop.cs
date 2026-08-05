@@ -19,7 +19,14 @@ namespace Farm.Farming
         [Tooltip("Центр расстановки. Пусто — берётся позиция этого объекта.")]
         [SerializeField] private Transform _placementCenter;
         [SerializeField, Min(0f)] private float _placementRadiusMin = 5f;
+
+        [Tooltip("Внешний край кольца расстановки. Работает запасом на случай, когда FarmBounds в " +
+                 "сцене нет: при живых границах край берётся у них и растёт вместе с фермой.")]
         [SerializeField, Min(0f)] private float _placementRadiusMax = 10f;
+
+        [Tooltip("Насколько не доводить покупки до забора.")]
+        [SerializeField, Min(0f)] private float _placementEdgeMargin = 0.7f;
+
         [Tooltip("Минимальный зазор между объектами на ферме.")]
         [SerializeField, Min(0.1f)] private float _placementSpacing = 1.6f;
 
@@ -228,17 +235,53 @@ namespace Farm.Farming
             return false;
         }
 
-        private bool TryFindSpot(out Vector3 position)
+        /// <summary>
+        /// Куда поставить купленное. Кольцо расстановки растёт вместе с фермой: уровень покупают
+        /// ровно за место, и магазин, продолжающий раскладывать покупки по старому кольцу, отменял
+        /// бы всю затею — земли больше, а поставить негде.
+        /// <para>
+        /// Наружу — в пару к <see cref="RegisterPlaced"/>: снаружи спрашивают ровно то же свободное
+        /// место (загрузка, проверка расширения), и второй такой расстановки заводить не нужно.
+        /// </para>
+        /// </summary>
+        public bool TryFindSpot(out Vector3 position)
         {
             Vector3 center = _placementCenter != null ? _placementCenter.position : transform.position;
-            float min = Mathf.Min(_placementRadiusMin, _placementRadiusMax);
-            float max = Mathf.Max(_placementRadiusMin, _placementRadiusMax);
+            var bounds = FarmBounds.Instance;
 
-            for (int attempt = 0; attempt < 48; attempt++)
+            float min = Mathf.Min(_placementRadiusMin, _placementRadiusMax);
+
+            // Край — у границ, с отступом от забора. Сериализованное поле остаётся запасом:
+            // без FarmBounds в сцене магазин работает ровно как раньше.
+            float max = Mathf.Max(_placementRadiusMin, _placementRadiusMax);
+            if (bounds != null) max = Mathf.Max(max, bounds.UsableRadius - _placementEdgeMargin);
+            if (max < min) max = min;
+
+            // 48 попыток хватало на кольцо 4.5–11 м (около 320 м²). Кольцо растёт с фермой, и то
+            // же число тыкалось бы в давно занятую середину: покупка отказывала бы при пустых
+            // окраинах — а это ровно тот отказ, за отсутствие которого игрок и заплатил.
+            // Держим постоянной плотность попыток на квадратный метр.
+            const float AreaPerAttempt = 6.6f;
+            const int MinAttempts = 48;
+            const int MaxAttempts = 400;
+
+            float ringArea = Mathf.PI * Mathf.Max(0f, max * max - min * min);
+            int attempts = Mathf.Clamp(Mathf.RoundToInt(ringArea / AreaPerAttempt), MinAttempts, MaxAttempts);
+
+            for (int attempt = 0; attempt < attempts; attempt++)
             {
                 float angle = UnityEngine.Random.Range(0f, Mathf.PI * 2f);
-                float radius = UnityEngine.Random.Range(min, max);
+
+                // Корень — иначе точки сгущаются к центру: площадь кольца растёт как квадрат
+                // радиуса, а равномерный радиус этого не знает. На большой ферме это разница
+                // между «ищем по всей земле» и «ищем в самой застроенной её части».
+                float radius = Mathf.Sqrt(Mathf.Lerp(min * min, max * max, UnityEngine.Random.value));
+
                 var candidate = center + new Vector3(Mathf.Cos(angle) * radius, 0f, Mathf.Sin(angle) * radius);
+
+                // Центр расстановки и центр фермы — разные объекты сцены; без этой проверки
+                // сдвинутый центр однажды вынесет покупку за забор.
+                if (bounds != null && !bounds.Contains(candidate)) continue;
 
                 if (IsClear(candidate))
                 {
@@ -260,6 +303,17 @@ namespace Farm.Farming
             var plots = GrowableRegistry.All;
             for (int i = 0; i < plots.Count; i++)
                 if ((plots[i].transform.position - candidate).sqrMagnitude < sqrSpacing) return false;
+
+            // Всё переставляемое: постройки из сцены, замыслы фермера, купленный декор.
+            // Свой список _placed знает только о покупках этой сессии, а кухня, стоявшая
+            // в сцене с начала партии, для него невидима — покупка садилась ей на крышу.
+            var movables = MovableRegistry.All;
+            for (int i = 0; i < movables.Count; i++)
+            {
+                var movable = movables[i];
+                if (movable == null) continue;
+                if ((movable.transform.position - candidate).sqrMagnitude < sqrSpacing) return false;
+            }
 
             for (int i = _placed.Count - 1; i >= 0; i--)
             {

@@ -76,6 +76,13 @@ namespace Farm.Game
             if (pending != null && pending.IsGuest) GuestMode.Enter(pending.OwnerId, pending.OwnerName);
             else GuestMode.Exit();
 
+            // Уровень фермы ставится ВСЕГДА и раньше всего остального, даже когда снимка нет.
+            // FarmLevels — статика, а она переживает смену сцены: без этой строки «Начать
+            // заново» после шестой ступени оставляло бы уровень 6 при земле в 13 метров,
+            // а возвращение из гостей уносило бы домой чужой уровень — и записывало его
+            // в свой сейв первым же автосохранением.
+            FarmLevels.RestoreState(pending != null && pending.Data != null ? pending.Data.FarmLevel : 1);
+
             if (pending != null)
             {
                 if (pending.Data != null)

@@ -92,6 +92,13 @@
                 <ui:Label name="plots-ready" text="—" class="row" />
                 <ui:Label name="plots-next" text="—" class="row row--muted" />
                 <ui:Label name="net-status" text="" class="row row--muted" />
+
+                <!-- Лестница фермы: сколько земли уже своей и чего стоит следующая ступень.
+                     Кнопка последней в панели — как наём в панели фермера: строки читают,
+                     нажимают одну. -->
+                <ui:Label name="farm-level" text="—" class="row" />
+                <ui:Label name="farm-level-note" text="" class="row row--muted" />
+                <ui:Button name="farm-expand" text="Расширить" class="btn btn--accent hire-btn" />
             </ui:VisualElement>
 
             </ui:VisualElement>

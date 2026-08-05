@@ -18,6 +18,9 @@ namespace Farm.Juice
     /// </para>
     /// </summary>
     [DisallowMultipleComponent]
+    // После рельефа (-180): трава ложится по высоте земли, и на выросшей ферме обязана
+    // спрашивать её у уже выровненной площадки, а не у вчерашнего склона.
+    [DefaultExecutionOrder(-50)]
     [AddComponentMenu("Farm/Foliage Scatter")]
     public sealed class FoliageScatter : MonoBehaviour
     {
@@ -44,8 +47,14 @@ namespace Farm.Juice
         [Tooltip("Внутренний радиус кольца засева. 0 — сеять и в середине фермы.")]
         [SerializeField, Min(0f)] private float _innerRadius;
 
-        [Tooltip("Внешний радиус. Заметно больше фермы — мир не должен обрываться за забором.")]
+        [Tooltip("Внешний радиус. Заметно больше фермы — мир не должен обрываться за забором.\n" +
+                 "Работает как нижняя граница: выросшая ферма отодвигает край сама.")]
         [SerializeField, Min(1f)] private float _outerRadius = 30f;
+
+        [Tooltip("Насколько заросли обязаны заходить за забор. Ферма растёт, а полоса травы за " +
+                 "ней должна оставаться той же ширины, иначе на последней ступени мир кончается " +
+                 "сразу за оградой.")]
+        [SerializeField, Min(0f)] private float _outerMargin = 8f;
 
         [Tooltip("Во сколько раз реже сеять внутри фермы: там место под грядки.")]
         [SerializeField, Range(0f, 1f)] private float _insideFarmDensity = 0.35f;
@@ -71,12 +80,112 @@ namespace Farm.Juice
 
         [SerializeField] private float _groundY;
 
+        [Header("Лес")]
+        [Tooltip("Лес, расставленный руками. Деревья, оказавшиеся внутри выросшей фермы, прячутся.")]
+        [SerializeField] private Transform _forest;
+
+        [Tooltip("На сколько за забор отодвигать ближайшее дерево. Дерево вплотную к ограде " +
+                 "выглядит так, будто забор построили вокруг него, — и наоборот, это правда.")]
+        [SerializeField, Min(0f)] private float _forestClearance = 1.5f;
+
         private Transform _holder;
+
+        // Пересев по сигналу границ имеет смысл только после первого засева: до Start сеять
+        // нечего, а лишний проход по 2600 кустам на старте партии никому не нужен.
+        private bool _seeded;
 
         /// <summary>Сколько кустиков реально встало. Меньше запрошенного, когда кончилось место.</summary>
         public int Placed { get; private set; }
 
-        private void Start() => Rebuild();
+        /// <summary>Сколько деревьев спрятано ростом фермы. На родной поляне — ноль.</summary>
+        public int ForestHidden { get; private set; }
+
+        private void OnEnable()
+        {
+            FarmBounds.RadiusChanged += OnFarmRadiusChanged;
+            FarmingRuntime.Restored += OnFarmRestored;
+        }
+
+        private void OnDisable()
+        {
+            FarmBounds.RadiusChanged -= OnFarmRadiusChanged;
+            FarmingRuntime.Restored -= OnFarmRestored;
+        }
+
+        /// <summary>Партия разложена — теперь ферма достоверна, и отложенный пересев осмыслен.</summary>
+        private void OnFarmRestored()
+        {
+            if (!_reseedPending) return;
+            _reseedPending = false;
+            Rebuild();
+        }
+
+        /// <summary>Пересев ждёт конца загрузки: во время неё ферма пуста и трава легла бы под грядки.</summary>
+        private bool _reseedPending;
+
+        private void Start()
+        {
+            // Уровень фермы мог восстановиться из сохранения раньше, чем мы сюда добрались:
+            // приводим лес к текущему радиусу, а не к тому, с которым сцену собирали.
+            var bounds = FarmBounds.Instance;
+            if (bounds != null) TrimForest(bounds.Radius);
+
+            Rebuild();
+            _seeded = true;
+        }
+
+        /// <summary>
+        /// Ферма выросла. Заросли пересеваются целиком: их разрежение внутри фермы считается от
+        /// её радиуса, и оставить старый посев — значит оставить бурьян ровно там, где игрок
+        /// только что купил место под грядки.
+        /// </summary>
+        private void OnFarmRadiusChanged(float radius)
+        {
+            // Лес чистим всегда: он стоит в сцене независимо от того, посеяли мы уже траву или нет.
+            TrimForest(radius);
+
+            if (!_seeded) return;
+
+            // Посреди загрузки сеять нельзя: старые грядки уже уничтожены (но ещё числятся
+            // в реестрах — Destroy отложенный), новые не созданы. Трава обошла бы призраков
+            // и легла ровно туда, где через миг встанет ферма. Ждём конца раскладки.
+            if (FarmingRuntime.Restoring) { _reseedPending = true; return; }
+
+            Rebuild();
+        }
+
+        /// <summary>
+        /// Убрать с фермы деревья, которые она переросла, и вернуть те, что снова снаружи.
+        /// <para>
+        /// Именно спрятать, а не удалить: ферма умеет и сужаться — гость смотрит чужой снимок,
+        /// загрузка возвращает уровень ниже текущего, — а срубленное дерево вернуть уже нечем.
+        /// </para>
+        /// </summary>
+        public void TrimForest(float farmRadius)
+        {
+            if (_forest == null) return;
+
+            var bounds = FarmBounds.Instance;
+            Vector3 center = bounds != null ? bounds.Center : transform.position;
+
+            float keepOut = farmRadius + _forestClearance;
+            float sqr = keepOut * keepOut;
+            int hidden = 0;
+
+            for (int i = 0; i < _forest.childCount; i++)
+            {
+                var tree = _forest.GetChild(i);
+
+                Vector3 delta = tree.position - center;
+                delta.y = 0f;
+                bool inside = delta.sqrMagnitude < sqr;
+
+                if (tree.gameObject.activeSelf == inside) tree.gameObject.SetActive(!inside);
+                if (inside) hidden++;
+            }
+
+            ForestHidden = hidden;
+        }
 
         /// <summary>Стереть и рассыпать заново. Публичный — чтобы редактор уровня или загрузка могли перезапустить.</summary>
         public void Rebuild()
@@ -103,7 +212,12 @@ namespace Farm.Juice
             Vector3 center = bounds != null ? bounds.Center : transform.position;
             float farmRadius = bounds != null ? bounds.UsableRadius : 0f;
 
-            float inner = Mathf.Min(_innerRadius, _outerRadius);
+            // Край зарослей идёт за фермой, но никогда не ближе того, что задано в сцене:
+            // на родной поляне мир выглядит ровно как раньше, а на последней ступени полоса
+            // травы за забором остаётся той же ширины.
+            float outer = Mathf.Max(_outerRadius, farmRadius + _outerMargin);
+
+            float inner = Mathf.Min(_innerRadius, outer);
             int attempts = _count * 4;   // потолок, чтобы плотная ферма не крутила цикл вечно
 
             while (Placed < _count && attempts-- > 0)
@@ -111,7 +225,7 @@ namespace Farm.Juice
                 // Корень радиуса — иначе точки сгущаются к центру: площадь кольца растёт
                 // как квадрат, а равномерный радиус этого не знает.
                 float t = (float)random.NextDouble();
-                float radius = Mathf.Sqrt(Mathf.Lerp(inner * inner, _outerRadius * _outerRadius, t));
+                float radius = Mathf.Sqrt(Mathf.Lerp(inner * inner, outer * outer, t));
                 float angle = (float)random.NextDouble() * Mathf.PI * 2f;
 
                 var seed = center + new Vector3(Mathf.Cos(angle) * radius, _groundY, Mathf.Sin(angle) * radius);
@@ -218,8 +332,11 @@ namespace Farm.Juice
             var bounds = FarmBounds.Instance;
             Vector3 center = bounds != null ? bounds.Center : transform.position;
 
+            float outer = _outerRadius;
+            if (bounds != null) outer = Mathf.Max(outer, bounds.UsableRadius + _outerMargin);
+
             Gizmos.color = new Color(0.5f, 0.85f, 0.55f, 0.5f);
-            DrawCircle(center + Vector3.up * _groundY, _outerRadius);
+            DrawCircle(center + Vector3.up * _groundY, outer);
 
             if (_innerRadius > 0f)
             {

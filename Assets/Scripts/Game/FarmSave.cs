@@ -144,6 +144,7 @@ namespace Farm.Game
 
             data.TotalHarvested = FarmProgress.TotalHarvested;
             data.TotalMerges = FarmProgress.TotalMerges;
+            data.FarmLevel = FarmLevels.Current;
             data.Footpaths = Footpaths.CaptureWorn();
 
             CapturePlots(data);
@@ -332,7 +333,34 @@ namespace Farm.Game
             var registry = ContentRegistry.Instance;
             if (registry == null) { Debug.LogError("[Save] Нет реестра контента — загрузка отменена"); return; }
 
+            // Окно восстановления: пока оно открыто, ферма недостоверна — старое снесено
+            // отложенным Destroy и ещё числится в реестрах, новое не создано. Оформители
+            // (заросли и прочие, кто читает содержимое фермы) ждут закрытия окна.
+            FarmingRuntime.BeginRestore();
+            try
+            {
+                ApplyState(data, registry, offlineSeconds);
+            }
+            finally
+            {
+                // Окно закрывается при любом исходе: упавшая загрузка не должна оставить
+                // ферму навсегда «в процессе восстановления» — это тихо выключило бы
+                // всё оформление до перезапуска.
+                FarmingRuntime.EndRestore();
+            }
+        }
+
+        /// <summary>Собственно раскладка. Порядок строк здесь — не косметика, см. комментарии.</summary>
+        private static void ApplyState(FarmSaveData data, ContentRegistry registry, double offlineSeconds)
+        {
             ClearScene();
+
+            // Уровень — самым первым из всего состояния, и уж точно раньше построек и грядок:
+            // он двигает край земли, а по краю меряются забор, рельеф и место, куда магазин
+            // кладёт покупку. Восстанови его после расстановки — и сохранённая ферма успела бы
+            // разложиться по старой, тесной земле.
+            // Ноль здесь означает сейв, снятый до появления лестницы: у него первый уровень.
+            FarmLevels.RestoreState(data.FarmLevel > 0 ? data.FarmLevel : 1);
 
             var wallet = Wallet.Instance;
             if (wallet != null) wallet.RestoreState(data.Gold);
@@ -451,6 +479,8 @@ namespace Farm.Game
 
         private static void ApplyImprovements(FarmSaveData data, ContentRegistry registry)
         {
+            var shop = Shop.Instance;
+
             foreach (var save in data.Improvements)
             {
                 var definition = registry.Improvement(save.ImprovementId);
@@ -465,6 +495,11 @@ namespace Farm.Game
                 built.name = "Improvement_" + definition.Id;
 
                 if (built.GetComponent<Movable>() == null) built.AddComponent<Movable>();
+
+                // И магазину — как постройкам с грядками: иначе купленное поедет прямо
+                // в клумбу. Дублирует проверку по MovableRegistry, но стоит дёшево и
+                // страхует на случай, если замысел останется без Movable.
+                if (shop != null) shop.RegisterPlaced(built.transform);
             }
         }
 

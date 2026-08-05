@@ -71,8 +71,18 @@ KNOWN_API_PATHS = frozenset({
     "/api/time", "/api/farm", "/api/friends", "/api/events",
     "/api/register", "/api/login", "/api/session", "/api/password", "/api/logout",
     "/api/friends/request", "/api/friends/accept", "/api/friends/remove",
-    "/api/events/ack",
+    "/api/events/ack", "/api/daily",
 })
+
+#: Ежедневная награда. Сутки считаются по UTC-календарю, а не «24 часа с прошлого раза»:
+#: скользящее окно наказывает за то, что вчера зашёл вечером, а сегодня утром, — игрок
+#: начинает подгадывать время вместо того, чтобы просто заходить.
+DAILY_BASE_GOLD = 120
+
+#: Прибавка за каждый день подряд, до потолка. Растёт линейно и упирается быстро: смысл
+#: серии — вернуть завтра, а не наказать того, кто пропустил неделю.
+DAILY_STREAK_BONUS = 60
+DAILY_MAX_STREAK = 7
 
 #: Поле password — не пароль, а предварительный хеш sha256(имя_в_нижнем_регистре + ':' + пароль):
 #: сам пароль по сети не ходит никогда (docs/ONLINE.md, «Пароли»). Ровно 64 hex в нижнем
@@ -108,7 +118,9 @@ CREATE TABLE IF NOT EXISTS players(
     pw_salt       TEXT,
     pw_iterations INTEGER,
     created_at    REAL NOT NULL,
-    last_seen     REAL NOT NULL
+    last_seen     REAL NOT NULL,
+    daily_day     TEXT,
+    daily_streak  INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS sessions(
     token_hash TEXT PRIMARY KEY,
@@ -385,6 +397,8 @@ class Db:
                 "ALTER TABLE players ADD COLUMN pw_hash TEXT",
                 "ALTER TABLE players ADD COLUMN pw_salt TEXT",
                 "ALTER TABLE players ADD COLUMN pw_iterations INTEGER",
+                "ALTER TABLE players ADD COLUMN daily_day TEXT",
+                "ALTER TABLE players ADD COLUMN daily_streak INTEGER NOT NULL DEFAULT 0",
             ):
                 try:
                     self._conn.execute(ddl)
@@ -495,6 +509,32 @@ class Db:
             self._conn.execute(
                 "UPDATE farms SET suspicious = suspicious + 1 WHERE player_id = ?",
                 (player_id,))
+
+    def claim_daily(self, player_id, today, yesterday):
+        """Забрать ежедневную награду. Возвращает (взято_сейчас, длина_серии).
+
+        Проверка и запись — под одним замком: две вкладки, нажавшие «забрать»
+        одновременно, иначе получили бы награду дважды за один день.
+        """
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT daily_day, daily_streak FROM players WHERE id = ?",
+                (player_id,)).fetchone()
+            if row is None:
+                return False, 0
+
+            last = row["daily_day"]
+            streak = row["daily_streak"] or 0
+
+            if last == today:
+                return False, streak
+
+            # Серия продолжается только со вчерашнего дня; пропуск начинает её заново.
+            streak = streak + 1 if last == yesterday else 1
+            self._conn.execute(
+                "UPDATE players SET daily_day = ?, daily_streak = ? WHERE id = ?",
+                (today, streak, player_id))
+            return True, streak
 
     def put_farm(self, player_id, state, expected_rev, now):
         """(True, новый rev) или (False, текущий rev) при расхождении ревизий.
@@ -753,6 +793,8 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
                 return self._api_password()
             if path == "/api/logout":
                 return self._api_logout()
+            if path == "/api/daily":
+                return self._api_daily()
             if path == "/api/friends/request":
                 return self._api_friends_request()
             if path == "/api/friends/accept":
@@ -837,6 +879,28 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
         player = self._auth()
         return {"ok": True, "playerId": player["id"], "name": player["name"],
                 "serverNow": time.time()}
+
+    def _api_daily(self):
+        """Ежедневная награда: раз в календарные сутки UTC, с серией за возвращения.
+
+        Считает сервер, а не клиент: «день» на клиенте — это местные часы, которые
+        игрок переводит, а суточный цикл самой фермы (240 секунд) к календарю
+        отношения не имеет вовсе.
+
+        Золото начисляет КЛИЕНТ по ответу — так же, как он начисляет всё остальное
+        (модель доверия Ф1, docs/ONLINE.md): сервер здесь сторож календаря, а не
+        бухгалтер. Повторно за день он не даст при любом числе нажатий.
+        """
+        player = self._auth()
+        now = time.time()
+        today = time.strftime("%Y-%m-%d", time.gmtime(now))
+        yesterday = time.strftime("%Y-%m-%d", time.gmtime(now - 86400))
+
+        claimed, streak = self.db.claim_daily(player["id"], today, yesterday)
+        gold = DAILY_BASE_GOLD + DAILY_STREAK_BONUS * (min(streak, DAILY_MAX_STREAK) - 1) if claimed else 0
+
+        return {"ok": True, "claimed": claimed, "gold": gold, "streak": streak,
+                "serverNow": now}
 
     def _api_password(self):
         player = self._auth()

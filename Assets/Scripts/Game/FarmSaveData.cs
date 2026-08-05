@@ -128,6 +128,18 @@ namespace Farm.Game
         public int TotalHarvested;
         public int TotalMerges;
 
+        /// <summary>
+        /// Уровень фермы, с единицы. От него зависит радиус земли, а от радиуса — где стоит
+        /// забор и куда магазин кладёт покупку, поэтому он лежит рядом со счётчиками партии,
+        /// а не среди построек: восстанавливать его нужно раньше всего расставляемого.
+        /// <para>
+        /// В сейвах до лестницы поля нет вовсе, и <c>JsonUtility</c> оставит здесь 0 —
+        /// читающая сторона поднимает его до 1. Это ровно те 13 метров, с которыми старая
+        /// партия и жила: молча съёжившаяся ферма была бы хуже любой ошибки.
+        /// </para>
+        /// </summary>
+        public int FarmLevel = 1;
+
         public PlotSave[] Plots = Array.Empty<PlotSave>();
         public BuildingSave[] Buildings = Array.Empty<BuildingSave>();
         public ImprovementSave[] Improvements = Array.Empty<ImprovementSave>();

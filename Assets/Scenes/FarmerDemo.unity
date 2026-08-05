@@ -7472,6 +7472,63 @@ Transform:
   m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 252a4e9a7ab8d4a40abb20ddcb6a0dc7, type: 3}
   m_PrefabInstance: {fileID: 148418145}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &151272357
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 151272359}
+  - component: {fileID: 151272358}
+  m_Layer: 0
+  m_Name: CameraRig
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &151272358
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 151272357}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b074db63859b784baa9dac37d7968ab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Farm.Interaction::Farm.Interaction.FarmCamera
+  _camera: {fileID: 1152723529}
+  _ui: {fileID: 236242264}
+  _keyPanSpeed: 12
+  _minDistance: 9
+  _zoomStep: 1.15
+  _zoomSmoothing: 12
+  _fitFill: 0.85
+  _fitMargin: 0.8
+  _minZoomOut: 1.25
+  _distanceCeiling: 60
+  _fogFollowsZoom: 1
+  _fogNearShare: 0.75
+--- !u!4 &151272359
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 151272357}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.43, y: 0, z: -5.190613}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1152723530}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &152201944
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -31554,6 +31611,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 701059115}
+  - component: {fileID: 701059116}
   m_Layer: 0
   m_Name: Fence
   m_TagString: Untagged
@@ -31658,6 +31716,23 @@ Transform:
   - {fileID: 1422915798}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &701059116
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 701059114}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e05e68fe650a7c84b846e437f1e7686d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.FenceRing
+  _section: {fileID: 919132149155446097, guid: 507d253fa1f4165419301c2566691436, type: 3}
+  _gate: {fileID: 919132149155446097, guid: 0442c524561de0348b45fbd73f6750bc, type: 3}
+  _sectionLength: 1
+  _gateEvery: 11
+  _fallbackRadius: 13
 --- !u!1001 &703822402
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -49480,12 +49555,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1152723527}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.3494316, y: -0, z: -0, w: 0.9369618}
-  m_LocalPosition: {x: -0.43, y: 12.64, z: -19.78}
+  m_LocalRotation: {x: 0.34943163, y: -0, z: -0, w: 0.9369619}
+  m_LocalPosition: {x: 0, y: 12.64, z: -14.589388}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 151272359}
   m_LocalEulerAnglesHint: {x: 40.905, y: 0, z: 0}
 --- !u!114 &1152723531
 MonoBehaviour:
@@ -59066,6 +59141,7 @@ MonoBehaviour:
   _placementCenter: {fileID: 1669929426}
   _placementRadiusMin: 4.5
   _placementRadiusMax: 11
+  _placementEdgeMargin: 0.7
   _placementSpacing: 1.8
 --- !u!114 &1358375452
 MonoBehaviour:
@@ -76712,6 +76788,7 @@ MonoBehaviour:
   _count: 2600
   _innerRadius: 0
   _outerRadius: 30
+  _outerMargin: 8
   _insideFarmDensity: 0.22
   _clearance: 1.5
   _clusterSize: 8
@@ -76719,6 +76796,8 @@ MonoBehaviour:
   _seed: 20260802
   _tilt: 8
   _groundY: 0
+  _forest: {fileID: 1262656139}
+  _forestClearance: 1.5
 --- !u!4 &1776839737
 Transform:
   m_ObjectHideFlags: 0
@@ -92593,7 +92672,6 @@ Transform:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
-  - {fileID: 1152723530}
   - {fileID: 760246023}
   - {fileID: 995360876}
   - {fileID: 1669929426}
@@ -92610,3 +92688,4 @@ SceneRoots:
   - {fileID: 1776839737}
   - {fileID: 1988225091}
   - {fileID: 813472364}
+  - {fileID: 151272359}
