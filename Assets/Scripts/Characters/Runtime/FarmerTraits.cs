@@ -78,6 +78,33 @@ namespace Farm.Characters
             if (traits.Length > 4) _nightCourage = Mathf.Clamp01(traits[4]);
         }
 
+        /// <summary>
+        /// Пересеять характер от текстового зерна. Новая партия зовёт это с именем игрока:
+        /// у каждого хозяина — свой фермер, и характер перестаёт быть производной имени
+        /// объекта сцены (грабли «переименовал — другой характер»). После первого сохранения
+        /// авторитетны данные сейва — <see cref="RestoreState"/> пересев не трогает.
+        /// </summary>
+        public void Reroll(string seedText)
+        {
+            _ready = false;
+            _randomize = true;
+            _seed = StableHash(seedText);
+            EnsureReady();
+        }
+
+        /// <summary>
+        /// Свой хэш вместо string.GetHashCode: тот не обещан одинаковым между версиями
+        /// рантайма, а характер от зерна обязан быть один и тот же всегда и везде.
+        /// </summary>
+        private static int StableHash(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return 0;
+
+            int hash = 23;
+            foreach (char c in text) hash = unchecked(hash * 31 + c);
+            return hash != 0 ? hash : 1;
+        }
+
         private void Awake() => EnsureReady();
 
         private void EnsureReady()

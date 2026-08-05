@@ -46,15 +46,31 @@ namespace Farm.Game
 
         // ---- хранилище ----
 
-        public static bool Write(FarmSaveData data)
+        /// <summary>
+        /// Проставить штампы времени и превратить снимок в JSON. Отдельно от записи,
+        /// потому что тот же текст без изменений уезжает на сервер: два разных JSON
+        /// одного снимка рано или поздно разошлись бы.
+        /// </summary>
+        public static string Serialize(FarmSaveData data)
         {
-            if (data == null) return false;
+            if (data == null) return null;
+
+            data.SavedAtUtc = DateTime.UtcNow.ToString("O");
+            // Часы игры к этому моменту — unix-секунды (ServerClock из Farm.Net);
+            // по этому штампу оффлайн-режим считает, сколько ферма прожила закрытой.
+            data.SavedAtUnix = FarmingRuntime.Now;
+            return JsonUtility.ToJson(data, true);
+        }
+
+        public static bool Write(FarmSaveData data) => WriteJson(Serialize(data));
+
+        /// <summary>Записать уже сериализованный снимок в локальное хранилище.</summary>
+        public static bool WriteJson(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return false;
 
             try
             {
-                data.SavedAtUtc = DateTime.UtcNow.ToString("O");
-                string json = JsonUtility.ToJson(data, true);
-
                 if (UsePrefs)
                 {
                     PlayerPrefs.SetString(PrefKey, json);
@@ -252,7 +268,8 @@ namespace Farm.Game
             {
                 Position = farmer.transform.position,
                 Yaw = farmer.transform.eulerAngles.y,
-                Pack = pack != null ? pack.CaptureState() : new InventorySnapshot()
+                Pack = pack != null ? pack.CaptureState() : new InventorySnapshot(),
+                HiredUntilUnix = farmer.HiredUntil
             };
 
             var needs = farmer.GetComponent<CharacterNeeds>();
@@ -302,7 +319,12 @@ namespace Farm.Game
         /// спрашивает ауры о своей скорости роста, — иначе первая же загрузка отдала бы
         /// каждой грядке скорость «без построек».
         /// </summary>
-        public static void Apply(FarmSaveData data)
+        /// <param name="offlineSeconds">
+        /// Сколько настенных секунд ферма прожила закрытой — рост догонит это время.
+        /// Кто считает дельту, тот и отвечает за её честность: онлайн — сервер
+        /// (saved_at и serverNow оба его), без сети — локальный UTC против SavedAtUnix.
+        /// </param>
+        public static void Apply(FarmSaveData data, double offlineSeconds = 0.0)
         {
             if (data == null) return;
 
@@ -328,7 +350,7 @@ namespace Farm.Game
             var buildings = ApplyBuildings(data, registry);
             FarmBuffs.Refresh();   // ауры готовы — теперь грядкам есть что спросить
 
-            ApplyPlots(data, registry);
+            ApplyPlots(data, registry, offlineSeconds);
             ApplyImprovements(data, registry);
             ApplyShop(data, registry);
             ApplyFarmer(data, registry, buildings);
@@ -394,7 +416,7 @@ namespace Farm.Game
             return placed;
         }
 
-        private static void ApplyPlots(FarmSaveData data, ContentRegistry registry)
+        private static void ApplyPlots(FarmSaveData data, ContentRegistry registry, double offlineSeconds)
         {
             var parent = GameObject.Find("Plots");
             var shop = Shop.Instance;
@@ -419,7 +441,8 @@ namespace Farm.Game
                     go.AddComponent<GrazingAnimal>();
 
                 growable.RestoreState(definition, save.Level, save.Ready,
-                                      save.ElapsedGrowth, save.RipeSeconds, save.OwnGrowthSpeed);
+                                      save.ElapsedGrowth, save.RipeSeconds, save.OwnGrowthSpeed,
+                                      offlineSeconds);
 
                 if (shop != null) shop.RegisterPlaced(go.transform);
             }
@@ -477,6 +500,9 @@ namespace Farm.Game
                 pack.Clear();
                 pack.RestoreState(save.Pack, registry.Resource);
             }
+
+            // Часы найма — те же unix-часы, что растят грядки: наём честно тикает и без нас.
+            farmer.RestoreHired(save.HiredUntilUnix);
 
             foreach (var built in data.Built)
             {

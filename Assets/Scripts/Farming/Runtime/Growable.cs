@@ -356,8 +356,13 @@ namespace Farm.Farming
         /// а отклик на неё никто не вешает.
         /// </para>
         /// </summary>
+        /// <param name="offlineSeconds">
+        /// Сколько настенных секунд ферма прожила закрытой. Пересчёт в секунды роста происходит
+        /// именно здесь, а не у вызывающего: только грядка знает свою итоговую скорость с аурами.
+        /// </param>
         public void RestoreState(GrowableDefinition definition, int level, bool ready,
-                                 double elapsedGrowth, double ripeSeconds, float ownGrowthSpeed)
+                                 double elapsedGrowth, double ripeSeconds, float ownGrowthSpeed,
+                                 double offlineSeconds = 0.0)
         {
             if (definition == null || definition.StageCount == 0) return;
 
@@ -367,6 +372,14 @@ namespace Farm.Farming
             _ownGrowthSpeed = Mathf.Max(0.01f, ownGrowthSpeed);
             _ownSpeedCaptured = true;
             _growthSpeed = _ownGrowthSpeed * Mathf.Max(0.01f, FarmBuffs.GrowthSpeedAt(transform.position, Category));
+
+            // Оффлайн-догон: закрытая игра не тикала, но время шло. Спелая копит «спелые» секунды,
+            // растущая — секунды роста; дозревшая за отлучку станет Ready ниже обычным путём.
+            if (offlineSeconds > 0.0)
+            {
+                if (ready) ripeSeconds += offlineSeconds;
+                else elapsedGrowth += offlineSeconds * _growthSpeed;
+            }
 
             double now = FarmingRuntime.Now;
             _plantedAt = now - Math.Max(0.0, elapsedGrowth) / _growthSpeed;

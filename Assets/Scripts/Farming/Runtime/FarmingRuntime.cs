@@ -55,6 +55,16 @@ namespace Farm.Farming
         public float SampleHeight(Vector3 worldPosition) => 0f;
     }
 
+    /// <summary>
+    /// Сток-пустышка для гостя: урожай помощи принадлежит хозяину и в мир гостя не
+    /// попадает вовсе — он уезжает событием через <see cref="GuestMode.Helped"/>.
+    /// </summary>
+    public sealed class DiscardSink : IResourceSink
+    {
+        public static readonly DiscardSink Instance = new DiscardSink();
+        public void Add(ResourceDefinition resource, int amount) { }
+    }
+
     /// <summary>Сток-заглушка: логирует урожай и ведёт суммарный счёт по каждому ресурсу.</summary>
     public sealed class DebugResourceSink : IResourceSink
     {

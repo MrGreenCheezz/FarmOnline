@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEngine.UIElements;
 using Farm.Farming;
 using Farm.Characters;
+using Farm.Net;
 
 namespace Farm.UI
 {
@@ -55,7 +56,14 @@ namespace Farm.UI
         private Label _carryLabel;
         private Label _plotsReady;
         private Label _plotsNext;
+        private Label _netStatus;
+        private Label _farmerHire;
+        private Button _hireButton;
         private Label _skillNext;
+
+        /// <summary>Пока идёт — в строке найма висит отказ, и Refresh её не затирает.</summary>
+        private float _hireMessageTimer;
+        private string _hireMessage;
         private VisualElement _satietyFill;
         private VisualElement _hydrationFill;
         private VisualElement _energyFill;
@@ -109,6 +117,10 @@ namespace Farm.UI
             _carryLabel = root.Q<Label>("carry-label");
             _plotsReady = root.Q<Label>("plots-ready");
             _plotsNext = root.Q<Label>("plots-next");
+            _netStatus = root.Q<Label>("net-status");
+            _farmerHire = root.Q<Label>("farmer-hire");
+            _hireButton = root.Q<Button>("hire-button");
+            if (_hireButton != null) _hireButton.clicked += OnHireClicked;
             _skillNext = root.Q<Label>("skill-next");
             _satietyFill = root.Q<VisualElement>("satiety-fill");
             _hydrationFill = root.Q<VisualElement>("hydration-fill");
@@ -160,6 +172,9 @@ namespace Farm.UI
             GatherFocus.Changed += OnGatherChanged;
             ApplyBusy();
 
+            NetStatus.Changed += OnNetStatusChanged;
+            RefreshNetStatus(NetStatus.Line);
+
             Bind();
             Refresh();
         }
@@ -173,6 +188,7 @@ namespace Farm.UI
 
             DragFocus.Changed -= OnCarryChanged;
             GatherFocus.Changed -= OnGatherChanged;
+            NetStatus.Changed -= OnNetStatusChanged;
 
             _storage = null;
             _wallet = null;
@@ -580,6 +596,52 @@ namespace Farm.UI
                 : "Рюкзак " + inv.TotalUnits;
 
             SetMeter(_carryFill, _carryLabel, text, fill, false, appendPercent: false);
+
+            RefreshHire();
+        }
+
+        /// <summary>
+        /// Строка и кнопка найма (Ф3). Нанятый фермер собирает только рутину — ступени
+        /// до <see cref="FarmerAgent.HelperMaxTier"/>; дорогое всегда остаётся рукам игрока.
+        /// </summary>
+        private void RefreshHire()
+        {
+            if (_farmerHire == null && _hireButton == null) return;
+
+            if (_hireMessageTimer > 0f)
+            {
+                _hireMessageTimer -= _refreshInterval;
+                if (_farmerHire != null) _farmerHire.text = _hireMessage;
+            }
+            else if (_farmerHire != null)
+            {
+                _farmerHire.text = _farmer.IsHired
+                    ? "нанят ещё на " + FormatDuration(_farmer.HiredSecondsLeft)
+                      + " · собирает ступени 1–" + FarmerAgent.HelperMaxTier
+                    : "не нанят — урожай собирает хозяин";
+            }
+
+            if (_hireButton != null)
+                _hireButton.text = (_farmer.IsHired ? "Продлить на сутки — " : "Нанять на сутки — ")
+                                   + TierEconomy.FarmerWagePerDay + " зол.";
+        }
+
+        private void OnHireClicked()
+        {
+            if (_farmer == null) return;
+
+            if (_farmer.TryHire(86400.0, TierEconomy.FarmerWagePerDay))
+            {
+                Punch(_farmerHire, 0.25f);
+                Farm.Juice.Sfx.Play(b => b.UiOpen);
+            }
+            else
+            {
+                // Отказ обязан быть заметным: строка называет и причину, и цену.
+                _hireMessage = "не хватает золота — жалование " + TierEconomy.FarmerWagePerDay + " зол.";
+                _hireMessageTimer = 2.5f;
+                Farm.Juice.Sfx.Play(b => b.UiClose);
+            }
         }
 
         private void RefreshFarm()
@@ -599,8 +661,42 @@ namespace Farm.UI
             }
 
             _plotsNext.text = soonest < double.MaxValue
-                ? "Следующая через " + soonest.ToString("F1") + " c"
+                ? "Следующая через " + FormatDuration(soonest)
                 : "Всё поспело";
+        }
+
+        /// <summary>
+        /// Срок по-людски: рост теперь меряется реальными часами, и «10800.0 c» на плашке
+        /// читалось бы как ошибка, а не как обещание. Секунды показываем только под минутой —
+        /// там счёт уже идёт на глазах.
+        /// </summary>
+        private static string FormatDuration(double seconds)
+        {
+            if (seconds >= 3600.0)
+            {
+                int hours = (int)(seconds / 3600.0);
+                int minutes = (int)(seconds % 3600.0 / 60.0);
+                return minutes > 0 ? hours + " ч " + minutes + " мин" : hours + " ч";
+            }
+
+            if (seconds >= 60.0) return (int)(seconds / 60.0) + " мин";
+            return Mathf.CeilToInt((float)seconds) + " с";
+        }
+
+        private void OnNetStatusChanged(string line) => RefreshNetStatus(line);
+
+        /// <summary>
+        /// Сетевая строка в панели фермы. Пустая строка состояния — тоже состояние:
+        /// до первого события показываем, за кого мы на сервере (или что играем без сети).
+        /// </summary>
+        private void RefreshNetStatus(string line)
+        {
+            if (_netStatus == null) return;
+
+            if (string.IsNullOrEmpty(line))
+                line = NetSession.LoggedIn ? "онлайн: " + NetSession.PlayerName : "без сети";
+
+            _netStatus.text = line;
         }
 
         private static void SetMeter(VisualElement fill, Label label, string caption, float value01,

@@ -10,10 +10,13 @@
 
             <ui:Label name="menu-save-info" text="—" class="menu__info" />
 
-            <ui:Button name="menu-continue" text="Продолжить" class="menu__button menu__button--primary" />
+            <ui:TextField name="menu-name" class="menu__input" max-length="24" />
+            <ui:Button name="menu-continue" text="Играть" class="menu__button menu__button--primary" />
             <ui:Button name="menu-new" text="Новая игра" class="menu__button" />
             <ui:Button name="menu-settings" text="Звук" class="menu__button" />
             <ui:Button name="menu-quit" text="Выход" class="menu__button menu__button--quiet" />
+
+            <ui:Label name="menu-net-status" text="" class="menu__net-status" />
         </ui:VisualElement>
 
         <ui:VisualElement name="menu-settings-overlay" class="menu__overlay">

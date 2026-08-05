@@ -186,7 +186,12 @@ namespace Farm.Farming
                     if (item.Prefab == null) return false;
 
                     var instance = Instantiate(item.Prefab, position, Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f));
-                    instance.name = item.Id;
+
+                    // Декор с замыслом-первоисточником получает имя Improvement_<id> — под ним
+                    // его находит и сохранение (CaptureImprovements ловит ровно этот префикс),
+                    // и восстановление. Проп без замысла остаётся сессионным — об этом
+                    // предупреждает OnValidate самого товара.
+                    instance.name = item.Improvement != null ? "Improvement_" + item.Improvement.Id : item.Id;
 
                     // Всё купленное игрок должен иметь возможность переставить.
                     if (instance.GetComponent<Movable>() == null) instance.AddComponent<Movable>();

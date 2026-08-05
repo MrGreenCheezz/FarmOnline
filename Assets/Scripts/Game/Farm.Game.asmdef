@@ -3,7 +3,8 @@
     "rootNamespace": "Farm.Game",
     "references": [
         "Farm.Farming",
-        "Farm.Characters"
+        "Farm.Characters",
+        "Farm.Net"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

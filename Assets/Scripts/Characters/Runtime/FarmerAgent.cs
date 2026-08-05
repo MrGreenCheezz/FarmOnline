@@ -126,6 +126,10 @@ namespace Farm.Characters
         [SerializeField, Min(0f)] private float _switchMargin = 1.5f;
 
         [Header("Что собирать")]
+        [Tooltip("Может ли фермер собирать урожай сам. В онлайн-версии выключено: урожай — " +
+                 "хозяйский, ради него игрок и возвращается. Вернётся в виде платной помощи " +
+                 "с ограничениями (Ф3, docs/ONLINE.md).")]
+        [SerializeField] private bool _mayHarvest;
         [SerializeField] private bool _filterByCategory;
         [SerializeField] private ResourceCategory _category = ResourceCategory.Crop;
 
@@ -451,6 +455,7 @@ namespace Farm.Characters
         internal Vector3 FavouriteSpot => _favouriteSpot;
         internal float SearchRadius => _searchRadius;
         internal bool SleepsAtNight => _sleepAtNight;
+        internal bool MayHarvest => _mayHarvest || IsHired;
         internal bool OnlyOwnCategory => _filterByCategory;
         internal ResourceCategory Category => _category;
         internal int KeepFood => _keepFood;
@@ -461,6 +466,50 @@ namespace Farm.Characters
         internal int GoldReserve => _goldReserve;
         internal int MaxPlots => _maxPlots;
         internal float TidySpacing => _tidySpacing;
+
+        // ---- наём (Ф3, docs/ONLINE.md) ----
+
+        /// <summary>
+        /// Вершина лестницы принадлежит рукам игрока: нанятый фермер собирает только рутину —
+        /// ступени не выше этой. Требование владельца: помощь не должна снимать с игрока
+        /// необходимость собирать самому, и дорогие многочасовые культуры — всегда его.
+        /// </summary>
+        public const int HelperMaxTier = 3;
+
+        /// <summary>
+        /// До какого момента (в секундах серверных часов) фермер нанят. Не сериализуется
+        /// в сцену: живёт в сохранении и продлевается жалованием.
+        /// </summary>
+        private double _hiredUntil;
+
+        /// <summary>Нанят ли сейчас — по тем же часам, что растят грядки.</summary>
+        public bool IsHired => FarmingRuntime.Now < _hiredUntil;
+
+        /// <summary>Сколько секунд найма осталось. 0 — не нанят.</summary>
+        public double HiredSecondsLeft => System.Math.Max(0.0, _hiredUntil - FarmingRuntime.Now);
+
+        /// <summary>Для сохранения: момент окончания найма как есть.</summary>
+        public double HiredUntil => _hiredUntil;
+
+        /// <summary>
+        /// Нанять фермера на <paramref name="seconds"/> вперёд за <paramref name="wage"/> золота.
+        /// Продление складывается: заплатил дважды — работает двое суток. Денег нет — false,
+        /// и говорить об этом вслух обязан вызывающий UI.
+        /// </summary>
+        public bool TryHire(double seconds, int wage)
+        {
+            if (seconds <= 0.0) return false;
+
+            var wallet = Wallet.Instance;
+            if (wallet == null || !wallet.TrySpend(wage)) return false;
+
+            double from = System.Math.Max(FarmingRuntime.Now, _hiredUntil);
+            _hiredUntil = from + seconds;
+            return true;
+        }
+
+        /// <summary>Вернуть наём из сохранения.</summary>
+        public void RestoreHired(double hiredUntil) => _hiredUntil = hiredUntil;
 
         #region Жизненный цикл
 

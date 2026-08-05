@@ -58,6 +58,9 @@ namespace Farm.Interaction
         private float _groundY;
         private Vector2 _pressScreen;
 
+        /// <summary>Спелая грядка под пальцем гостя — кандидат на «помочь» при отпускании.</summary>
+        private Growable _guestPlot;
+
         /// <summary>Узел, который игрок сейчас собирает руками, или null.</summary>
         public Gatherable Gathering => _gathering;
 
@@ -79,6 +82,16 @@ namespace Farm.Interaction
             if (mouse == null || _camera == null) return;
 
             Vector2 screen = mouse.position.ReadValue();
+
+            // В гостях руки связаны нарочно: таскать, сливать и собирать ночное может
+            // только хозяин (правило 1). Гостю остаётся ровно один жест — тап-помощь
+            // по спелой грядке, и он идёт отдельной веткой, не касаясь захвата.
+            if (GuestMode.IsGuest)
+            {
+                if (mouse.leftButton.wasPressedThisFrame && !IsPointerOverUI(screen)) GuestPress(screen);
+                if (mouse.leftButton.wasReleasedThisFrame) GuestRelease(screen);
+                return;
+            }
 
             // Сбор проверяем раньше перетаскивания: узлы мельче грядок, и если сначала
             // хватать грядку, до светлячка над ней клик не дойдёт никогда.
@@ -103,6 +116,73 @@ namespace Farm.Interaction
                 _draggedGrowable = null;
                 ClearHighlight();
             }
+        }
+
+        // ---- гостевая помощь ----
+
+        private void GuestPress(Vector2 screen)
+        {
+            _pressScreen = screen;
+            _guestPlot = FindRipePlot(screen);
+        }
+
+        private void GuestRelease(Vector2 screen)
+        {
+            var plot = _guestPlot;
+            _guestPlot = null;
+
+            if (plot == null || !plot.IsReady) return;
+            if ((screen - _pressScreen).sqrMagnitude > TapSlopSqr()) return;
+
+            if (!GuestMode.CanHelp)
+            {
+                // Лимит кончился, а игрок кликает — молчать нельзя, UI слушает это событие.
+                GuestMode.RefuseHelp();
+                Sfx.Play(b => b.UiClose);
+                return;
+            }
+
+            // Всё нужное — до сбора: однолетку TryHarvest уничтожает вместе с определением.
+            var definition = plot.Definition;
+            Vector3 at = plot.transform.position;
+            int level = plot.Level;
+
+            // Урожай — в пустышку: он хозяйский и материализуется у хозяина при
+            // проигрывании события, а не в чужом складе гостя.
+            if (!plot.TryHarvest(out HarvestResult result, DiscardSink.Instance)) return;
+
+            Effects.Play(l => l.Harvest, at + Vector3.up * _plotAimHeight);
+            Sfx.Play(b => b.Harvest);
+
+            GuestMode.ReportHelp(new HelpReport(
+                at,
+                definition != null ? definition.Id : "",
+                level,
+                result.Resource != null ? result.Resource.Id : "",
+                result.Amount));
+        }
+
+        /// <summary>Ближайшая спелая грядка под курсором — единственная цель гостя.</summary>
+        private Growable FindRipePlot(Vector2 screen)
+        {
+            float scale = Screen.height > 0 ? Screen.height / 1080f : 1f;
+            float radius = _pickRadiusPixels * Mathf.Max(0.5f, scale);
+            float bestSqr = radius * radius;
+
+            Growable best = null;
+            var plots = GrowableRegistry.All;
+            for (int i = 0; i < plots.Count; i++)
+            {
+                var g = plots[i];
+                if (g == null || !g.IsReady) continue;
+                if (!TryScreenDistance(g.transform.position, _plotAimHeight, screen, out float sqr)) continue;
+                if (sqr >= bestSqr) continue;
+
+                bestSqr = sqr;
+                best = g;
+            }
+
+            return best;
         }
 
         // ---- сбор руками ----
@@ -225,11 +305,34 @@ namespace Farm.Interaction
             // Цель ищем до того, как отпустить ссылки: она нужна и для проверки совместимости.
             var target = FindMergeTarget(screen, growable);
 
-            // Курсор почти не сдвинулся — это был клик, а не перенос. Клик по постройке открывает
-            // её панель; по грядке — просто снимает выделение. Отдельная кнопка «осмотреть» не нужна,
-            // а правая кнопка мыши не переживёт переезда на тач.
+            // Курсор почти не сдвинулся — это был клик, а не перенос. Клик по спелой грядке —
+            // сбор: главный жест онлайн-фермы, посадил-подождал-собрал. Клик по постройке
+            // открывает её панель; по остальному — просто снимает выделение. Отдельная кнопка
+            // «осмотреть» не нужна, а правая кнопка мыши не переживёт переезда на тач.
             if ((screen - _pressScreen).sqrMagnitude <= TapSlopSqr())
-                BuildingSelection.Select(dragged.GetComponent<Building>());
+            {
+                if (growable != null && growable.IsReady)
+                {
+                    // Однолетку сбор уничтожает (отложенно, в конце кадра) — решаем судьбу
+                    // приземления до сбора, пока определение точно живо.
+                    bool vanishes = growable.Definition != null &&
+                                    !growable.Definition.Regrows && growable.Definition.RemoveWhenEmpty;
+
+                    Vector3 at = dragged.position;
+                    if (growable.TryHarvest())
+                    {
+                        Effects.Play(l => l.Harvest, at + Vector3.up * _plotAimHeight);
+                        Sfx.Play(b => b.Harvest);
+
+                        // Собранное исчезнет — возвращать на землю нечего и некому.
+                        if (vanishes) return;
+                    }
+                }
+                else
+                {
+                    BuildingSelection.Select(dragged.GetComponent<Building>());
+                }
+            }
 
             _dragged = null;
             _draggedGrowable = null;
@@ -400,6 +503,7 @@ namespace Farm.Interaction
             DragFocus.Clear();
             _dragged = null;
             _draggedGrowable = null;
+            _guestPlot = null;
         }
     }
 }

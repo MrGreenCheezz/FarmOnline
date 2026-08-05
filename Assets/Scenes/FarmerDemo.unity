@@ -11011,10 +11011,10 @@ GameObject:
   - component: {fileID: 236242270}
   - component: {fileID: 236242271}
   - component: {fileID: 236242272}
-  - component: {fileID: 236242273}
   - component: {fileID: 236242274}
   - component: {fileID: 236242275}
   - component: {fileID: 236242276}
+  - component: {fileID: 236242277}
   m_Layer: 0
   m_Name: HUD
   m_TagString: Untagged
@@ -11183,18 +11183,6 @@ MonoBehaviour:
   _thickness: 5
   _trackColor: {r: 0, g: 0, b: 0, a: 0.35}
   _fillColor: {r: 0.75, g: 0.92, b: 1, a: 0.95}
---- !u!114 &236242273
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 236242262}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 791409af4e9f27140b68174bea63f48d, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Farm.UI::Farm.UI.FarmerThoughtBubble
 --- !u!114 &236242274
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -11246,6 +11234,18 @@ MonoBehaviour:
   _delay: 6
   _searchInterval: 0.4
   _praiseDuration: 4
+--- !u!114 &236242277
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 236242262}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2147fe2d3090640448d1d8fd2cccfc8c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Farm.Game::Farm.Game.SocialWindows
 --- !u!1001 &236268997
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -59288,6 +59288,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Farm.Game::Farm.Game.SaveRunner
   _autosaveInterval: 60
+  _actionSaveDelay: 4
   _logSaves: 1
 --- !u!1001 &1361582610
 PrefabInstance:
@@ -60705,6 +60706,7 @@ MonoBehaviour:
   _scanInterval: 0.25
   _thinkDuration: 0.45
   _switchMargin: 1.5
+  _mayHarvest: 0
   _filterByCategory: 0
   _category: 0
   _keepFood: 25

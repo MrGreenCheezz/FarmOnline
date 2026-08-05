@@ -372,6 +372,10 @@ namespace Farm.Characters
         /// </summary>
         private FarmerDecision ScoreHarvest()
         {
+            // Онлайн-правило: урожай принадлежит игроку. Фермеру сбор закрыт тем же флагом,
+            // что и ожидание, — наглухо, а не оценкой: «иногда соберёт» читалось бы поломкой.
+            if (!_agent.MayHarvest) return FarmerDecision.None;
+
             // Перерыв закрывает сбор наглухо, а не придерживает оценкой. Полумера здесь
             // читалась бы хуже: «иногда собирает, иногда нет» выглядит поломкой, а «в
             // перерыв не собирает вообще» — распорядком, который игрок видит и понимает.
@@ -394,6 +398,11 @@ namespace Farm.Characters
                 // оставить в нём призрак, и ходить к нему — значит ходить и разворачиваться.
                 if (!plot.IsReady) continue;
                 if (_agent.OnlyOwnCategory && plot.Category != _agent.Category) continue;
+
+                // Наёмному — только рутина: дорогие многочасовые ступени принадлежат рукам
+                // игрока (правило 1). Фильтр здесь, а не в оценке: «иногда берёт дорогое»
+                // читалось бы как поломка, а «высокое не трогает вовсе» — как уговор.
+                if (TierOf(plot) > FarmerAgent.HelperMaxTier) continue;
 
                 float ripe01 = Mathf.Clamp01((float)plot.RipeSeconds / LongWait);
 
@@ -433,13 +442,23 @@ namespace Farm.Characters
                 HarvestThought(best), plot: best);
         }
 
+        /// <summary>Ступень того, что вырастет на грядке. Без ресурса — первая: рутина по умолчанию.</summary>
+        private static int TierOf(Growable plot)
+        {
+            var resource = plot.Definition != null ? plot.Definition.YieldResource : null;
+            return resource != null ? resource.Tier : 1;
+        }
+
         /// <summary>
         /// Подождать у грядки, которой осталось несколько секунд. Стоять без дела в двух шагах
         /// от почти созревшего — ровно та мелочь, из-за которой персонаж выглядит бездумным.
         /// </summary>
         private FarmerDecision ScoreAwait()
         {
-            // Ожидание — это тот же сбор, только стоя. В перерыв оно закрыто вместе с ним,
+            // Ожидание — это тот же сбор, только стоя: без права сбора ждать у грядки нечего.
+            if (!_agent.MayHarvest) return FarmerDecision.None;
+
+            // В перерыв оно закрыто вместе со сбором,
             // иначе фермер «отдыхал» бы, торча над почти спелой грядкой.
             if (Resting) return FarmerDecision.None;
 
@@ -455,6 +474,9 @@ namespace Farm.Characters
                 var plot = all[i];
                 if (plot == null || plot.Phase != GrowthPhase.Growing) continue;
                 if (_agent.OnlyOwnCategory && plot.Category != _agent.Category) continue;
+
+                // Ждать имеет смысл только то, что потом можно собрать, — тот же фильтр ступеней.
+                if (TierOf(plot) > FarmerAgent.HelperMaxTier) continue;
 
                 double left = plot.TimeUntilReady;
                 if (left < 0.0 || left > WorthWaiting) continue;

@@ -4,7 +4,8 @@
     "references": [
         "Farm.Farming",
         "Farm.Characters",
-        "Farm.Juice"
+        "Farm.Juice",
+        "Farm.Net"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

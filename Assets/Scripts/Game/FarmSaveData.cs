@@ -83,6 +83,9 @@ namespace Farm.Game
 
         /// <summary>Рюкзак: он мог нести урожай в момент сохранения.</summary>
         public InventorySnapshot Pack;
+
+        /// <summary>До какого момента (unix-секунды серверных часов) фермер нанят. 0 — не нанят.</summary>
+        public double HiredUntilUnix;
     }
 
     /// <summary>
@@ -98,10 +101,21 @@ namespace Farm.Game
     [Serializable]
     public sealed class FarmSaveData
     {
-        /// <summary>Версия формата. Растёт, когда поля меняют смысл, — старое читается снисходительно.</summary>
-        public int Version = 1;
+        /// <summary>
+        /// Версия формата. Растёт, когда поля меняют смысл, — старое читается снисходительно.
+        /// V2: появился <see cref="SavedAtUnix"/> — с него начинается оффлайн-рост.
+        /// </summary>
+        public int Version = 2;
 
         public string SavedAtUtc;
+
+        /// <summary>
+        /// Момент сохранения в unix-секундах по часам <see cref="FarmingRuntime.Now"/>.
+        /// По разнице с «сейчас» ферма при загрузке узнаёт, сколько она прожила без нас.
+        /// Онлайн эту разницу считает сервер по своим часам; это поле — для игры без сети.
+        /// 0 — сейв формата V1, оффлайн-дельты не будет (партия просто продолжится).
+        /// </summary>
+        public double SavedAtUnix;
 
         public int Gold;
         public InventorySnapshot Storage;

@@ -61,6 +61,35 @@
 
 .menu__info--empty { color: rgba(246, 232, 210, 0.42); }
 
+/* Поле имени: одна строка, тот же дощатый ряд, что и кнопки. Видно только гостю —
+   у кого есть токен, у того и имя. */
+.menu__input {
+    width: 100%;
+    margin: 0 0 9px 0;
+}
+
+.menu__input .unity-base-text-field__input {
+    font-size: 18px;
+    color: rgb(252, 240, 220);
+    background-color: rgba(20, 13, 8, 0.55);
+    border-color: rgba(255, 226, 180, 0.25);
+    border-width: 1px;
+    border-radius: 3px;
+    padding: 10px 14px 11px 14px;
+}
+
+/* Строка сетевого состояния. Ей положено быть скучной, пока всё хорошо,
+   и заметной, когда сервер молчит: отказ системы обязан быть слышен. */
+.menu__net-status {
+    font-size: 13px;
+    color: rgba(228, 234, 240, 0.55);
+    margin-top: 10px;
+    white-space: normal;
+    max-width: 300px;
+}
+
+.menu__net-status--bad { color: rgb(255, 176, 158); }
+
 .menu__button {
     width: 100%;
     font-size: 20px;

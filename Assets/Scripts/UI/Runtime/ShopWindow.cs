@@ -24,7 +24,8 @@ namespace Farm.UI
             ShopCategory.Plants,
             ShopCategory.Animals,
             ShopCategory.Ore,
-            ShopCategory.Buildings
+            ShopCategory.Buildings,
+            ShopCategory.Decor
         };
 
         [Tooltip("Сколько секунд держать сообщение об отказе.")]
@@ -284,6 +285,7 @@ namespace Farm.UI
                 case ShopCategory.Animals: return "Животные";
                 case ShopCategory.Ore: return "Руда";
                 case ShopCategory.Buildings: return "Постройки";
+                case ShopCategory.Decor: return "Декор";
                 default: return category.ToString();
             }
         }

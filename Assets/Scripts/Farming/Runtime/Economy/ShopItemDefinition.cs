@@ -8,7 +8,8 @@ namespace Farm.Farming
         Plants = 0,
         Animals = 1,
         Buildings = 2,
-        Ore = 3
+        Ore = 3,
+        Decor = 4
     }
 
     /// <summary>Что реально появляется на ферме при покупке.</summary>
@@ -48,6 +49,11 @@ namespace Farm.Farming
         [Tooltip("Для Prop: что поставить на ферму.")]
         [SerializeField] private GameObject _prefab;
 
+        [Tooltip("Для Prop: замысел, чей префаб ставим. Задан — покупка получает имя " +
+                 "Improvement_<id> и попадает в сохранение как замысел; без него декор " +
+                 "не переживёт перезагрузку.")]
+        [SerializeField] private ImprovementDefinition _improvement;
+
         [Tooltip("Для Building: какую постройку возвести. Цена берётся с её первого уровня.")]
         [SerializeField] private BuildingDefinition _building;
 
@@ -60,7 +66,13 @@ namespace Farm.Farming
         public ShopCategory Category => _category;
         public ShopItemKind Kind => _kind;
         public GrowableDefinition Growable => _growable;
-        public GameObject Prefab => _prefab;
+
+        /// <summary>Замысел-первоисточник декора; null у пропов без сохранения.</summary>
+        public ImprovementDefinition Improvement => _improvement;
+
+        /// <summary>Префаб пропа. Замысел главнее явного поля: у него и модель, и имя для сейва.</summary>
+        public GameObject Prefab => _improvement != null && _improvement.Prefab != null ? _improvement.Prefab : _prefab;
+
         public BuildingDefinition Building => _building;
         public int MaxOwned => _maxOwned;
 
@@ -85,8 +97,10 @@ namespace Farm.Farming
         {
             if (_kind == ShopItemKind.Plot && _growable == null)
                 Debug.LogWarning("[Shop] У '" + Id + "' тип Plot, но не задан GrowableDefinition", this);
-            if (_kind == ShopItemKind.Prop && _prefab == null)
-                Debug.LogWarning("[Shop] У '" + Id + "' тип Prop, но не задан префаб", this);
+            if (_kind == ShopItemKind.Prop && _prefab == null && _improvement == null)
+                Debug.LogWarning("[Shop] У '" + Id + "' тип Prop, но не задан ни префаб, ни замысел", this);
+            if (_kind == ShopItemKind.Prop && _improvement == null && _prefab != null)
+                Debug.LogWarning("[Shop] Проп '" + Id + "' без замысла — покупка не переживёт перезагрузку", this);
             if (_kind == ShopItemKind.Building && _building == null)
                 Debug.LogWarning("[Shop] У '" + Id + "' тип Building, но не задан BuildingDefinition", this);
         }
