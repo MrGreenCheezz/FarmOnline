@@ -15,7 +15,7 @@ MonoBehaviour:
   _id: fence
   _displayName: "\u0417\u0430\u0431\u043E\u0440"
   _description: "\u0421\u0435\u043A\u0446\u0438\u044F \u043E\u0433\u0440\u0430\u0434\u044B."
-  _icon: {fileID: 21300000, guid: 11803d374be0bc343b2fd3b169d12f26, type: 3}
+  _icon: {fileID: 21300000, guid: e4c9b85e61cd54249b53ad6eac5c0503, type: 3}
   _category: 2
   _price:
     Gold: 20

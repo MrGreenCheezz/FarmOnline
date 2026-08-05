@@ -1,4 +1,12 @@
-/* HUD и магазин. Раскладка — флексбокс, как в CSS, свойства с юнитевскими именами. */
+/* HUD, окна и мировые плашки. Раскладка — флексбокс, как в CSS, свойства с юнитевскими именами.
+
+   Два закона этого файла:
+   1. Цвет и кегль берутся только из Theme.uss. Литеральный rgb() тут остался ровно в двух
+      местах — лестница уровней грядок и полоски потребностей, — и оба помечены комментарием.
+   2. Отступы кратны 4 пикселям. Это не эстетика: разнобой 5/6/7/9/10/14 не даёт глазу
+      опереться, и панели, набранные вроде бы одинаково, стоят вразнобой.
+      Числа, которые считаются, а не выбираются (ширина ячейки склада, высота дорожки,
+      центровка ползунка, размер мировой плашки), сеткой не связаны — они геометрия. */
 
 .screen {
     flex-grow: 1;
@@ -6,38 +14,74 @@
 
 /* ================= HUD ================= */
 
+/* Прижат ко всем четырём краям, а не только к левому верхнему. Коробка без правой границы
+   не знает, где кончается экран, и переносить топбару нечего: он просто уезжал за кадр.
+   Клики HUD всё равно не ловит (GameHud.MakeReadout снимает picking со всего поддерева),
+   поэтому растянуть его на весь экран безопасно. */
 .hud {
     position: absolute;
     left: 0;
     top: 0;
+    right: 0;
+    bottom: 0;
     flex-direction: column;
     align-items: flex-start;
-    padding: 14px;
+    padding: 16px;
 }
 
+/* Перенос обязателен, а не желателен: в портрете топбар просит ≈1030 логических пикселей
+   при 978 доступных, и «Уровни / Скрыть / В меню» уходили за кадр — с телефона из игры
+   нельзя было выйти. Перенос дешевле гамбургера и не прячет ничего от глаза. */
 .topbar {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    max-width: 100%;
 }
 
+/* Второй ряд перенесённого топбара не должен слипаться с первым. */
+.topbar > * { margin-bottom: 4px; }
+
 .gold {
-    font-size: 24px;
+    font-size: var(--text-lg);
     -unity-font-style: bold;
-    color: rgb(255, 210, 110);
-    background-color: rgba(26, 19, 13, 0.88);
-    border-radius: 5px;
+    color: var(--gold);
+    background-color: var(--panel);
+    border-radius: 4px;
     border-width: 1px;
-    border-color: rgba(150, 108, 62, 0.7);
-    padding: 5px 14px 6px 14px;
-    margin-right: 10px;
+    border-color: var(--wood-edge-soft);
+    padding: 4px 16px;
+    margin-right: 8px;
     -unity-text-align: middle-center;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+    text-shadow: 1px 1px 2px var(--shadow);
 }
 
 .gold--inline {
-    font-size: 20px;
-    margin-right: 14px;
+    font-size: var(--text-md);
+    margin-right: 12px;
+}
+
+/* Счётчик, который не про деньги: ёмкость склада, число из числа. Своя плашка, а не
+   золотая, — иначе золото перестаёт быть знаком золота. Тёплый приглушённый на врезанном
+   в доску поле: та же семья, что у полей ввода, и заведомо тише заголовка окна. */
+.count {
+    font-size: var(--text-md);
+    color: var(--ink-warm-soft);
+    background-color: var(--field-warm);
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: var(--wood-line);
+    padding: 4px 12px;
+    margin-right: 12px;
+    -unity-text-align: middle-center;
+}
+
+/* Часы — единственное холодное пятно в топбаре: время не заработано и не тратится,
+   спорить с золотом за внимание ему незачем. */
+.gold--clock {
+    color: var(--clock);
+    font-size: var(--text-md);
 }
 
 .hud-panels {
@@ -51,99 +95,126 @@
    Не до нуля: пропавшее табло читалось бы как сбой, а не как вежливость. */
 .hud-panels--busy { opacity: 0.25; }
 
-.btn--ghost {
-    color: rgba(246, 232, 210, 0.66);
-    -unity-font-style: normal;
-    margin-left: 4px;
-    opacity: 0.82;
-}
-
-.btn--ghost:hover { color: rgb(252, 240, 220); opacity: 1; }
-
-/* Выключенный переключатель: тусклее обычного, чтобы состояние читалось без чтения текста. */
-.btn--muted {
-    color: rgba(246, 232, 210, 0.34);
-    opacity: 0.6;
-}
-
 /* ---- настройки ---- */
 
-.settings { padding: 12px 16px 14px 16px; }
+.settings { padding: 12px 16px 16px 16px; }
 
 .setting {
     flex-direction: column;
     margin-bottom: 12px;
 }
 
+/* Тёплый, а не холодный: окно настроек — голая доска, без вуали и без шапки. */
 .setting__label {
-    font-size: 15px;
-    color: rgb(228, 234, 240);
+    font-size: var(--text-sm);
+    color: var(--ink-warm);
     margin-bottom: 4px;
 }
 
 .setting__slider { margin: 0; }
 
+/* Дорожка — тот же вдавленный жёлоб, что у полосок нужд; бегунок — маленькая зелёная
+   доска. Раньше это была серая нитка с мятным кружком: стоковый контрол, случайно
+   доживший до релиза посреди деревянного окна. */
 .setting__slider .unity-base-slider__tracker {
-    background-color: rgba(255, 255, 255, 0.14);
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_track.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
     border-width: 0;
-    height: 6px;
-    border-radius: 3px;
+    height: 8px;
+    border-radius: 0;
 }
 
-.setting__slider .unity-base-slider__dragger {
-    background-color: rgb(150, 210, 165);
+/* Заливка дорожки. Элемента с таким классом в разметке нет — его подкладывает в жёлоб
+   SettingsWindow.AttachFill, потому что у стокового Slider заливки не существует вовсе.
+   Класс общий: в меню дорожка та же (MainMenu.uss), и правило стоит написать один раз.
+   Тот же wood_bar_fill, что у полосок нужд, — иначе набранное в двух местах одного окна
+   выглядело бы двумя разными вещами. */
+.slider__fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_fill.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
     border-width: 0;
-    width: 16px;
-    height: 16px;
-    border-radius: 8px;
+}
+
+/* Отрицательный сдвиг — не отступ, а центровка: (18 - 8) / 2. */
+.setting__slider .unity-base-slider__dragger {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    width: 18px;
+    height: 18px;
+    border-radius: 0;
     margin-top: -5px;
 }
 
 /* Панели HUD остаются тёмными и полупрозрачными: сквозь них видно ферму, и доска
    на пол-экрана закрыла бы то, ради чего игра. Деревенское тут — тёплая окантовка. */
+/* Ширина ровная, а не «сколько попросит самая длинная строка». При min-width колонка
+   стояла рваным правым краем: у «ФЕРМЕР» и «НАВЫКИ» край на 313 px, у «ФЕРМА» — на 530,
+   потому что там лежит строка про цену следующей ступени. Три панели одна под другой с
+   разбегом в 217 px глаз читает как съехавшую вёрстку, а не как разное содержимое. */
 .panel {
-    background-color: rgba(26, 19, 13, 0.85);
-    border-left-color: rgb(150, 108, 62);
+    background-color: var(--panel);
+    border-left-color: var(--wood-edge);
     border-left-width: 4px;
-    border-top-right-radius: 6px;
-    border-bottom-right-radius: 6px;
-    padding: 10px 16px 12px 12px;
-    margin-bottom: 10px;
-    min-width: 300px;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    padding: 12px 16px 12px 12px;
+    margin-bottom: 8px;
+    width: 320px;
 }
 
 .panel__title {
     -unity-font-style: bold;
-    font-size: 15px;
-    color: rgb(150, 210, 165);
-    margin-bottom: 6px;
+    font-size: var(--text-sm);
+    color: var(--accent);
+    margin-bottom: 4px;
     letter-spacing: 2px;
 }
 
+/* Переносится: ширина колонки теперь задана, и длинной строке некуда расти, кроме как
+   вниз. Без переноса она молча уезжала бы за край панели. */
 .row {
-    font-size: 17px;
-    color: rgb(228, 234, 240);
-    margin-top: 2px;
+    font-size: var(--text-md);
+    color: var(--ink);
+    margin-top: 4px;
+    white-space: normal;
 }
 
-.row--muted { color: rgba(228, 234, 240, 0.45); }
+/* Подписи всех сортов говорят одним голосом: тот же кегль, тот же цвет, что у .hint.
+   Раньше эти двое отличались на пять пикселей и десять процентов прозрачности —
+   разница, которую никто не задумывал, но которую видно. */
+.row--muted {
+    font-size: var(--text-sm);
+    color: var(--muted);
+}
 
 .row--alert {
-    color: rgb(240, 128, 116);
+    color: var(--danger);
     -unity-font-style: bold;
 }
 
 .row--strong {
     -unity-font-style: bold;
-    font-size: 18px;
-    color: rgb(255, 214, 120);
-    margin-bottom: 6px;
+    font-size: var(--text-md);
+    color: var(--gold);
+    margin-bottom: 4px;
 }
 
 .hint {
-    font-size: 12px;
-    color: rgba(228, 234, 240, 0.35);
-    margin-top: 6px;
+    font-size: var(--text-sm);
+    color: var(--muted);
+    margin-top: 8px;
+    white-space: normal;
 }
 
 /* ---- ячейки склада ---- */
@@ -155,46 +226,53 @@
     padding: 4px;
 }
 
+/* 74 — размер ячейки, а не отступ: под него подобрана иконка.
+   Ячейка одета в wood_slot — вдавленное гнездо в доске. Тянется, а не мостится: середина
+   спрайта 12 px, и замощение печатало бы её по ячейке шесть раз подряд рябью. Гнездо —
+   одно ровное поле, ему растяжение и полагается. */
 .cell {
     width: 74px;
     height: 74px;
     margin: 4px;
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 8px;
-    border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.10);
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_slot.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
     justify-content: flex-end;
     align-items: flex-end;
 }
 
-/* Пустая ячейка не должна выглядеть кликабельной. */
+/* Пустая ячейка не должна выглядеть кликабельной: то же гнездо, но глуше. */
 .cell--empty {
-    background-color: rgba(255, 255, 255, 0.025);
-    border-color: rgba(255, 255, 255, 0.06);
+    -unity-background-image-tint-color: rgb(178, 172, 166);
 }
 
+/* Наведение — рамкой, а не подсветкой: тонировка фона умеет только затемнять, светлее
+   доску ей сделать нечем, а второй спрайт ради ячейки склада не нужен. */
 .cell--filled:hover {
-    background-color: rgba(255, 255, 255, 0.15);
-    border-color: rgba(150, 210, 165, 0.85);
+    border-width: 2px;
+    border-color: var(--accent);
+    border-radius: 6px;
 }
 
 .cell__icon {
     position: absolute;
-    left: 6px;
-    top: 6px;
-    right: 6px;
-    bottom: 6px;
+    left: 8px;
+    top: 8px;
+    right: 8px;
+    bottom: 8px;
     -unity-background-scale-mode: scale-to-fit;
 }
 
 .cell__count {
-    font-size: 15px;
+    font-size: var(--text-sm);
     -unity-font-style: bold;
-    color: rgb(255, 255, 255);
-    background-color: rgba(0, 0, 0, 0.75);
-    border-radius: 5px;
-    padding: 0 5px 1px 5px;
-    margin: 3px;
+    color: var(--ink-hi);
+    background-color: var(--chip);
+    border-radius: 4px;
+    padding: 0 4px;
+    margin: 4px;
 }
 
 /* ---- плашки уровней над грядками ---- */
@@ -204,12 +282,14 @@
     left: 0; top: 0; right: 0; bottom: 0;
 }
 
+/* Плашка живёт в мире, а не в интерфейсе: она висит над грядкой размером с ладонь,
+   и шаг в 4 пикселя раздул бы её вдвое. Здесь сетка не действует. */
 .badge {
     position: absolute;
     flex-direction: row;
     align-items: center;
-    background-color: rgba(20, 24, 30, 0.85);
-    border-radius: 9px;
+    background-color: var(--panel-cool);
+    border-radius: 8px;
     border-width: 2px;
     padding: 2px 6px 2px 3px;
 }
@@ -223,14 +303,16 @@
 }
 
 .badge__level {
-    font-size: 14px;
+    font-size: var(--text-xs);
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    color: rgb(255, 255, 255);
+    color: var(--ink-hi);
     min-width: 12px;
 }
 
-/* Цвет — быстрый способ увидеть, что с чем сливать, не читая цифру. */
+/* Лестница уровней — единственное место в файле, где цвет назван числом, и так и останется.
+   Пять различимых оттенков тут не оформление, а язык: быстрый способ увидеть, что с чем
+   сливать, не читая цифру. Свести их к --accent значит стереть этот язык. */
 .badge--lvl1 { border-color: rgb(150, 210, 165); color: rgb(190, 232, 200); }
 .badge--lvl2 { border-color: rgb(96, 178, 232); color: rgb(160, 210, 245); }
 .badge--lvl3 { border-color: rgb(186, 140, 232); color: rgb(214, 180, 245); }
@@ -240,7 +322,7 @@
 /* Готово к сбору. Ниже цветов уровня, чтобы фон перебивал их, а рамка уровня осталась. */
 .badge--ready {
     background-color: rgb(70, 142, 86);
-    color: rgb(255, 255, 255);
+    color: var(--ink-hi);
 }
 
 /* ---- первый урок ---- */
@@ -252,10 +334,10 @@
     left: 0;
     right: 0;
     bottom: 44px;
-    font-size: 19px;
-    color: rgb(255, 236, 190);
+    font-size: var(--text-md);
+    color: var(--ink-warm);
     -unity-text-align: middle-center;
-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
+    text-shadow: 1px 1px 3px var(--shadow-hard);
 }
 
 /* Кольцо над грядкой. Пустое внутри: закрасить грядку значило бы спрятать то,
@@ -266,7 +348,7 @@
     height: 38px;
     border-radius: 50%;
     border-width: 3px;
-    border-color: rgb(255, 236, 150);
+    border-color: var(--gold-hint);
 }
 
 /* ---- всплывающие числа ---- */
@@ -275,10 +357,10 @@
    хватать боковому зрению, читать его никто не обязан. */
 .emote {
     position: absolute;
-    background-color: rgba(22, 27, 34, 0.86);
+    background-color: var(--panel-cool);
     border-radius: 50%;
     border-width: 1px;
-    border-color: rgba(150, 175, 200, 0.45);
+    border-color: var(--panel-cool-edge);
     align-items: center;
     justify-content: center;
 }
@@ -291,37 +373,48 @@
 
 .float {
     position: absolute;
-    font-size: 18px;
+    font-size: var(--text-md);
     -unity-font-style: bold;
     -unity-text-align: middle-center;
-    color: rgb(235, 240, 245);
+    color: var(--ink);
     -unity-text-outline-width: 1.4px;
-    -unity-text-outline-color: rgba(0, 0, 0, 0.85);
+    -unity-text-outline-color: var(--shadow-hard);
 }
 
-.float--harvest { color: rgb(168, 226, 178); }
-.float--gold { color: rgb(255, 208, 96); font-size: 21px; }
-.float--merge { color: rgb(255, 236, 150); font-size: 26px; }
-.float--bad { color: rgb(240, 128, 116); }
+.float--harvest { color: var(--accent); }
+.float--gold { color: var(--gold); font-size: var(--text-lg); }
+.float--merge { color: var(--gold-hint); font-size: var(--text-xl); }
+.float--bad { color: var(--danger); }
 
 /* ---- полоски ---- */
 
-.meter { flex-direction: column; margin-top: 7px; }
+.meter { flex-direction: column; margin-top: 8px; }
 
 .meter__label {
-    font-size: 14px;
-    color: rgba(228, 234, 240, 0.8);
-    margin-bottom: 3px;
+    font-size: var(--text-xs);
+    color: var(--ink-soft);
+    margin-bottom: 4px;
 }
 
+/* Дорожка — вдавленный жёлоб wood_bar_track: полоска лежит в доске, а не поверх неё.
+   Тянется, а не мостится: середина спрайта 6 px, на трёхсотпиксельной дорожке замощение
+   дало бы полсотни повторов — вельвет вместо жёлоба.
+   Заливка при этом остаётся крашеной: пять цветов полосок — язык (см. Theme.uss),
+   и подменять их одной зелёной доской значит стереть его. */
 .meter__track {
     height: 10px;
-    background-color: rgba(255, 255, 255, 0.12);
-    border-radius: 5px;
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_track.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
     overflow: hidden;
 }
 
 .meter__fill { height: 100%; width: 100%; border-radius: 5px; }
+
+/* Вторая и последняя лестница цветов — по той же причине, что и уровни грядок:
+   игрок узнаёт полоску по цвету раньше, чем прочтёт подпись. Красная — общая тревога
+   поверх любой из четырёх, поэтому она идёт последней и перебивает всё. */
 .meter__fill--food { background-color: rgb(226, 168, 74); }
 .meter__fill--water { background-color: rgb(88, 172, 224); }
 .meter__fill--carry { background-color: rgb(140, 196, 130); }
@@ -330,16 +423,11 @@
 
 /* ---- навыки ---- */
 
-.gold--clock {
-    color: rgb(178, 208, 236);
-    font-size: 20px;
-}
-
 .skill-list { flex-direction: column; }
 
 .skill {
     flex-direction: column;
-    margin-top: 6px;
+    margin-top: 8px;
 }
 
 .skill__head {
@@ -349,42 +437,65 @@
 }
 
 .skill__name {
-    font-size: 15px;
-    color: rgb(228, 234, 240);
+    font-size: var(--text-sm);
+    color: var(--ink);
 }
 
 .skill__level {
-    font-size: 15px;
+    font-size: var(--text-sm);
     -unity-font-style: bold;
-    color: rgb(255, 214, 120);
+    color: var(--gold);
 }
 
 /* Тоньше полосок потребностей: навык растёт часами, за ним не следят посекундно. */
 .skill__track {
     height: 6px;
-    background-color: rgba(255, 255, 255, 0.12);
-    border-radius: 3px;
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_track.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
     overflow: hidden;
-    margin-top: 3px;
+    margin-top: 4px;
 }
 
+/* Единственная полоска, у которой заливка не кодирует смысл цветом, — значит, ей можно
+   быть доской. wood_bar_fill той же зелени, что и --accent, но с волокном. */
 .skill__fill {
     height: 100%;
     width: 0;
-    background-color: rgb(150, 210, 165);
-    border-radius: 3px;
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_fill.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
 }
 
-/* Умение уже открыто — полоску закрашиваем целиком другим цветом. */
-.skill__fill--max { background-color: rgb(255, 214, 120); }
+/* Умение уже открыто — полоску закрашиваем целиком другим цветом. Доска тут снимается
+   намеренно: тонировка умеет только умножать, и золото поверх зелёного волокна дало бы
+   болотный, а не медовый. */
+.skill__fill--max {
+    background-image: none;
+    background-color: var(--gold);
+}
 
 /* ================= кнопки ================= */
 
 /* Деревянные кнопки: те же 9-slice доски, что в меню. Одна тема на всю игру —
-   интерфейс, который в меню деревенский, а в игре стеклянный, читается как два разных. */
+   интерфейс, который в меню деревенский, а в игре стеклянный, читается как два разных.
+
+   Состояний теперь четыре, и они одинаковы у всех кнопок игры и меню:
+   покой — наведение (светлая доска) — нажатие (доска темнеет и уходит на пиксель вниз) —
+   выключено (глохнет и сереет). Выключенное состояние тут не украшение: кнопки найма,
+   покупки и расширения гаснут по бедности, и кнопка, которая выглядит живой, но не
+   отвечает, — тот самый молчаливый отказ, который в этом проекте считается дефектом.
+
+   Разделение труда между картинкой и тонировкой: наведение — подмена спрайта (тонировка
+   умеет только затемнять, светлее сделать ей нечем), нажатие и выключение — тонировка
+   `-unity-background-image-tint-color`. Тонировка работает поверх любой доски, в том числе
+   тех, что появятся позже, — поэтому новую кнопку достаточно одеть в картинку покоя,
+   и три остальных состояния она получит даром. */
 .btn {
-    font-size: 15px;
-    color: rgb(252, 240, 220);
+    font-size: var(--text-sm);
+    color: var(--ink-warm);
     -unity-font-style: bold;
 
     background-image: url("project://database/Assets/Game/UI/Skin/wood_button.png");
@@ -393,22 +504,99 @@
     background-color: rgba(0, 0, 0, 0);
     border-width: 0;
 
-    padding: 8px 15px 9px 15px;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    padding: 8px 16px;
+    text-shadow: 1px 1px 2px var(--shadow);
 }
 
 .btn:hover { background-image: url("project://database/Assets/Game/UI/Skin/wood_button_hover.png"); }
-.btn:disabled { opacity: 0.4; }
 
+.btn:active {
+    -unity-background-image-tint-color: var(--press);
+    translate: 0 1px;
+}
+
+/* Выключенная кнопка обязана остаться ЧИТАЕМОЙ: она объясняет, чего не хватает, и её
+   надпись — часть отказа. При opacity 0.45 контраст падал до 2.38:1 (порог 3:1), и «Сдать»
+   на карточке заказа превращалась в немое пятно. Гасим доску, а не буквы: тонировка картинки
+   остаётся, прозрачность всей кнопки снята, надпись — приглушённая, но с контрастом 4+. */
+.btn:disabled {
+    -unity-background-image-tint-color: var(--off);
+    color: var(--ink-warm-soft);
+}
+
+/* Зелёная доска на наведении не подменяется: коричневая картинка hover'а превратила бы
+   главную кнопку в обычную. Наведение здесь — светлеющая надпись. Появится зелёная
+   картинка наведения — менять только строку с url, состояния уже на месте. */
 .btn--accent {
     background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green.png");
-    color: rgb(250, 255, 240);
+    color: var(--ink-on-accent);
 }
-.btn--accent:hover { background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green.png"); }
+
+.btn--accent:hover {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green_hover.png");
+    color: var(--ink-hi);
+}
+
+/* Тихие кнопки топбара. Идут после базовых состояний: при равной специфичности
+   выигрывает то, что ниже, и переставленный блок молча вернёт им обычный голос.
+
+   Второстепенность показана ОТСУТСТВИЕМ ДОСКИ при полной яркости надписи, а не
+   прозрачностью. Раньше тут стояло opacity 0.82 против 0.6 у настоящего «выключено» —
+   разрыв в две десятых, которого глаз не видит, и «Уровни / Скрыть / В меню» читались
+   как погашенные пункты. Кнопка без доски выглядит второстепенной; кнопка бледная
+   выглядит сломанной. */
+/* Тихая плашка, а не обводка. Здесь стояло `-unity-text-outline-width: 1px` — попытка
+   удержать букву на любом фоне без подложки. На 15 px это не работает в принципе: стебель
+   Inter на таком кегле сам полтора пикселя, и обводка в пиксель съедает букву изнутри.
+   Замер по 01_game (доля площади в рамке надписи): «Склад» на доске — 14.9 % буквы и 0 %
+   черноты; «В меню» с обводкой — 1.2 % буквы и 29.5 % черноты. До глаза доходило вчетверо
+   меньше буквы, чем у соседки, а черноты вокруг было втрое больше самой надписи: кнопки
+   читались уже не как тихие, а как сломанные, и самой нечитаемой надписью на экране
+   оказался выход из игры.
+
+   Вывод, ради которого это здесь записано: второстепенная кнопка НЕ обязана быть
+   бесфоновой — она обязана быть тише соседней, оставаясь читаемой. Отсутствие фона было
+   выбрано способом показать второстепенность, и способ не сработал, потому что фон под
+   HUD — живой мир, а не ровное поле.
+
+   Плашка тише доски не контрастом, а всем остальным: плоская заливка вместо волокна,
+   без кромки и гвоздей, шрифт Normal против Bold. Числа — в `--plate-quiet` (Theme.uss). */
+.btn--ghost {
+    background-image: none;
+    background-color: var(--plate-quiet);
+    border-radius: 5px;
+    border-width: 0;
+    color: var(--ink-warm);
+    -unity-font-style: normal;
+    text-shadow: 1px 1px 3px var(--shadow-hard);
+    -unity-text-outline-width: 0;
+    margin-left: 4px;
+    opacity: 1;
+}
+
+.btn--ghost:hover {
+    background-image: none;
+    background-color: var(--plate-quiet-hover);
+    color: var(--gold);
+}
+
+/* Нажатие: у соседок доска темнеет тонировкой, но тонировать нечего — картинки нет.
+   Без этой строки призрачная кнопка единственная в игре не отвечает на палец. */
+.btn--ghost:active {
+    background-color: var(--plate-quiet-hover);
+    -unity-background-image-tint-color: rgba(255, 255, 255, 1);
+}
+
+/* Выключенный переключатель: тусклее обычного, чтобы состояние читалось без чтения текста.
+   Это не `:disabled` — кнопка жива и ждёт нажатия, погашен предмет, которым она правит. */
+.btn--muted {
+    color: var(--ink-warm-off);
+    opacity: 0.6;
+}
 
 .btn--icon {
-    font-size: 16px;
-    padding: 4px 10px 5px 10px;
+    font-size: var(--text-sm);
+    padding: 4px 12px;
 }
 
 /* ================= контекстное меню ================= */
@@ -416,51 +604,65 @@
 .ctx {
     position: absolute;
     min-width: 260px;
-    background-color: rgb(30, 36, 45);
+    background-color: var(--surface);
     border-radius: 8px;
     border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.16);
-    padding: 6px 0 6px 0;
+    border-color: var(--veil-4);
+    padding: 4px 0;
 }
 
 .ctx__title {
-    font-size: 14px;
+    font-size: var(--text-xs);
     -unity-font-style: bold;
-    color: rgb(150, 210, 165);
-    padding: 4px 14px 6px 14px;
+    color: var(--accent);
+    padding: 4px 16px 8px 16px;
 }
 
 .ctx__items { flex-direction: column; }
 
 .ctx__item {
-    font-size: 15px;
-    color: rgb(232, 238, 244);
+    font-size: var(--text-sm);
+    color: var(--ink);
     background-color: transparent;
     border-width: 0;
     border-radius: 0;
-    padding: 7px 14px 8px 14px;
+    padding: 8px 16px;
     margin: 0;
     -unity-text-align: middle-left;
 }
 
-.ctx__item:hover { background-color: rgba(120, 200, 140, 0.22); }
-.ctx__item:disabled { color: rgba(232, 238, 244, 0.35); }
+.ctx__item:hover { background-color: var(--accent-wash); }
+.ctx__item:active { color: var(--accent); }
+.ctx__item:disabled { color: var(--faint); }
 
 /* ================= магазин ================= */
 
 .overlay {
     position: absolute;
     left: 0; top: 0; right: 0; bottom: 0;
-    background-color: rgba(0, 0, 0, 0.55);
+    background-color: var(--scrim);
     justify-content: center;
     align-items: center;
 }
 
-.window--narrow { width: 420px; }
+/* ---- сетка окон ----
+   Ширин в сетке две: широкая 620 (магазин, склад, друзья — там списки и строки с действиями)
+   и узкая 420 (настройки, «пока тебя не было»). Третьей нет: окна центрированы в одной
+   точке, и при переходе между ними прямоугольник каждый раз прыгал новым размером —
+   раньше их было три по ширине и четыре по высоте.
+
+   Исключение одно, и оно ниже по файлу: `.vp--wide #shop-window { width: 1000px }` —
+   широкая ширина, которой на экране от 1600 px дали разложиться в две колонки. Ширина
+   зависит от ЭКРАНА, а не от окна, поэтому прыжка между окнами она не возвращает: на
+   любом одном экране ширины по-прежнему две. Раньше эта оговорка стояла только там, и
+   читающий сверху вниз успевал поверить, что третьей ширины не бывает вовсе.
+   Общий нижний рост держит окно от схлопывания в полоску: окно друзей без друзей стояло
+   высотой 115 px и читалось как обрывок. */
 
 /* Окна — тот же сколоченный щит, что и панель меню. */
 .window {
     width: 620px;
+    min-height: 260px;
     max-height: 78%;
     background-image: url("project://database/Assets/Game/UI/Skin/wood_panel.png");
     -unity-slice-scale: 1px;
@@ -469,117 +671,275 @@
     overflow: hidden;
 }
 
+/* Обязательно ПОСЛЕ `.window`: специфичность у них равная, и стоявшее выше узкое окно
+   молча проигрывало широкому — настройки и «пока тебя не было» много месяцев ехали в
+   620 px, хотя в USS написано 420. */
+.window--narrow { width: 420px; }
+
+/* Шапка — прибитая лента wood_ribbon: заголовок лежит НА доске, а не растворён в ней.
+   Тянется: середина ленты пустая, повторять там нечего. */
 .window__header {
     flex-direction: row;
     align-items: center;
-    background-color: rgba(0, 0, 0, 0.28);
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_ribbon.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
     border-bottom-width: 1px;
-    border-bottom-color: rgba(255, 226, 180, 0.12);
-    padding: 10px 12px 10px 16px;
+    border-bottom-color: var(--wood-line);
+    padding: 8px 12px 8px 16px;
+    flex-shrink: 0;
 }
 
+/* Заголовок тёплым белым, а не золотом. Золото в шапке остаётся ровно одно — число рядом,
+   и оно ещё и на плашке; когда заголовок и счётчик одного цвета, кегля и веса, глаз не
+   знает, что важнее, и «МАГАЗИН» с «150 зол.» тянут внимание поровну. */
 .window__title {
-    font-size: 18px;
+    font-size: var(--text-md);
     -unity-font-style: bold;
-    color: rgb(255, 219, 138);
+    color: var(--ink-warm);
     letter-spacing: 2px;
     flex-grow: 1;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+    text-shadow: 1px 1px 2px var(--shadow);
 }
 
+/* Тело сжимается вместе с окном, а не упирается в свой потолок. Здесь стояло
+   max-height: 420px — жёсткое число, которое перебивало `.window { max-height: 78% }`:
+   на экране 1080 магазин показывал три товара из пятнадцати, а список обрывался посреди
+   строки, и обрыв читался не как «крути дальше», а как сломанная вёрстка. */
 .window__body {
-    max-height: 420px;
-    padding: 6px 10px 6px 10px;
+    flex-shrink: 1;
+    min-height: 0;
+    padding: 8px 12px;
 }
 
 .window__message {
-    font-size: 14px;
-    color: rgb(230, 140, 130);
-    padding: 4px 16px 10px 16px;
+    font-size: var(--text-sm);
+    color: var(--danger);
+    padding: 4px 16px 12px 16px;
     min-height: 20px;
+    white-space: normal;
+    flex-shrink: 0;
 }
 
-/* Должно идти после .window__message — при равной специфичности выигрывает то, что ниже. */
-.window__message--hint { color: rgba(228, 234, 240, 0.4); }
+/* Должно идти после .window__message — при равной специфичности выигрывает то, что ниже.
+   Тёплый, а не холодный: подсказка лежит на голой доске под окном. */
+.window__message--hint { color: var(--ink-warm-muted); }
+
+/* Голос пустого места: склад без вещей, список без строк. Стоит ВМЕСТО содержимого, поэтому
+   и растёт на всю высоту тела — иначе строчка липнет к верхнему краю, и окно всё равно
+   читается недогрузившимся. Тон тише заголовка и громче сноски: это не украшение и не
+   ошибка, а ответ на вопрос «почему тут ничего нет». */
+.vacant {
+    font-size: var(--text-md);
+    color: var(--ink-warm-soft);
+    -unity-text-align: middle-center;
+    white-space: normal;
+    flex-grow: 1;
+    padding: 48px 24px;
+}
 
 .tabs {
     flex-direction: row;
+    flex-wrap: wrap;
     padding: 8px 12px 0 12px;
+    flex-shrink: 0;
 }
 
+/* Вкладки стоят прямо на доске — значит, тёплые.
+   Закрытая вкладка вдавлена в щит (wood_tab нарисован recessed), открытая — поднятая
+   доска (wood_tab_active). Разница читается силуэтом, а не только цветом надписи. */
 .tab {
-    font-size: 15px;
-    color: rgba(228, 234, 240, 0.6);
-    background-color: transparent;
+    font-size: var(--text-sm);
+    color: var(--ink-warm-soft);
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_tab.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
     border-width: 0;
     border-bottom-width: 3px;
     border-bottom-color: rgba(0, 0, 0, 0);
     border-radius: 0;
-    padding: 6px 16px 6px 16px;
+    padding: 4px 16px;
     margin-right: 4px;
 }
 
-.tab:hover { color: rgb(228, 234, 240); }
+.tab:hover { color: var(--ink-warm); }
+.tab:active { color: var(--gold); }
+.tab:disabled { color: var(--ink-warm-off); }
 
 .tab--active {
-    color: rgb(255, 214, 120);
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_tab_active.png");
+    color: var(--gold);
     -unity-font-style: bold;
-    border-bottom-color: rgb(255, 214, 120);
+    border-bottom-color: var(--gold);
 }
+
+/* Наведение на текущую вкладку не должно её обесцвечивать: `.tab:hover` весит больше,
+   чем `.tab--active`, и без этой строки открытая вкладка под курсором теряет золото. */
+.tab--active:hover { color: var(--gold); }
 
 .shop-list { flex-direction: column; }
 
+/* Одна вертикальная ось на строку вместо четырёх. Было: иконка по центру строки, заголовок
+   у верха, цена у низа, кнопка снова по центру — ни одна пара не выровнена, и на товаре с
+   двустрочным описанием рассинхрон становился очевиден. Теперь всё считается от верхней
+   линии заголовка, а цена идёт под описанием сама, порядком в колонке. */
 .shop-item {
     flex-direction: row;
-    align-items: center;
-    background-color: rgba(255, 255, 255, 0.045);
+    align-items: flex-start;
+    background-color: var(--veil-2);
     border-radius: 8px;
-    padding: 10px;
-    margin: 4px 2px;
+    padding: 12px;
+    margin: 4px 0;
 }
 
+/* ---- почему иконки 128 px, а ворота атласа подняты под них ----
+   Панель считает пиксели по ScaleWithScreenSize от 1920x1080, то есть логический пиксель на
+   экране крупнее растёт вместе с экраном. Самая большая иконка в игре — в гнезде склада:
+   74 px гнезда минус 8 padding с каждой стороны = 58 логических. В физических:
+
+       1920x1080 — 58 px    2560x1440 — 77 px    3440x1440 — 90 px    3840x2160 — 116 px
+
+   Отсюда решение по третьему пункту ревизии. Иконки НЕ уменьшены до 64 px: уже на 1440p
+   гнездо просит 77 px, на 4K — 116, и 64-пиксельный исходник растягивался бы на всех экранах
+   выше Full HD. Исходник 128 покрывает 4K впритык и ничего не тратит зря.
+   Мипы не включены и включать их незачем: в атласе мип-уровней нет по устройству, а вне
+   атласа иконка уменьшается всего в 128/116…128/58 = 1.1…2.2 раза — это один уровень, ради
+   которого не стоит платить третью памяти.
+   Неверным было третье число — ворота атласа: `m_MaxSubTextureSize` стояли на 64 при
+   исходнике 128, и КАЖДАЯ иконка отсеивалась по размеру. Скин (48…64 px) в атлас проходил,
+   иконки — нет, а `m_TextureSlotCount: 8` означает, что неатласованные текстуры едят слоты:
+   витрина магазина с шестнадцатью разными иконками рвала ленту на несколько вызовов.
+   Ворота подняты до 128 (GameHudPanelSettings.asset — в ассете комментарий не живёт, поэтому
+   он здесь). Цена: 73 иконки по 128x128 = 1.2 Мпикс, атлас вырастет до 2048x1024 = 8 МБ
+   RGBA32 при потолке 4096x4096 = 64 МБ — занято семь процентов.
+   Двигать `.cell` или `.shop-item__icon` вверх — пересчитывать эту таблицу: как только
+   логический размер перевалит за 128 на 4K, исходники придётся поднимать до 256. */
 .shop-item__icon {
     width: 54px;
     height: 54px;
     margin-right: 12px;
     -unity-background-scale-mode: scale-to-fit;
-    background-color: rgba(255, 255, 255, 0.06);
-    border-radius: 6px;
+    background-color: var(--veil-2);
+    border-radius: 4px;
+    flex-shrink: 0;
 }
 
 .shop-item__text { flex-grow: 1; flex-direction: column; }
 
+/* Кнопка покупки — на ту же верхнюю линию. Плюс запрет на сжатие: без него флекс отбирал
+   ширину у надписи, и «Купить» на длинном названии превращалось в «Куп…». */
+.shop-item .btn {
+    align-self: flex-start;
+    flex-shrink: 0;
+}
+
 .shop-item__name {
-    font-size: 17px;
+    font-size: var(--text-md);
     -unity-font-style: bold;
-    color: rgb(232, 238, 244);
+    color: var(--ink);
 }
 
 .shop-item__desc {
-    font-size: 13px;
-    color: rgba(228, 234, 240, 0.5);
+    font-size: var(--text-xs);
+    color: var(--muted);
     white-space: normal;
 }
 
 .shop-item__price {
-    font-size: 15px;
-    color: rgb(255, 205, 90);
-    margin-top: 3px;
+    font-size: var(--text-sm);
+    color: var(--gold);
+    margin-top: 4px;
 }
 
-.shop-item__price--unaffordable { color: rgb(214, 108, 98); }
+.shop-item__price--unaffordable { color: var(--danger); }
+
+/* ================= полосы прокрутки =================
+
+   Единственное место, где интерфейс говорил чужим голосом: в магазине и складе поверх
+   дерева стоял виндовый светло-серый скроллбар с белыми кнопками-стрелками. Селекторов
+   `.unity-scroller*` в USS не было вовсе — их просто забыли одеть.
+
+   Стрелки убраны совсем. В деревенском щите они лишние, а держать их значит рисовать ещё
+   два спрайта ради двух пикселей прокрутки, которых никто не нажимает: колесо и перетяжка
+   бегунка делают то же самое.
+
+   Селекторы без класса — на весь документ: скроллбар должен быть один и тот же в складе,
+   магазине, друзьях и «пока тебя не было». Заводить класс на каждое окно значит однажды
+   его забыть и получить серый контрол в пятом. */
+
+.unity-scroll-view__vertical-scroller {
+    width: 12px;
+}
+
+.unity-scroll-view__horizontal-scroller {
+    height: 12px;
+}
+
+.unity-scroller {
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+}
+
+.unity-scroller__low-button,
+.unity-scroller__high-button {
+    display: none;
+}
+
+/* Дорожка — вдавленный жёлоб, бегунок — доска. Отступов у слайдера внутри скроллера нет:
+   он занимает всю дорожку, иначе бегунок не доезжает до края и список выглядит
+   недокрученным. */
+.unity-scroller .unity-base-slider {
+    margin: 0;
+    min-width: auto;
+    min-height: auto;
+}
+
+.unity-scroller .unity-base-slider__tracker {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_track.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 0;
+    margin: 0;
+    left: 0;
+    right: 0;
+    top: 0;
+    bottom: 0;
+}
+
+.unity-scroller .unity-base-slider__dragger {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 0;
+    margin: 0;
+}
+
+.unity-scroller .unity-base-slider__dragger:hover {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_hover.png");
+}
+
+/* Вертикальный бегунок занимает всю ширину дорожки, горизонтальный — всю высоту:
+   у Unity по умолчанию он уже на несколько пикселей и висит в жёлобе с зазором. */
+.unity-scroller--vertical .unity-base-slider__dragger { left: 0; right: 0; width: auto; }
+.unity-scroller--horizontal .unity-base-slider__dragger { top: 0; bottom: 0; height: auto; }
 
 /* ================= панель постройки ================= */
 
 .building {
     position: absolute;
-    right: 14px;
-    top: 14px;
+    right: 16px;
+    top: 16px;
     width: 340px;
-    background-color: rgb(24, 29, 36);
-    border-radius: 10px;
+    background-color: var(--surface);
+    border-radius: 8px;
     border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.12);
+    border-color: var(--veil-3);
     overflow: hidden;
 }
 
@@ -587,7 +947,7 @@
    оставляла пустоту под постройкой максимального уровня. */
 .building__body {
     max-height: none;
-    padding: 10px 14px 4px 14px;
+    padding: 12px 16px 4px 16px;
 }
 
 .building__head {
@@ -603,29 +963,29 @@
 
 .building__section { margin-top: 12px; }
 .building__next { flex-direction: column; }
-.building__cost { flex-direction: column; margin-top: 6px; }
+.building__cost { flex-direction: column; margin-top: 8px; }
 
 .cost {
     flex-direction: row;
     justify-content: space-between;
     align-items: center;
-    margin-top: 3px;
+    margin-top: 4px;
 }
 
 .cost__name {
-    font-size: 15px;
-    color: rgba(228, 234, 240, 0.75);
+    font-size: var(--text-sm);
+    color: var(--ink-soft);
 }
 
 /* Зелёное — хватает, красное — нет. Игрок должен видеть, чего именно недостаёт,
    не вчитываясь в причину под кнопкой. */
 .cost__have {
-    font-size: 15px;
+    font-size: var(--text-sm);
     -unity-font-style: bold;
-    color: rgb(150, 210, 165);
+    color: var(--accent);
 }
 
-.cost__have--short { color: rgb(214, 108, 98); }
+.cost__have--short { color: var(--danger); }
 
 .building__upgrade {
     margin-top: 12px;
@@ -635,82 +995,387 @@
 /* ---- друзья и гости (Ф2) ---- */
 
 /* Имя хозяина в топбаре гостя: гость должен с одного взгляда понимать, что ферма чужая. */
-.guest-title { color: rgb(186, 226, 158); }
+.guest-title { color: var(--accent-warm); }
 
 .friends-add {
     flex-direction: row;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .friends-add__field { flex-grow: 1; margin-right: 8px; }
 
+/* Поле ввода врезано в доску тем же жёлобом, что и полоски: раньше здесь стояла плоская
+   белая вуаль в 6%, и на дереве она читалась как серый стоковый контрол Unity. */
 .friends-add__field .unity-base-text-field__input {
-    font-size: 15px;
-    color: rgb(236, 240, 244);
-    background-color: rgba(255, 255, 255, 0.07);
-    border-color: rgba(255, 255, 255, 0.16);
-    border-width: 1px;
-    border-radius: 3px;
-    padding: 7px 10px 8px 10px;
+    font-size: var(--text-sm);
+    color: var(--ink-warm);
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_track.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    padding: 8px 12px;
 }
 
-/* Окно друзей шире прочих узких: в строке друга теперь три действия, и на 420 px имя
-   с ними уже не помещалось — флекс отбирал ширину у имени, и друг превращался в огрызок. */
-.friends-window { width: 520px; }
+/* Окно друзей — широкое, как магазин и склад: в строке друга три действия, и на узких
+   420 px флекс отбирал ширину у имени, а друг превращался в огрызок. Своей, третьей
+   ширины (520) у него больше нет — см. сетку окон выше.
 
-.friends-scroll { max-height: 340px; }
+   Список тянется вместе с окном: жёсткие 340 px оставляли пустую доску под собой на
+   большом экране и резали список на маленьком. */
+.friends-scroll {
+    flex-shrink: 1;
+    min-height: 0;
+}
 
 /* Строка друга: имя слева, действия справа — как строки цены у построек. */
 .friend {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .friend__name {
-    font-size: 15px;
-    color: rgba(228, 234, 240, 0.9);
+    font-size: var(--text-sm);
+    color: var(--ink);
     flex-grow: 1;
 }
 
 .friend__seen {
-    font-size: 13px;
-    color: rgba(228, 234, 240, 0.45);
+    font-size: var(--text-xs);
+    color: var(--muted);
     margin-right: 8px;
 }
 
-.friend .btn { margin-left: 6px; }
+.friend .btn { margin-left: 4px; }
 
 /* Разрыв связи: отклонить заявку, отозвать свою, удалить друга. Голос тише и размер
    меньше, чем у «В гости» и «Подарить», — действие должно быть под рукой, но не звать
    к себе первым. Приглушённость здесь не декорация: она держит строку в ширине окна. */
 .friend__drop {
-    font-size: 13px;
-    color: rgba(246, 232, 210, 0.6);
+    font-size: var(--text-xs);
+    color: var(--ink-warm-muted);
     -unity-font-style: normal;
-    padding: 6px 11px 7px 11px;
+    padding: 4px 12px;
 }
 
-.friend__drop:hover { color: rgb(255, 214, 202); }
+/* Под курсором — морёная в красный доска: разрыв связи должен объявляться до нажатия,
+   а не после. */
+.friend__drop:hover {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_danger.png");
+    color: var(--danger-warm);
+}
 
 /* Заголовки секций внутри окна друзей — тем же голосом, что panel__title. */
 .friends-section {
-    margin-top: 10px;
+    margin-top: 12px;
     margin-bottom: 4px;
 }
 
 /* Строки «пока тебя не было» — просто список добрых дел. */
 .inbox-line {
-    font-size: 15px;
-    color: rgba(228, 234, 240, 0.85);
-    margin-bottom: 5px;
+    font-size: var(--text-sm);
+    color: var(--ink-soft);
+    margin-bottom: 4px;
     white-space: normal;
 }
 
 /* Кнопка найма в панели фермера: единственная кнопка среди строк табло. */
 .hire-btn {
-    margin-top: 6px;
+    margin-top: 8px;
     -unity-text-align: middle-center;
+}
+
+/* ================= дела: заказы и успехи =================
+
+   Ради этого экрана скин и полировали: награда, объявленная списком строк, не читается как
+   награда. Здесь у каждого дела своё гнездо в доске (wood_slot), свой жёлоб прогресса
+   (wood_bar_track) и своя зелёная доска действия — то же семейство, что склад и магазин,
+   и ни одного нового приёма.
+
+   Карточка — гнездо, а не вуаль `.shop-item`. Разница смысловая: строка магазина это
+   товар в витрине, а заказ и веха — дело, положенное на доску. Гнездо тянется, не
+   мостится, по той же причине, что и ячейка склада: середина спрайта 12 px, замощение на
+   ширине окна дало бы рябь. */
+
+.tasks-list { flex-direction: column; }
+
+/* Окно «Дела» держит одну высоту на обе вкладки. Без этого оно прыгало 732 → 842 px при
+   переключении и уносило из-под курсора кнопку, которую только что нажали: у заказов три
+   карточки, у успехов тринадцать. Число — высота вкладки заказов на 1080; список успехов
+   прокручивается внутри, что ему и положено. */
+#tasks-window .window__body { min-height: 560px; }
+
+/* Строка над списком: срок доски у заказов, счётчик у успехов. Тёплая — лежит на голой
+   доске окна, между вкладками и первым гнездом. */
+.tasks-note {
+    font-size: var(--text-sm);
+    color: var(--ink-warm-soft);
+    padding: 8px 16px 0 16px;
+    white-space: normal;
+    flex-shrink: 0;
+}
+
+.task {
+    flex-direction: column;
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_slot.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
+    padding: 12px 16px;
+    margin: 4px 0;
+}
+
+/* Сделанное дело не исчезает — оно тускнеет. Игрок должен видеть, что успел: пустеющая
+   к вечеру доска читается как «заказы кончились», а не как «я их сдал».
+   Гасим тонировкой картинки, а не opacity: opacity уронил бы и надпись «СДАНО», ради
+   которой всё и затевалось.
+   Тонировка — `--press` (0.78), а не `--off` (0.58). Замер по 03_refusal: гнездо и так
+   темнее панели, и при 0.58 закрытая карточка уходила в чёрный — читалась дырой в доске,
+   а не законченным делом. Отступает пусть текстом (ниже), а не провалом. */
+.task--done {
+    -unity-background-image-tint-color: var(--press);
+}
+
+/* Закрытое дело отступает и голосом: имя горожанина и награда уходят в подпись, и самым
+   ярким в карточке остаётся отметка — то единственное, ради чего на неё ещё смотрят. */
+.task--done .task__name { color: var(--ink-warm-muted); }
+.task--done .task__gold { color: var(--ink-warm-soft); }
+
+.task__head {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+/* Имя горожанина — то же, чем в окне зовут заголовок: тёплое и жирное, на доске. */
+.task__name {
+    font-size: var(--text-md);
+    -unity-font-style: bold;
+    color: var(--ink-warm);
+    flex-grow: 1;
+    white-space: normal;
+}
+
+.task__gold {
+    font-size: var(--text-md);
+    -unity-font-style: bold;
+    color: var(--gold);
+    margin-left: 12px;
+    flex-shrink: 0;
+}
+
+/* Отметка вместо кнопки у закрытого дела. Словом, а не галочкой: ✓ в Inter есть не
+   везде, а нарисованный «тофу» на месте отметки — ровно тот молчаливый отказ, который
+   в этом проекте считается дефектом. */
+.task__stamp {
+    font-size: var(--text-sm);
+    -unity-font-style: bold;
+    color: var(--accent-warm);
+    letter-spacing: 2px;
+    -unity-text-align: middle-center;
+    background-color: var(--field-warm);
+    border-radius: 5px;
+    padding: 6px 16px;
+    margin-top: 8px;
+    align-self: flex-start;
+}
+
+.task__stamp--gold { color: var(--gold); }
+
+/* Строка «иконка — сдано/нужно» и жёлоб под ней. */
+.task-line { flex-direction: column; margin-top: 8px; }
+
+.task-line__head {
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.task-line__icon {
+    width: 32px;
+    height: 32px;
+    margin-right: 8px;
+    -unity-background-scale-mode: scale-to-fit;
+    flex-shrink: 0;
+}
+
+.task-line__name {
+    font-size: var(--text-sm);
+    color: var(--ink-warm-soft);
+    flex-grow: 1;
+    white-space: normal;
+}
+
+/* Число справа — единственное место, где видно, чего и сколько не хватает. Красное, пока
+   не набрано: цвет отвечает раньше, чем игрок дочитает дробь. */
+.task-line__count {
+    font-size: var(--text-sm);
+    -unity-font-style: bold;
+    color: var(--danger-warm);
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+.task-line__count--full { color: var(--accent-warm); }
+
+/* Жёлоб толще, чем у навыков, и тоньше, чем у нужд: за заказом следят глазами, но не
+   посекундно. Заливка — зелёная доска wood_bar_fill: смысл тут один, кодировать его
+   цветом, как полоски потребностей, нечем. */
+.task-bar {
+    height: 8px;
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_track.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
+    overflow: hidden;
+}
+
+.task-bar__fill {
+    height: 100%;
+    width: 0;
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_fill.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* Набрано полностью — золото плоской заливкой, как у открытого навыка (`.skill__fill--max`).
+   Доску тут снимаем по той же причине: тонировка умеет только умножать, и золото поверх
+   зелёного волокна дало бы болотный. */
+.task-bar__fill--full {
+    background-image: none;
+    background-color: var(--gold);
+}
+
+.task__action {
+    margin-top: 12px;
+    align-self: flex-start;
+}
+
+/* Чего не хватает — под выключенной кнопкой. Выключенная кнопка без объяснения это
+   молчаливый отказ; строка превращает его в задачу. */
+.task__short {
+    font-size: var(--text-xs);
+    color: var(--danger-warm);
+    margin-top: 4px;
+    white-space: normal;
+}
+
+/* Успех отличается от заказа отсутствием строк с иконками — одна полоса на всю веху.
+   Отдельный класс держит его ритм: без верхней иконки голова карточки садится выше. */
+.task--goal .task-line { margin-top: 4px; }
+
+/* Хороший исход в подвале окна. Обязательно после `.window__message--hint` — при равной
+   специфичности выигрывает то, что ниже, иначе удача уходила бы тем же полушёпотом,
+   что и подсказка. */
+.window__message--good { color: var(--accent-warm); }
+
+/* ---- поздравление с вехой ---- */
+
+/* Слой во всю ширину, табличка по центру: ширину задаёт надпись, а не экран.
+
+   64 px сверху — не «на глаз под топбаром», а единственная щель, которая есть.
+   Сверху: паддинг HUD 16 + кнопка топбара ≈ 37 + её отступ 8 = 61, значит выше 64 нельзя.
+   Снизу: окно ростом до 78 % экрана центрировано, то есть на 1080 его верх стоит на 119.
+   Табличка ростом ≈ 42 занимает 64…106 и до окна не достаёт. Здесь стояло 96 — замер по
+   04_goals показал, что на высокой вкладке «Успехи» табличка легла прямо на шапку окна.
+   Двигаешь кегль или паддинг таблички — пересчитывай обе границы. */
+.toast-layer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 64px;
+    align-items: center;
+}
+
+/* Прибитая лента, та же, что в шапке окна: поздравление — объявление, а не подсказка. */
+.toast {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_ribbon.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
+    font-size: var(--text-lg);
+    -unity-font-style: bold;
+    color: var(--gold);
+    letter-spacing: 1px;
+    -unity-text-align: middle-center;
+    padding: 8px 32px;
+    text-shadow: 1px 1px 2px var(--shadow);
+}
+
+/* ================= размер экрана =================
+
+   Медиазапросов в USS нет, поэтому классы вешает код: GameHud.ApplyViewport меряет корень
+   и ставит на него `vp--short`, `vp--narrow`, `vp--wide`. Пороги — в логических пикселях
+   (PanelSettings приводит всё к эталону 1920×1080 при m_Match: 0.5), объяснение чисел —
+   там же, в комментарии к методу.
+
+   Проверять компоновку в редакторском окне нельзя: оно почти квадратное (1239×845) и врёт
+   в обе стороны сразу. Любое 16:9 приезжает сюда ровно как 1920×1080. */
+
+/* ---- низкий экран: всё 16:9, включая эталонный ----
+   Колонку HUD проектировали в редакторском окне, где логической высоты 1190. На настоящих
+   1080 нижняя кнопка «Расширить…» уходила за кромку экрана вместе с паддингом панели —
+   главное действие партии было обрезано. Ужимаем вертикальный ритм, а не прячем строки:
+   спрятанная строка — это молчание, а сдвинутая на четыре пикселя — просто теснее. */
+.vp--short .panel {
+    padding: 8px 12px 8px 10px;
+    margin-bottom: 6px;
+}
+
+.vp--short .panel__title { margin-bottom: 2px; }
+.vp--short .row { margin-top: 2px; }
+.vp--short .meter { margin-top: 5px; }
+.vp--short .meter__label { margin-bottom: 2px; }
+.vp--short .skill { margin-top: 5px; }
+.vp--short .hint { margin-top: 5px; }
+.vp--short .hire-btn { margin-top: 5px; }
+.vp--short .btn { padding: 5px 14px; }
+.vp--short .topbar { margin-bottom: 5px; }
+
+/* ---- узкий экран: телефон в портрете ----
+   Топбар переносится сам (flex-wrap выше). Здесь остаётся отдать миру ширину: панели
+   уже, окно не шире экрана. Прятать колонку насовсем нельзя — «Скрыть» это и делает,
+   и решение чем закрывать поле остаётся за игроком. */
+.vp--narrow .panel { width: 272px; }
+.vp--narrow .window { max-width: 94%; }
+.vp--narrow .cell { width: 62px; height: 62px; }
+
+/* В портрете табличка уходит ВНИЗ, а не вниз-по-верху. Причина не в топбаре, а в ширине:
+   на 791 логическом пикселе табличка шириной ≈500 занимает 145…645, а колонка панелей
+   стоит на 20…292 — центрированная надпись обязана лечь на «ФЕРМЕРА», куда её ни двигай
+   по вертикали (замер: 04_toast_queue, первый заход — легла).
+   Внизу портрета пусто до самого края: колонка кончается около 1165, экран — 1714.
+   96 снизу оставляет место первому уроку (`.lesson`, 44) и не спорит с ним. */
+.vp--narrow .toast-layer {
+    top: auto;
+    bottom: 96px;
+}
+
+.vp--narrow .toast {
+    font-size: var(--text-md);
+    padding: 8px 20px;
+    max-width: 92%;
+    white-space: normal;
+}
+
+/* ---- широкий экран: магазин лентой не читается ----
+   620 px посреди 1920 — колодец, вокруг которого пустота: пятнадцать товаров идут в одну
+   колонку, и до нижнего надо крутить, хотя места хватает на десять сразу. Ширину меняет
+   ровно одно окно и ровно на широком экране — это не третья ширина сетки, а та же
+   широкая, которой дали разложиться. */
+.vp--wide #shop-window { width: 1000px; }
+
+.vp--wide #shop-list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+}
+
+.vp--wide #shop-list > .shop-item {
+    width: 48%;
+    margin: 4px 1%;
 }

@@ -44,6 +44,7 @@ namespace Farm.UI
         private Button _badgesButton;
 
         private VisualElement _root;
+        private VisualElement _screen;
         private Label _goldValue;
         private Label _clockValue;
         private DayNightCycle _clock;
@@ -146,6 +147,10 @@ namespace Farm.UI
 
             root.RegisterCallback<PointerDownEvent>(OnRootPointerDown, TrickleDown.TrickleDown);
 
+            _screen = root.Q<VisualElement>("screen") ?? root;
+            _screen.RegisterCallback<GeometryChangedEvent>(OnScreenResized);
+            ApplyViewport();
+
             var shopButton = root.Q<Button>("shop-button");
             if (shopButton != null) shopButton.clicked += () => { CloseSellMenu(); _shop?.Toggle(); };
 
@@ -202,6 +207,7 @@ namespace Farm.UI
             if (_wallet != null) _wallet.Changed -= OnWalletChanged;
             if (_clock != null) _clock.DayStarted -= OnDayStarted;
             if (_root != null) _root.UnregisterCallback<PointerDownEvent>(OnRootPointerDown, TrickleDown.TrickleDown);
+            if (_screen != null) _screen.UnregisterCallback<GeometryChangedEvent>(OnScreenResized);
 
             DragFocus.Changed -= OnCarryChanged;
             GatherFocus.Changed -= OnGatherChanged;
@@ -212,7 +218,38 @@ namespace Farm.UI
             _wallet = null;
             _clock = null;
             _root = null;
+            _screen = null;
         }
+
+        /// <summary>
+        /// Три класса на корне — единственный способ дать вёрстке узнать размер экрана:
+        /// медиазапросов в USS нет, а угадать телефон по одному числу нельзя.
+        /// <para>
+        /// Пороги в логических пикселях, а не в физических: PanelSettings масштабирует всё под
+        /// эталон 1920×1080 при <c>m_Match: 0.5</c>, и телефон 1080×2340 приезжает сюда как
+        /// 978×2119. Считать по <see cref="Screen"/> значило бы мерить не ту линейку.
+        /// </para>
+        /// <para>
+        /// 1100 — не круглое число, а щель: любое 16:9 даёт ровно 1920×1080 логических,
+        /// поэтому порог по высоте обязан быть выше 1080 (иначе эталонный экран остаётся
+        /// «высоким» и колонка HUD не влезает), а порог по ширине — ниже 1920 и выше
+        /// портретных 978.
+        /// </para>
+        /// </summary>
+        private void ApplyViewport()
+        {
+            if (_screen == null) return;
+
+            float w = _screen.resolvedStyle.width;
+            float h = _screen.resolvedStyle.height;
+            if (w <= 0f || h <= 0f) return;
+
+            _screen.EnableInClassList("vp--narrow", w < 1100f);
+            _screen.EnableInClassList("vp--short", h < 1100f);
+            _screen.EnableInClassList("vp--wide", w >= 1400f);
+        }
+
+        private void OnScreenResized(GeometryChangedEvent evt) => ApplyViewport();
 
         private void Update()
         {
@@ -558,7 +595,10 @@ namespace Farm.UI
             if (_badgesButton == null) return;
 
             bool on = _badges != null && _badges.Visible;
-            _badgesButton.text = on ? "Уровни" : "Уровни ✕";
+            // × (U+00D7), а не ✕ (U+2715): второго в Inter нет, и динамический атлас рисует
+            // на его месте пустой квадрат-«тофу». Правило: символ в тексте интерфейса обязан
+            // быть в шрифте — проверять надо весь текст, а не только новый.
+            _badgesButton.text = on ? "Уровни" : "Уровни ×";
             _badgesButton.EnableInClassList("btn--muted", !on);
         }
 
@@ -786,8 +826,13 @@ namespace Farm.UI
         /// Срок по-людски: рост теперь меряется реальными часами, и «10800.0 c» на плашке
         /// читалось бы как ошибка, а не как обещание. Секунды показываем только под минутой —
         /// там счёт уже идёт на глазах.
+        /// <para>
+        /// Публичный, потому что срок в игре не один: тем же голосом говорят таймер грядки,
+        /// остаток найма и смена доски заказов (<see cref="TasksWindow"/>). Второй такой же
+        /// метод рядом — это две разных «2 ч 40 мин» через месяц.
+        /// </para>
         /// </summary>
-        private static string FormatDuration(double seconds)
+        public static string FormatDuration(double seconds)
         {
             if (seconds >= 3600.0)
             {
@@ -805,15 +850,24 @@ namespace Farm.UI
         /// <summary>
         /// Сетевая строка в панели фермы. Пустая строка состояния — тоже состояние:
         /// до первого события показываем, за кого мы на сервере (или что играем без сети).
+        /// <para>
+        /// Отказ красится <c>row--alert</c>, а не тихим <c>row--muted</c>: правило проекта —
+        /// отказ системы обязан быть заметным, а «без сети», набранное самой блёклой строкой
+        /// экрана, — то же молчание, только буквами.
+        /// </para>
         /// </summary>
         private void RefreshNetStatus(string line)
         {
             if (_netStatus == null) return;
 
+            bool bad = NetStatus.Bad || !NetSession.LoggedIn;
+
             if (string.IsNullOrEmpty(line))
                 line = NetSession.LoggedIn ? "онлайн: " + NetSession.PlayerName : "без сети";
 
             _netStatus.text = line;
+            _netStatus.EnableInClassList("row--muted", !bad);
+            _netStatus.EnableInClassList("row--alert", bad);
         }
 
         private static void SetMeter(VisualElement fill, Label label, string caption, float value01,

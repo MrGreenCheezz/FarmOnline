@@ -211,4 +211,19 @@ namespace Farm.Net
         public bool ok;
         public string error;
     }
+
+    /// <summary>
+    /// POST /api/daily — ежедневная награда. <c>claimed</c> ложно, когда за сегодня уже брали:
+    /// это не отказ, а нормальный ответ, и золото в нём ноль.
+    /// </summary>
+    [Serializable]
+    public class DailyResponse
+    {
+        public bool ok;
+        public bool claimed;
+        public int gold;
+        public int streak;
+        public double serverNow;
+        public string error;
+    }
 }

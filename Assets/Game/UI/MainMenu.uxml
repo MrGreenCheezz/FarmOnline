@@ -1,4 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- Theme.uss первым: он объявляет переменные, которыми пользуется MainMenu.uss.
+         Поменяешь порядок — часть цветов не разрешится и молча уйдёт в наследование. -->
+    <Style src="project://database/Assets/Game/UI/Theme.uss" />
     <Style src="project://database/Assets/Game/UI/MainMenu.uss" />
 
     <ui:VisualElement name="menu-root" class="menu">
@@ -29,7 +32,10 @@
             <ui:Button name="menu-continue" text="Играть" class="menu__button menu__button--primary" />
             <ui:Button name="menu-new" text="Новая игра" class="menu__button" />
             <ui:Button name="menu-settings" text="Звук" class="menu__button" />
-            <ui:Button name="menu-password-change" text="Сменить пароль" class="menu__button menu__button--quiet" />
+            <!-- Отсюда идут дела игрока, а не фермы: группа отделена отступом, а не тем,
+                 что надписи в ней бледнее. Бледная надпись читается как «недоступно». -->
+            <ui:Button name="menu-password-change" text="Сменить пароль"
+                       class="menu__button menu__button--quiet menu__button--group-start" />
             <ui:Button name="menu-switch" text="Сменить игрока" class="menu__button menu__button--quiet" />
             <ui:Button name="menu-quit" text="Выход" class="menu__button menu__button--quiet" />
 

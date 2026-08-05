@@ -46,6 +46,12 @@ namespace Farm.UI
         private VisualElement _layer;
         private readonly List<Badge> _pool = new List<Badge>();
 
+        /// <summary>Куски HUD, под которые плашки не заезжают: полоса кнопок и колонка панелей.</summary>
+        private readonly List<VisualElement> _blockers = new List<VisualElement>();
+
+        /// <summary>Окна поверх мира. Пока открыто хоть одно, плашки уходят целиком.</summary>
+        private readonly List<VisualElement> _overlays = new List<VisualElement>();
+
         /// <summary>
         /// Видны ли плашки. Выключенные не просто прячутся — вся покадровая работа
         /// пропускается: на большой ферме это десятки проекций в кадр впустую.
@@ -68,8 +74,67 @@ namespace Farm.UI
             var root = GetComponent<UIDocument>()?.rootVisualElement;
             _layer = root?.Q<VisualElement>("world-badges");
 
+            // Мировой слой объявлен первым ребёнком, но рисуется поверх панелей: порядок
+            // отрисовки у UI Toolkit — порядок в дереве, а HUD лежит ниже. Значит прятать
+            // плашки приходится нам самим — иначе цифра уровня повисает на кнопке топбара
+            // и читается как ошибка сборки.
+            //
+            // Собираем по КЛАССУ, а не по списку имён. Список имён однажды уже подвёл:
+            // новое окно «Дела» появилось в тот же день и в него не записалось, а пятнадцать
+            // плашек повисли ровно поверх него. Правило «мир отступает под окном» не должно
+            // зависеть от того, вспомнил ли автор нового окна про этот файл.
+            _overlays.Clear();
+            if (root != null)
+            {
+                root.Query<VisualElement>(className: "overlay").ForEach(_overlays.Add);
+
+                // Панель постройки — окно по сути, но своего класса overlay не носит:
+                // она без затемнения и живёт у правого края, чтобы игрок видел саму постройку.
+                var building = root.Q<VisualElement>("building-panel");
+                if (building != null) _overlays.Add(building);
+            }
+
+            // Запретные зоны: полоса кнопок и колонка панелей. Раньше здесь был один топбар —
+            // при неподвижной камере до колонки плашки просто не доставали. С панорамой и зумом
+            // достают, и цифра ложится на «ФЕРМЕР» ничуть не реже.
+            _blockers.Clear();
+            Add(root?.Q<VisualElement>("topbar"));
+            Add(root?.Q<VisualElement>("hud-panels"));
+
             if (_camera == null) _camera = Camera.main;
             if (_layer == null) enabled = false;
+
+            void Add(VisualElement element)
+            {
+                if (element != null) _blockers.Add(element);
+            }
+        }
+
+        /// <summary>Открыто ли хоть одно окно поверх мира.</summary>
+        private bool AnyWindowOpen()
+        {
+            for (int i = 0; i < _overlays.Count; i++)
+            {
+                var overlay = _overlays[i];
+                if (overlay != null && overlay.resolvedStyle.display != DisplayStyle.None) return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>Лежит ли плашка на каком-нибудь куске HUD.</summary>
+        private bool BlockedBy(Rect badge)
+        {
+            for (int i = 0; i < _blockers.Count; i++)
+            {
+                var blocker = _blockers[i];
+                if (blocker == null || blocker.resolvedStyle.display == DisplayStyle.None) continue;
+
+                var bounds = blocker.worldBound;
+                if (bounds.height > 0f && bounds.Overlaps(badge)) return true;
+            }
+
+            return false;
         }
 
         private void OnDisable() => HideFrom(0);
@@ -81,6 +146,10 @@ namespace Farm.UI
 
             var panel = _layer.panel;
             if (panel == null) return;
+
+            // Открыто окно — мир под ним отступает целиком. Иначе полтора десятка ярких
+            // плашек висят поверх затемнения и спорят с тем, ради чего окно открыли.
+            if (AnyWindowOpen()) { HideFrom(0); return; }
 
             var plots = GrowableRegistry.All;
             int shown = 0;
@@ -104,8 +173,17 @@ namespace Farm.UI
                 var badge = GetBadge(shown);
                 Vector2 point = RuntimePanelUtils.CameraTransformWorldToPanel(panel, world, _camera);
 
-                badge.Root.style.left = point.x - badge.Root.resolvedStyle.width * 0.5f;
-                badge.Root.style.top = point.y - badge.Root.resolvedStyle.height;
+                float left = point.x - badge.Root.resolvedStyle.width * 0.5f;
+                float top = point.y - badge.Root.resolvedStyle.height;
+
+                // Заехала под HUD — не показываем вовсе. Прижимать её в сторону значило бы врать
+                // о том, где грядка: плашка обязана стоять над своей грядкой или не стоять.
+                if (BlockedBy(new Rect(left, top,
+                        badge.Root.resolvedStyle.width, badge.Root.resolvedStyle.height)))
+                    continue;
+
+                badge.Root.style.left = left;
+                badge.Root.style.top = top;
 
                 int level = plot.Level;
                 badge.Level.text = level.ToString();

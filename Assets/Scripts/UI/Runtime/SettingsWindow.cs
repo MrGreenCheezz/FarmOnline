@@ -40,6 +40,10 @@ namespace Farm.UI
         private Label _masterLabel;
         private Label _effectsLabel;
 
+        /// <summary>Заливка дорожки: сколько набрано, видно самой дорожкой, а не только местом ручки.</summary>
+        private VisualElement _masterFill;
+        private VisualElement _effectsFill;
+
         public bool IsOpen => _overlay != null && _overlay.style.display != DisplayStyle.None;
 
         private void OnEnable()
@@ -66,6 +70,9 @@ namespace Farm.UI
             }
 
             if (_overlay != null) _overlay.RegisterCallback<ClickEvent>(OnOverlayClick);
+
+            _masterFill = AttachFill(_master);
+            _effectsFill = AttachFill(_effects);
 
             if (_master != null) _master.RegisterValueChangedCallback(OnMasterChanged);
             if (_effects != null) _effects.RegisterValueChangedCallback(OnEffectsChanged);
@@ -142,6 +149,43 @@ namespace Farm.UI
         {
             if (_masterLabel != null) _masterLabel.text = "Общая громкость — " + Mathf.RoundToInt(master * 100f) + "%";
             if (_effectsLabel != null) _effectsLabel.text = "Эффекты — " + Mathf.RoundToInt(effects * 100f) + "%";
+
+            SetFill(_masterFill, _master, master);
+            SetFill(_effectsFill, _effects, effects);
+        }
+
+        /// <summary>
+        /// Подложить в жёлоб дорожки полоску набранного. У стокового <c>Slider</c> заливки нет
+        /// вовсе: есть жёлоб и ручка, и громкость читается ТОЛЬКО местом ручки — «80 %» и
+        /// «100 %» отличались тем, где стоит зелёный квадратик. Полоски нужд рядом устроены
+        /// правильно (дорожка + заливка тем же <c>wood_bar_fill</c>), и звук выпадал из общего
+        /// языка окна.
+        /// <para>
+        /// Кладём внутрь дорожки, а не рядом: жёлоб обрезает заливку своими краями сам, и её
+        /// не приходится совмещать с ним вручную при каждом изменении размера окна.
+        /// </para>
+        /// </summary>
+        private static VisualElement AttachFill(Slider slider)
+        {
+            var tracker = slider?.Q<VisualElement>(className: "unity-base-slider__tracker");
+            if (tracker == null) return null;
+
+            var fill = new VisualElement();
+            fill.AddToClassList("slider__fill");
+            // Дорожка ловит клик и переносит ручку; заливка лежит поверх неё и перехватила бы
+            // это ровно на набранной части — то есть слева тянулось бы, а справа нет.
+            fill.pickingMode = PickingMode.Ignore;
+            tracker.Add(fill);
+            return fill;
+        }
+
+        private static void SetFill(VisualElement fill, Slider slider, float value)
+        {
+            if (fill == null || slider == null) return;
+
+            float span = slider.highValue - slider.lowValue;
+            float part = span > 0.0001f ? (value - slider.lowValue) / span : 0f;
+            fill.style.width = Length.Percent(Mathf.Clamp01(part) * 100f);
         }
     }
 }

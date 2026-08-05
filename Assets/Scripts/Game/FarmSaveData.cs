@@ -140,6 +140,19 @@ namespace Farm.Game
         /// </summary>
         public int FarmLevel = 1;
 
+        /// <summary>
+        /// Заказы, сданные в текущем окне времени. Сами заказы не хранятся — они выводятся из
+        /// часов и того, что растёт на ферме (<see cref="FarmOrders"/>), поэтому помнить нужно
+        /// ровно одно: за что уже заплачено. Записи чужих окон отсеются при чтении.
+        /// </summary>
+        public string[] FilledOrders = Array.Empty<string>();
+
+        /// <summary>Полученные достижения — по идентификаторам, чтобы список можно было менять.</summary>
+        public string[] Achievements = Array.Empty<string>();
+
+        /// <summary>Сколько заказов сдано за партию: свой счётчик, его больше никто не ведёт.</summary>
+        public int OrdersFilled;
+
         public PlotSave[] Plots = Array.Empty<PlotSave>();
         public BuildingSave[] Buildings = Array.Empty<BuildingSave>();
         public ImprovementSave[] Improvements = Array.Empty<ImprovementSave>();

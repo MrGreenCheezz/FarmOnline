@@ -1,10 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <!-- Theme.uss первым: он объявляет переменные, которыми пользуется GameHud.uss.
+         Поменяешь порядок — часть цветов не разрешится и молча уйдёт в наследование. -->
+    <Style src="Theme.uss" />
     <Style src="GameHud.uss" />
 
     <ui:VisualElement name="screen" class="screen" picking-mode="Ignore">
 
-        <!-- ===== плашки уровней над грядками (под панелями) ===== -->
+        <!-- ===== плашки уровней над грядками =====
+             ВНИМАНИЕ, приписка «под панелями» тут врала. Слой объявлен первым, то есть по
+             порядку документа обязан рисоваться НИЖЕ `hud`, — а на деле рисуется выше.
+             Замер (Shots/pass4/01_game.png): плашка грядки попала на кнопку «Уровни»
+             (её рамка 772,27 при кнопке 746,23…827,52); светлота тела плашки внутри кнопки
+             83.3 против 82.1 вне её — то есть подложка кнопки (альфа 0.34) плашку НЕ
+             притемняет, значит плашка поверх. Почему так — не выяснено.
+             Следствие: рассчитывать, что HUD закроет мировой слой, нельзя. Понадобится
+             развести — прятать плашку, чья рамка пересекает рамку топбара, а не менять
+             местами слои. -->
         <ui:VisualElement name="world-badges" class="world-layer" picking-mode="Ignore" />
 
         <!-- ===== кольцо прогресса над узлом, который держат рукой ===== -->
@@ -26,6 +38,14 @@
              picking-mode поэлементно не нужно — забытый элемент вернёт мёртвую зону. -->
         <ui:VisualElement name="hud" class="hud">
 
+            <!-- Крестик закрытия во всех окнах — × (U+00D7), а НЕ ✕ (U+2715). Второго нет в
+                 Inter, запасного шрифта у FarmUI.asset тоже нет, и на месте символа рисуется
+                 пустой квадрат: игрок не понимает, что окно закрывается кнопкой. Заводишь в
+                 интерфейс новый символ — проверь, что он есть в шрифте. -->
+
+            <!-- Топбар переносится (flex-wrap в GameHud.uss): в портрете он просит около 1030
+                 логических пикселей при 978 доступных, и три кнопки, включая «В меню», уезжали
+                 за экран — из игры нельзя было выйти. -->
             <ui:VisualElement name="topbar" class="topbar">
                 <ui:Label name="gold-value" text="0" class="gold" />
                 <ui:Label name="clock-value" text="—" class="gold gold--clock" />
@@ -35,6 +55,7 @@
                 <ui:Button name="inventory-button" text="Склад" class="btn" />
                 <ui:Button name="shop-button" text="Магазин" class="btn btn--accent" />
                 <ui:Button name="friends-button" text="Друзья" class="btn" />
+                <ui:Button name="tasks-button" text="Дела" class="btn" />
                 <ui:Button name="settings-button" text="Настройки" class="btn" />
                 <ui:Button name="badges-button" text="Уровни" class="btn btn--ghost" />
                 <ui:Button name="collapse-button" text="Скрыть" class="btn btn--ghost" />
@@ -110,7 +131,7 @@
         <ui:VisualElement name="building-panel" class="building" style="display: none;">
             <ui:VisualElement class="window__header">
                 <ui:Label name="building-title" text="" class="window__title" />
-                <ui:Button name="building-close" text="✕" class="btn btn--icon" />
+                <ui:Button name="building-close" text="×" class="btn btn--icon" />
             </ui:VisualElement>
 
             <ui:VisualElement class="window__body building__body">
@@ -145,7 +166,7 @@
             <ui:VisualElement name="settings-window" class="window window--narrow">
                 <ui:VisualElement class="window__header">
                     <ui:Label text="НАСТРОЙКИ" class="window__title" />
-                    <ui:Button name="settings-close" text="✕" class="btn btn--icon" />
+                    <ui:Button name="settings-close" text="×" class="btn btn--icon" />
                 </ui:VisualElement>
 
                 <ui:VisualElement class="window__body settings">
@@ -169,18 +190,28 @@
 
         <!-- ================= СКЛАД ================= -->
         <ui:VisualElement name="inventory-overlay" class="overlay" style="display: none;">
-            <ui:VisualElement name="inventory-window" class="window window--narrow">
+            <!-- Широкое, как магазин и друзья: на 420 px в ряд вставало четыре ячейки из
+                 сорока восьми, и склад читался колодцем. Ширин в сетке две (GameHud.uss),
+                 списки берут широкую. -->
+            <ui:VisualElement name="inventory-window" class="window">
                 <ui:VisualElement class="window__header">
                     <ui:Label text="СКЛАД" class="window__title" />
-                    <ui:Label name="inventory-count" text="" class="gold gold--inline" />
-                    <ui:Button name="inventory-close" text="✕" class="btn btn--icon" />
+                    <ui:Label name="inventory-count" text="" class="count" />
+                    <ui:Button name="inventory-close" text="×" class="btn btn--icon" />
                 </ui:VisualElement>
 
                 <ui:ScrollView name="inventory-scroll" class="window__body">
+                    <!-- Пустой склад обязан сказать, что он пуст: сорок восемь одинаковых пустых
+                         гнёзд читаются как «не загрузилось», а молчаливое состояние без объяснения
+                         в этом проекте считается дефектом. Сетку в этот момент прячем целиком —
+                         подпись поверх сетки была бы двумя ответами на один вопрос. -->
+                    <ui:Label name="inventory-empty" text="склад пуст — собери урожай" class="vacant" style="display: none;" />
                     <ui:VisualElement name="inventory-grid" class="inv-grid" />
                 </ui:ScrollView>
 
-                <ui:Label name="inventory-hint" text="клик по занятой ячейке — продать" class="window__message window__message--hint" />
+                <!-- Показывается только когда есть что продать (InventoryWindow.Rebuild): совет
+                     «кликни по занятой ячейке» над пустой сеткой обещал действие, которого нет. -->
+                <ui:Label name="inventory-hint" text="клик по занятой ячейке — продать" class="window__message window__message--hint" style="display: none;" />
             </ui:VisualElement>
         </ui:VisualElement>
 
@@ -191,7 +222,7 @@
                 <ui:VisualElement class="window__header">
                     <ui:Label text="МАГАЗИН" class="window__title" />
                     <ui:Label name="shop-gold" text="0" class="gold gold--inline" />
-                    <ui:Button name="shop-close" text="✕" class="btn btn--icon" />
+                    <ui:Button name="shop-close" text="×" class="btn btn--icon" />
                 </ui:VisualElement>
 
                 <ui:VisualElement name="shop-tabs" class="tabs" />
@@ -209,7 +240,7 @@
             <ui:VisualElement name="friends-window" class="window friends-window">
                 <ui:VisualElement class="window__header">
                     <ui:Label name="friends-title" text="ДРУЗЬЯ" class="window__title" />
-                    <ui:Button name="friends-close" text="✕" class="btn btn--icon" />
+                    <ui:Button name="friends-close" text="×" class="btn btn--icon" />
                 </ui:VisualElement>
 
                 <ui:VisualElement class="window__body">
@@ -227,12 +258,37 @@
             </ui:VisualElement>
         </ui:VisualElement>
 
+        <!-- ================= ДЕЛА: ЗАКАЗЫ И УСПЕХИ =================
+             Одно окно на две вкладки, а не два окна в топбаре: заказы и вехи — один и тот
+             же вопрос «чем сейчас заняться», и разводить их по кнопкам значит заставлять
+             игрока помнить, в какой из двух лежит ответ.
+             Строка `tasks-note` стоит НАД списком и принадлежит вкладке: у заказов это
+             срок доски, у успехов — счётчик взятого. Держать оба числа в шапке нельзя —
+             шапка одна, а вкладки две, и второе число читалось бы как чужое. -->
+        <ui:VisualElement name="tasks-overlay" class="overlay" style="display: none;">
+            <ui:VisualElement name="tasks-window" class="window">
+                <ui:VisualElement class="window__header">
+                    <ui:Label text="ДЕЛА" class="window__title" />
+                    <ui:Button name="tasks-close" text="×" class="btn btn--icon" />
+                </ui:VisualElement>
+
+                <ui:VisualElement name="tasks-tabs" class="tabs" />
+                <ui:Label name="tasks-note" text="" class="tasks-note" />
+
+                <ui:ScrollView name="tasks-scroll" class="window__body">
+                    <ui:VisualElement name="tasks-list" class="tasks-list" />
+                </ui:ScrollView>
+
+                <ui:Label name="tasks-message" text="" class="window__message window__message--hint" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
         <!-- ================= ПОКА ТЕБЯ НЕ БЫЛО ================= -->
         <ui:VisualElement name="inbox-overlay" class="overlay" style="display: none;">
             <ui:VisualElement name="inbox-window" class="window window--narrow">
                 <ui:VisualElement class="window__header">
                     <ui:Label text="ПОКА ТЕБЯ НЕ БЫЛО" class="window__title" />
-                    <ui:Button name="inbox-close" text="✕" class="btn btn--icon" />
+                    <ui:Button name="inbox-close" text="×" class="btn btn--icon" />
                 </ui:VisualElement>
 
                 <ui:ScrollView class="window__body">
@@ -241,6 +297,17 @@
 
                 <ui:Label text="друзья заходили и оставили след" class="window__message window__message--hint" />
             </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ===== поздравление с вехой =====
+             Не модальное окно и не всплывающее число. Веха берётся посреди игры, часто во
+             время сбора, — окно поперёк хода раздражает, а `float` над грядкой живёт 1.1 с
+             и привязан к точке в мире, которой у вехи нет. Поэтому прибитая табличка под
+             топбаром: висит несколько секунд, тает сама, клики не ловит.
+             Стоит предпоследним, перед контекстным меню: мировой слой в этом документе
+             рисуется поверх HUD (см. приписку наверху), и табличка обязана быть выше его. -->
+        <ui:VisualElement name="toast-layer" class="toast-layer" picking-mode="Ignore">
+            <ui:Label name="achievement-toast" text="" class="toast" picking-mode="Ignore" style="display: none;" />
         </ui:VisualElement>
 
         <!-- ===== контекстное меню — последним, чтобы рисовалось поверх окон ===== -->

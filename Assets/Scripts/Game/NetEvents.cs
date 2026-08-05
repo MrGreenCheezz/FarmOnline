@@ -153,13 +153,28 @@ namespace Farm.Game
 
             try
             {
+                var summary = new List<string>();
+
+                // Ежедневная награда — в ту же сводку «пока тебя не было»: игрок открывает игру
+                // и одним окном узнаёт всё, что случилось без него. Отдельное поздравление поверх
+                // сводки было бы вторым окном подряд на пустом месте.
+                await ClaimDaily(summary);
+
                 var res = await ApiClient.GetEventsAsync();
-                if (!res.Transport || res.Value == null || !res.Value.ok) return;
+                if (!res.Transport || res.Value == null || !res.Value.ok)
+                {
+                    ShowSummary(summary);
+                    return;
+                }
 
                 var events = res.Value.events;
-                if (events == null || events.Length == 0) return;
+                if (events == null || events.Length == 0)
+                {
+                    if (summary.Count > 0) runner.Save("ежедневная награда");
+                    ShowSummary(summary);
+                    return;
+                }
 
-                var summary = new List<string>();
                 var ids = new List<int>(events.Length);
 
                 foreach (var ev in events)
@@ -171,7 +186,11 @@ namespace Farm.Game
                     catch (Exception e) { Debug.LogException(e); }
                 }
 
-                if (ids.Count == 0) return;
+                if (ids.Count == 0)
+                {
+                    ShowSummary(summary);
+                    return;
+                }
 
                 runner.Save("события друзей");
 
@@ -179,20 +198,48 @@ namespace Farm.Game
                 if (!ack.Transport || ack.Value == null || !ack.Value.ok)
                     Debug.LogWarning("[События] ack не прошёл — при следующем входе возможен повтор");
 
-                if (summary.Count > 0)
-                {
-                    var handler = InboxReady;
-                    if (handler != null)
-                    {
-                        try { handler(summary); }
-                        catch (Exception e) { Debug.LogException(e); }
-                    }
-                }
+                ShowSummary(summary);
             }
             catch (Exception e)
             {
                 Debug.LogException(e);
             }
+        }
+
+        /// <summary>
+        /// Спросить сервер про ежедневную награду и начислить её. Сервер сторожит календарь,
+        /// золото кладёт клиент — как и всё остальное в модели доверия Ф1 (docs/ONLINE.md).
+        /// Повторный вызов за те же сутки вернёт <c>claimed = false</c> и ничего не даст.
+        /// </summary>
+        private static async Awaitable ClaimDaily(List<string> summary)
+        {
+            try
+            {
+                var res = await ApiClient.ClaimDailyAsync();
+                if (!res.Transport || res.Value == null || !res.Value.ok || !res.Value.claimed) return;
+
+                var wallet = Wallet.Instance;
+                if (wallet != null && res.Value.gold > 0) wallet.Add(res.Value.gold);
+
+                summary.Add(res.Value.streak > 1
+                    ? "ежедневная награда: +" + res.Value.gold + " зол. (" + res.Value.streak + " дня подряд)"
+                    : "ежедневная награда: +" + res.Value.gold + " зол.");
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
+
+        private static void ShowSummary(List<string> summary)
+        {
+            if (summary == null || summary.Count == 0) return;
+
+            var handler = InboxReady;
+            if (handler == null) return;
+
+            try { handler(summary); }
+            catch (Exception e) { Debug.LogException(e); }
         }
 
         private static void Apply(EventEntry ev, List<string> summary)

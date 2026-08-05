@@ -11072,6 +11072,7 @@ GameObject:
   - component: {fileID: 236242275}
   - component: {fileID: 236242276}
   - component: {fileID: 236242277}
+  - component: {fileID: 236242278}
   m_Layer: 0
   m_Name: HUD
   m_TagString: Untagged
@@ -11303,6 +11304,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2147fe2d3090640448d1d8fd2cccfc8c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Farm.Game::Farm.Game.SocialWindows
+--- !u!114 &236242278
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 236242262}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2dc467ec3260abf4c817a00a59d22cd7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Farm.UI::Farm.UI.TasksWindow
+  _messageDuration: 3
+  _toastDuration: 3.6
 --- !u!1001 &236268997
 PrefabInstance:
   m_ObjectHideFlags: 0

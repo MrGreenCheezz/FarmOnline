@@ -145,6 +145,9 @@ namespace Farm.Game
             data.TotalHarvested = FarmProgress.TotalHarvested;
             data.TotalMerges = FarmProgress.TotalMerges;
             data.FarmLevel = FarmLevels.Current;
+            data.FilledOrders = FarmOrders.CaptureFilled();
+            data.Achievements = FarmAchievements.CaptureState();
+            data.OrdersFilled = FarmAchievements.OrdersFilled;
             data.Footpaths = Footpaths.CaptureWorn();
 
             CapturePlots(data);
@@ -375,6 +378,8 @@ namespace Farm.Game
             if (clock != null) clock.RestoreState(data.Time01, data.Day);
 
             FarmProgress.RestoreState(data.TotalHarvested, data.TotalMerges);
+            FarmOrders.RestoreState(data.FilledOrders);
+            FarmAchievements.RestoreState(data.Achievements, data.OrdersFilled);
 
             var buildings = ApplyBuildings(data, registry);
             FarmBuffs.Refresh();   // ауры готовы — теперь грядкам есть что спросить

@@ -57,6 +57,10 @@ namespace Farm.Game
             _friendsOverlay = _root.Q<VisualElement>("friends-overlay");
             _friendsList = _root.Q<VisualElement>("friends-list");
             _friendsName = _root.Q<TextField>("friends-name");
+            // Пустое поле рядом с кнопкой «Позвать» не говорит, что в него вписывать: имя
+            // человека, почту или код фермы. Зовут по имени фермы — так и написано в поле.
+            // Ставится кодом, а не в UXML: атрибута placeholder у TextField в разметке нет.
+            if (_friendsName != null) _friendsName.textEdition.placeholder = "имя фермы друга";
             _friendsMessage = _root.Q<Label>("friends-message");
             _inboxOverlay = _root.Q<VisualElement>("inbox-overlay");
             _inboxList = _root.Q<VisualElement>("inbox-list");
@@ -163,7 +167,7 @@ namespace Farm.Game
 
             if (!NetSession.LoggedIn)
             {
-                Message("без сети друзей не видно — войди с главного меню");
+                Message("без сети друзей не видно — войди с главного меню", bad: true);
                 _friendsList.Clear();
                 return;
             }
@@ -176,7 +180,7 @@ namespace Farm.Game
                 var res = await ApiClient.GetFriendsAsync();
                 if (!res.Transport || res.Value == null || !res.Value.ok)
                 {
-                    Message("не получилось: " + (res.Transport && res.Value != null ? res.Value.error : "сеть молчит"));
+                    Message("не получилось: " + (res.Transport && res.Value != null ? res.Value.error : "сеть молчит"), bad: true);
                     return;
                 }
 
@@ -259,10 +263,10 @@ namespace Farm.Game
             if (_refreshing) return;
 
             string name = _friendsName != null ? _friendsName.value.Trim() : "";
-            if (name.Length < 2) { Message("имя — от 2 символов"); return; }
+            if (name.Length < 2) { Message("имя — от 2 символов", bad: true); return; }
 
             var res = await ApiClient.RequestFriendAsync(name);
-            if (!res.Transport) { Message("сеть молчит — попробуй ещё раз"); return; }
+            if (!res.Transport) { Message("сеть молчит — попробуй ещё раз", bad: true); return; }
 
             if (res.Value != null && res.Value.ok)
             {
@@ -289,9 +293,9 @@ namespace Farm.Game
                 string error = res.Value != null ? res.Value.error : "непонятный ответ";
                 switch (error)
                 {
-                    case "no_such_player": Message("нет игрока с именем «" + name + "»"); break;
-                    case "self_request": Message("это же ты и есть"); break;
-                    default: Message("не получилось: " + error); break;
+                    case "no_such_player": Message("нет игрока с именем «" + name + "»", bad: true); break;
+                    case "self_request": Message("это же ты и есть", bad: true); break;
+                    default: Message("не получилось: " + error, bad: true); break;
                 }
             }
         }
@@ -299,7 +303,7 @@ namespace Farm.Game
         private async void Accept(int playerId, string name)
         {
             var res = await ApiClient.AcceptFriendAsync(playerId);
-            if (!res.Transport) { Message("сеть молчит — попробуй ещё раз"); return; }
+            if (!res.Transport) { Message("сеть молчит — попробуй ещё раз", bad: true); return; }
 
             if (res.Value != null && res.Value.ok) { RefreshFriends("теперь вы друзья: " + name); return; }
 
@@ -324,7 +328,7 @@ namespace Farm.Game
         private async void Drop(int playerId, string name)
         {
             var res = await ApiClient.RemoveFriendAsync(playerId);
-            if (!res.Transport) { Message("сеть молчит — попробуй ещё раз"); return; }
+            if (!res.Transport) { Message("сеть молчит — попробуй ещё раз", bad: true); return; }
 
             if (res.Value != null && res.Value.ok)
             {
@@ -355,7 +359,7 @@ namespace Farm.Game
             var storage = FarmingRuntime.Sink as Inventory;
             if (storage == null || storage.Entries.Count == 0)
             {
-                Message("на складе пусто — дарить нечего");
+                Message("на складе пусто — дарить нечего", bad: true);
                 return;
             }
 
@@ -457,9 +461,21 @@ namespace Farm.Game
             if (element != null) element.style.display = visible ? DisplayStyle.Flex : DisplayStyle.None;
         }
 
-        private void Message(string text)
+        /// <summary>
+        /// Строка под списком друзей. <paramref name="bad"/> снимает класс-подсказку и
+        /// возвращает строке красный голос <c>.window__message</c>.
+        /// <para>
+        /// Раньше подсказка висела на элементе постоянно, и «без сети друзей не видно» уходило
+        /// в окно тем же полушёпотом, что и «друзья заходили и оставили след». Правило проекта:
+        /// отказ системы обязан быть заметным, а покрашенный как подсказка отказ — молчание.
+        /// </para>
+        /// </summary>
+        private void Message(string text, bool bad = false)
         {
-            if (_friendsMessage != null) _friendsMessage.text = text;
+            if (_friendsMessage == null) return;
+
+            _friendsMessage.text = text;
+            _friendsMessage.EnableInClassList("window__message--hint", !bad);
         }
     }
 }

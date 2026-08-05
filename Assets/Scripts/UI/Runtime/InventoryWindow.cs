@@ -29,6 +29,10 @@ namespace Farm.UI
         private VisualElement _grid;
         private Label _count;
 
+        /// <summary>Голос пустого склада и совет по продаже: оба зависят от того, есть ли что продавать.</summary>
+        private Label _empty;
+        private Label _hint;
+
         private GameHud _hud;
         private IInventory _storage;
 
@@ -50,6 +54,8 @@ namespace Farm.UI
             _overlay = root.Q<VisualElement>("inventory-overlay");
             _grid = root.Q<VisualElement>("inventory-grid");
             _count = root.Q<Label>("inventory-count");
+            _empty = root.Q<Label>("inventory-empty");
+            _hint = root.Q<Label>("inventory-hint");
 
             var close = root.Q<Button>("inventory-close");
             if (close != null) close.clicked += Close;
@@ -149,6 +155,21 @@ namespace Farm.UI
             int cellCount = CellCount();
             int used = _stacks.Count;
 
+            // Пустой склад говорит словами вместо сетки. Сорок восемь одинаковых пустых гнёзд
+            // не сообщают ничего, кроме «тут ничего нет», — и на новой ферме это неотличимо от
+            // «не загрузилось». Заодно на пустом складе не строится ни одной ячейки: раньше
+            // первое же открытие склада создавало сорок восемь элементов ради пустоты.
+            bool anything = used > 0;
+            if (_empty != null) _empty.style.display = anything ? DisplayStyle.None : DisplayStyle.Flex;
+            _grid.style.display = anything ? DisplayStyle.Flex : DisplayStyle.None;
+            // Совет живёт по тому же условию: «клик по занятой ячейке» над пустой сеткой обещал
+            // действие, которого в этот момент нет. До сих пор метка вообще не имела ссылок в
+            // коде и висела всегда.
+            if (_hint != null) _hint.style.display = anything ? DisplayStyle.Flex : DisplayStyle.None;
+
+            if (_count != null) _count.text = used + " / " + cellCount;
+            if (!anything) return;
+
             while (_cells.Count < cellCount) _cells.Add(CreateCell());
 
             for (int i = 0; i < _cells.Count; i++)
@@ -192,9 +213,6 @@ namespace Farm.UI
 
                 if (label != null) label.text = entry.Amount.ToString();
             }
-
-            if (_count != null)
-                _count.text = used + " / " + cellCount;
         }
 
         /// <summary>Сколько золота даёт единица прямо сейчас. До появления магазина — сырая цена ресурса.</summary>

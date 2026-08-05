@@ -1,5 +1,9 @@
 /* Главное меню. Панель прижата влево: справа должна оставаться живая ферма — она здесь
-   не фон, а половина обещания, ради которого игрок и нажимает «Продолжить». */
+   не фон, а половина обещания, ради которого игрок и нажимает «Продолжить».
+
+   Меню целиком стоит на доске, поэтому текст тут почти весь тёплый (см. Theme.uss).
+   Цвета и кегли — только токенами; отступы кратны 4 пикселям, кроме геометрии
+   (высота планки, центровка ползунка). */
 
 .menu {
     flex-grow: 1;
@@ -18,7 +22,7 @@
     flex-direction: column;
     align-items: flex-start;
     margin-left: 9%;
-    padding: 34px 40px 36px 40px;
+    padding: 32px 40px 36px 40px;
     min-width: 340px;
 
     background-image: url("project://database/Assets/Game/UI/Skin/wood_panel.png");
@@ -27,39 +31,40 @@
 }
 
 .menu__title {
-    font-size: 62px;
+    font-size: var(--text-title);
     -unity-font-style: bold;
-    color: rgb(255, 219, 138);
+    color: var(--gold);
     letter-spacing: 6px;
-    margin-bottom: 2px;
-    text-shadow: 2px 2px 3px rgba(0, 0, 0, 0.65);
+    margin-bottom: 4px;
+    text-shadow: 2px 2px 3px var(--shadow);
 }
 
 .menu__subtitle {
-    font-size: 16px;
-    color: rgba(246, 232, 210, 0.6);
-    margin-bottom: 18px;
+    font-size: var(--text-sm);
+    color: var(--ink-warm-muted);
+    margin-bottom: 16px;
 }
 
-/* Не линия, а прибитая планка — щит из досок скрепляют поперечиной. */
+/* Не линия, а прибитая планка — щит из досок скрепляют поперечиной.
+   Три пикселя высоты — толщина планки, а не отступ: сетка её не касается. */
 .menu__rule {
     height: 3px;
     width: 100%;
-    background-color: rgba(28, 18, 11, 0.7);
+    background-color: var(--wood-groove);
     border-bottom-width: 1px;
-    border-bottom-color: rgba(255, 226, 180, 0.14);
-    margin-bottom: 14px;
+    border-bottom-color: var(--wood-line);
+    margin-bottom: 16px;
 }
 
 /* Строка состояния партии: она отвечает на «а что там у меня было». */
 .menu__info {
-    font-size: 15px;
-    color: rgb(186, 226, 158);
+    font-size: var(--text-sm);
+    color: var(--accent-warm);
     margin-bottom: 20px;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+    text-shadow: 1px 1px 2px var(--shadow);
 }
 
-.menu__info--empty { color: rgba(246, 232, 210, 0.42); }
+.menu__info--empty { color: var(--ink-warm-muted); }
 
 /* Форма входа целиком. Ширина в сто процентов обязательна: панель складывает детей по
    flex-start, и коробка без неё сжалась бы до самой длинной надписи, а кнопки внутри
@@ -72,46 +77,52 @@
    кто ещё не вошёл, — у кого есть токен, у того и имя. */
 .menu__input {
     width: 100%;
-    margin: 0 0 9px 0;
+    margin: 0 0 8px 0;
 }
 
+/* Поле врезано в доску тем же жёлобом, что и полоски в игре: одно поле ввода на две
+   сцены не должно выглядеть двумя разными предметами. */
 .menu__input .unity-base-text-field__input {
-    font-size: 18px;
-    color: rgb(252, 240, 220);
-    background-color: rgba(20, 13, 8, 0.55);
-    border-color: rgba(255, 226, 180, 0.25);
-    border-width: 1px;
-    border-radius: 3px;
-    padding: 10px 14px 11px 14px;
+    font-size: var(--text-md);
+    color: var(--ink-warm);
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_track.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    padding: 8px 16px;
 }
 
 /* Строка сетевого состояния. Ей положено быть скучной, пока всё хорошо,
    и заметной, когда сервер молчит: отказ системы обязан быть слышен. */
 .menu__net-status {
-    font-size: 13px;
-    color: rgba(228, 234, 240, 0.55);
-    margin-top: 10px;
+    font-size: var(--text-xs);
+    color: var(--ink-warm-muted);
+    margin-top: 8px;
     white-space: normal;
     max-width: 300px;
 }
 
-.menu__net-status--bad { color: rgb(255, 176, 158); }
+.menu__net-status--bad { color: var(--danger-warm); }
 
 /* Предупреждение под формой входа. Голос как у menu__dialog-text, но с потолком ширины:
    без него длинная строка растянула бы всю панель — переносить текст флексу не с чего,
    пока ширина не ограничена. Сказать это надо тихо и один раз, а не пугать красным. */
 .menu__hint {
-    font-size: 13px;
-    color: rgba(246, 232, 210, 0.5);
+    font-size: var(--text-xs);
+    color: var(--ink-warm-muted);
     white-space: normal;
     max-width: 300px;
     margin-bottom: 12px;
 }
 
+/* Кнопки меню — те же доски и те же четыре состояния, что у .btn в GameHud.uss.
+   Отличается только кегль и выравнивание: в меню кнопка на всю ширину панели, и текст
+   по центру такой доски повисает в пустоте. */
 .menu__button {
     width: 100%;
-    font-size: 20px;
-    color: rgb(252, 240, 220);
+    font-size: var(--text-lg);
+    color: var(--ink-warm);
     -unity-font-style: bold;
 
     background-image: url("project://database/Assets/Game/UI/Skin/wood_button.png");
@@ -120,38 +131,70 @@
     background-color: rgba(0, 0, 0, 0);
     border-width: 0;
 
-    padding: 13px 20px 14px 20px;
-    margin: 0 0 9px 0;
+    padding: 12px 20px;
+    margin: 0 0 8px 0;
     -unity-text-align: middle-left;
 
     /* Тёмная подложка под текстом: на доске светлые буквы иначе теряются в волокнах. */
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.75);
+    text-shadow: 1px 1px 2px var(--shadow);
 }
 
 .menu__button:hover {
     background-image: url("project://database/Assets/Game/UI/Skin/wood_button_hover.png");
-    color: rgb(255, 250, 236);
+    color: var(--ink-warm-hi);
+}
+
+.menu__button:active {
+    -unity-background-image-tint-color: var(--press);
+    translate: 0 1px;
+}
+
+/* Выход и «Играть» гаснут, пока сервер молчит или пока нет партии. Погасшая кнопка
+   обязана выглядеть погасшей — иначе игрок жмёт её и получает молчание. */
+.menu__button:disabled {
+    opacity: 0.45;
+    -unity-background-image-tint-color: var(--off);
+    color: var(--ink-warm-off);
 }
 
 /* Главный путь выделен цветом доски, а не размером: ряд из кнопок разной высоты выглядит сломанным. */
 .menu__button--primary {
     background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green.png");
-    color: rgb(250, 255, 240);
+    color: var(--ink-on-accent);
 }
 
 .menu__button--primary:hover {
-    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green.png");
-    color: rgb(255, 255, 255);
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green_hover.png");
+    color: var(--ink-hi);
 }
 
+/* Второстепенный пункт отличается ВЕСОМ надписи, а не её яркостью. Замер критика: доска у
+   всех пяти коричневых кнопок одна и та же (137, 95, 60), а надписи разошлись по контрасту
+   7.16 против 5.1 — и «Сменить пароль», «Сменить игрока», «Выход» читались как погашенные,
+   хотя работают. Тонкая, но полной яркости — это тише; тусклая — это сломано. */
 .menu__button--quiet {
-    color: rgba(246, 232, 210, 0.72);
+    color: var(--ink-warm);
     -unity-font-style: normal;
 }
 
-.menu__button--quiet:hover { color: rgb(252, 240, 220); }
+.menu__button--quiet:hover { color: var(--gold); }
 
-.menu__button--danger { color: rgb(255, 214, 202); }
+/* Второй довод критика: если пункты второстепенные, они и стоять должны отдельной группой.
+   Отступ на первом из них разбивает столбец на «дела фермы» и «дела игрока». */
+.menu__button--group-start { margin-top: 16px; }
+
+/* Необратимое — на морёной в красный доске, а не одной надписью. */
+.menu__button--danger {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_danger.png");
+    color: var(--ink-warm);
+}
+
+/* Без этой строки красная кнопка под курсором белеет: `.menu__button:hover` весит больше
+   одиночного модификатора, и необратимое действие теряет единственный свой знак. */
+.menu__button--danger:hover {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_danger.png");
+    color: var(--ink-warm-hi);
+}
 
 /* ---- подтверждение ---- */
 
@@ -161,14 +204,14 @@
     top: 0;
     right: 0;
     bottom: 0;
-    background-color: rgba(8, 10, 14, 0.72);
+    background-color: var(--scrim);
     align-items: center;
     justify-content: center;
 }
 
 .menu__dialog {
     flex-direction: column;
-    padding: 26px 30px 26px 30px;
+    padding: 24px 32px;
     min-width: 380px;
 
     background-image: url("project://database/Assets/Game/UI/Skin/wood_panel.png");
@@ -177,46 +220,70 @@
 }
 
 .menu__dialog-title {
-    font-size: 24px;
+    font-size: var(--text-lg);
     -unity-font-style: bold;
-    color: rgb(255, 219, 138);
-    margin-bottom: 6px;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+    color: var(--gold);
+    margin-bottom: 8px;
+    text-shadow: 1px 1px 2px var(--shadow);
 }
 
 .menu__dialog-text {
-    font-size: 15px;
-    color: rgba(246, 232, 210, 0.72);
-    margin-bottom: 18px;
+    font-size: var(--text-sm);
+    color: var(--ink-warm-soft);
+    margin-bottom: 16px;
     white-space: normal;
 }
 
 /* ---- ползунки звука ---- */
 
 .menu__setting-label {
-    font-size: 15px;
-    color: rgba(228, 234, 240, 0.75);
+    font-size: var(--text-sm);
+    color: var(--ink-warm-soft);
     margin-bottom: 4px;
 }
 
 .menu__slider {
-    margin-bottom: 14px;
+    margin-bottom: 16px;
 }
 
+/* Дорожка и бегунок — те же спрайты и те же числа, что у .setting__slider в игре: ползунок
+   громкости не должен выглядеть двумя разными предметами в меню и в настройках. */
 .menu__slider .unity-base-slider__tracker {
-    background-color: rgba(255, 255, 255, 0.12);
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_track.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
     border-width: 0;
-    height: 5px;
-    border-radius: 3px;
+    height: 8px;
+    border-radius: 0;
 }
 
-.menu__slider .unity-base-slider__dragger {
-    background-color: rgb(168, 226, 178);
+/* Заливка дорожки — копия правила из GameHud.uss: класс один (его вешает
+   SettingsWindow.AttachFill), но таблицы у меню и игры разные, и меню правил игры не видит.
+   Разойдутся — ползунок снова станет двумя разными предметами; менять оба или ни одного. */
+.slider__fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_bar_fill.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
     border-width: 0;
-    border-radius: 8px;
-    width: 16px;
-    height: 16px;
-    margin-top: -6px;
+}
+
+/* Отрицательный сдвиг — центровка бегунка на дорожке: (18 - 8) / 2. */
+.menu__slider .unity-base-slider__dragger {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: stretch;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+    border-radius: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: -5px;
 }
 
 .menu__dialog-row {
@@ -226,6 +293,6 @@
 
 .menu__dialog-row .menu__button {
     width: auto;
-    margin: 0 0 0 10px;
+    margin: 0 0 0 8px;
     -unity-text-align: middle-center;
 }
