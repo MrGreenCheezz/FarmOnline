@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: melon
   _displayName: "\u0414\u044B\u043D\u044F"
   _category: 0
-  _defaultStageDuration: 130.68
+  _defaultStageDuration: 2400
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 130.68
+    _duration: 2400
     _visual: {fileID: 3550285434417723418, guid: 133837f71f473e146b21106f5972c608, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

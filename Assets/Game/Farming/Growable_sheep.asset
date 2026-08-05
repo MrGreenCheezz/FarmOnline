@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: sheep
   _displayName: "\u041E\u0432\u0446\u0430"
   _category: 1
-  _defaultStageDuration: 42
+  _defaultStageDuration: 300
   _stages:
   - _name: "\u041D\u0430\u043A\u0430\u043F\u043B\u0438\u0432\u0430\u0435\u0442"
-    _duration: 42
+    _duration: 300
     _visual: {fileID: 1326180302644515878, guid: 7255ea1180cb68643822545420585f27, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

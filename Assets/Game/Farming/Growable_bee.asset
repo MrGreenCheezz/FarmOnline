@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: bee
   _displayName: "\u041F\u0447\u0451\u043B\u044B"
   _category: 1
-  _defaultStageDuration: 130.68
+  _defaultStageDuration: 2400
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 130.68
+    _duration: 2400
     _visual: {fileID: 4937445243491891278, guid: f51f3cd107bbb7b48a564f602323d3a7, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

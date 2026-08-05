@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: pig
   _displayName: "\u0421\u0432\u0438\u043D\u044C\u044F"
   _category: 1
-  _defaultStageDuration: 66
+  _defaultStageDuration: 300
   _stages:
   - _name: "\u041D\u0430\u043A\u0430\u043F\u043B\u0438\u0432\u0430\u0435\u0442"
-    _duration: 66
+    _duration: 300
     _visual: {fileID: 2128083001115284644, guid: e07c14e5133155a409217393bcfe739d, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

@@ -28,5 +28,6 @@ MonoBehaviour:
   _kind: 1
   _growable: {fileID: 0}
   _prefab: {fileID: 1247838081460887927, guid: 7c444c7a54f57ad4a965f24d1c35a908, type: 3}
+  _improvement: {fileID: 11400000, guid: b82263ad9a7cd1f41bd3f9d06401e8a2, type: 2}
   _building: {fileID: 0}
   _maxOwned: 0

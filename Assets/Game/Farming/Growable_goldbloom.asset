@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: goldbloom
   _displayName: "\u0417\u043B\u0430\u0442\u043E\u0446\u0432\u0435\u0442"
   _category: 0
-  _defaultStageDuration: 587.0309
+  _defaultStageDuration: 18000
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 587.0309
+    _duration: 18000
     _visual: {fileID: 4034734840918160942, guid: b33c67968ba6df94b8ff77dda32453cf, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

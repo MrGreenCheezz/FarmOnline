@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: vein_starmetal
   _displayName: "\u0417\u0432\u0451\u0437\u0434\u043D\u0430\u044F \u0436\u0438\u043B\u0430"
   _category: 2
-  _defaultStageDuration: 1598.1914
+  _defaultStageDuration: 43200
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 1598.1914
+    _duration: 43200
     _visual: {fileID: 1432670988603955788, guid: bf6a39307c8e22b4881b43d6e80057ae, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

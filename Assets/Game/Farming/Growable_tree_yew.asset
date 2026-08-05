@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: tree_yew
   _displayName: "\u0422\u0438\u0441"
   _category: 0
-  _defaultStageDuration: 355.7763
+  _defaultStageDuration: 10800
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 355.7763
+    _duration: 10800
     _visual: {fileID: 919132149155446097, guid: 1603ea4fd7f75124f9bf8257d3f1e02f, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0
