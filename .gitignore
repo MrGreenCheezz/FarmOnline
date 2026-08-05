@@ -42,3 +42,9 @@ Desktop.ini
 sysinfo.txt
 *.stackdump
 crashlytics-build.properties
+
+# ===== Сервер онлайн-версии: база игроков — данные, а не исходник =====
+/Tools/farm.db
+/Tools/farm.db-journal
+/Tools/farm.db-wal
+/Tools/farm.db-shm
