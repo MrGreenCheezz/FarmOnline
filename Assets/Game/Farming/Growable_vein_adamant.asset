@@ -16,10 +16,10 @@ MonoBehaviour:
   _displayName: "\u0410\u0434\u0430\u043C\u0430\u043D\u0442\u043E\u0432\u0430\u044F
     \u0436\u0438\u043B\u0430"
   _category: 2
-  _defaultStageDuration: 484.30048
+  _defaultStageDuration: 968.601
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 484.30048
+    _duration: 968.601
     _visual: {fileID: 4398808739843505465, guid: e25f584ff0693ad43bd876cd5ab038f8, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

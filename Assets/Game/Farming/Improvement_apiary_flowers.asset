@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 637c7baae8a698e469f055d74f969fcf, type: 3}
+  m_Name: Improvement_apiary_flowers
+  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.ImprovementDefinition
+  _id: apiary_flowers
+  _thought: "\u043F\u0447\u0451\u043B\u0430\u043C \u0446\u0432\u0435\u0442\u043E\u0432
+    \u043D\u0430\u0441\u0430\u0436\u0443"
+  _prefab: {fileID: 6443497463726581764, guid: 3d3393d608ff59848b8e12e158917072, type: 3}
+  _cost:
+    Resource: {fileID: 11400000, guid: 4e1b1690ff8cb9e4ea0c362f99990416, type: 2}
+    Amount: 2
+  _buildSeconds: 5
+  _minDay: 1
+  _minHarvested: 60
+  _anchor: 2
+  _anchorBuilding: {fileID: 11400000, guid: d04206e5406d7774383acf3624e963b3, type: 2}
+  _anchorRadius: {x: 1.2, y: 2.8}
+  _maxCount: 3
+  _order: 1
+  _weight: 1

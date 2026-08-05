@@ -30,8 +30,7 @@ MonoBehaviour:
         Amount: 6
     Efficiency: 0.35
     Output: 1
-    Note: "\u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0435\u0442 35% \u043F\u043E\u0442\u0440\u0435\u0431\u043D\u043E\u0441\u0442\u0438
-      \u0437\u0430 \u0432\u0438\u0437\u0438\u0442"
+    Note: "\u043D\u0430\u043F\u043E\u043B\u043D\u044F\u0435\u0442 \u0434\u043E 74%"
   - Cost:
       Gold: 276
       Resources:
@@ -41,8 +40,7 @@ MonoBehaviour:
         Amount: 9
     Efficiency: 0.57
     Output: 1
-    Note: "\u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0435\u0442 57% \u043F\u043E\u0442\u0440\u0435\u0431\u043D\u043E\u0441\u0442\u0438
-      \u0437\u0430 \u0432\u0438\u0437\u0438\u0442"
+    Note: "\u043D\u0430\u043F\u043E\u043B\u043D\u044F\u0435\u0442 \u0434\u043E 83%"
   - Cost:
       Gold: 635
       Resources:
@@ -52,8 +50,7 @@ MonoBehaviour:
         Amount: 14
     Efficiency: 0.78999996
     Output: 1
-    Note: "\u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0435\u0442 79% \u043F\u043E\u0442\u0440\u0435\u0431\u043D\u043E\u0441\u0442\u0438
-      \u0437\u0430 \u0432\u0438\u0437\u0438\u0442"
+    Note: "\u043D\u0430\u043F\u043E\u043B\u043D\u044F\u0435\u0442 \u0434\u043E 92%"
   - Cost:
       Gold: 1460
       Resources:
@@ -63,8 +60,7 @@ MonoBehaviour:
         Amount: 22
     Efficiency: 1
     Output: 1
-    Note: "\u0437\u0430\u043A\u0440\u044B\u0432\u0430\u0435\u0442 100% \u043F\u043E\u0442\u0440\u0435\u0431\u043D\u043E\u0441\u0442\u0438
-      \u0437\u0430 \u0432\u0438\u0437\u0438\u0442"
+    Note: "\u043D\u0430\u043F\u043E\u043B\u043D\u044F\u0435\u0442 \u0434\u043E 100%"
   _serviceDuration: 1.4
   _baseRestore: 1
   _recipes: []

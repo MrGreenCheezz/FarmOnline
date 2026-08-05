@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: pumpkin
   _displayName: "\u0422\u044B\u043A\u0432\u0430"
   _category: 0
-  _defaultStageDuration: 39.6
+  _defaultStageDuration: 79.2
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 39.6
+    _duration: 79.2
     _visual: {fileID: 165992259883800244, guid: ad4070413f5a17d479f3d26823656757, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

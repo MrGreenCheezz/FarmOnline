@@ -43,6 +43,12 @@ namespace Farm.Farming
         {
             _definition = definition;
             _level = Mathf.Max(1, level);
+
+            // Компонент регистрируется в OnEnable, то есть ещё пустым: Instantiate + AddComponent
+            // происходят раньше, чем сюда попадают данные. Без этого оклика только что купленный
+            // силос числился бы постройкой «без определения» и не давал бы ничего до следующей
+            // покупки — а купившему кажется, что деньги ушли впустую.
+            BuildingRegistry.NotifyChanged();
         }
 
         // ---- улучшение ----
@@ -102,28 +108,50 @@ namespace Farm.Farming
 
         /// <summary>
         /// Обслужить один визит. Возвращает, сколько каждой нужды восстановлено, в единицах шкалы.
+        /// <para>
+        /// Уровень постройки — это ПОТОЛОК визита, а не размер порции: колодец 1-го уровня
+        /// наполняет до 0.6 шкалы из любого дефицита, прокачанный — до полной. Прежняя
+        /// фиксированная порция (max × 0.35) из утреннего нуля поднимала лишь до 0.35,
+        /// и фермер жил в вечной полосе жажды, прерываясь по 3–5 раз за день.
+        /// </para>
+        /// <para>
+        /// У кухни еда отдаёт ПОЛНУЮ питательность. Раньше Efficiency сидела и в цене единицы,
+        /// и в цели — и сокращалась: кухня 1-го уровня забирала со склада столько же еды,
+        /// сколько 4-го, а 65% съеденного просто исчезало.
+        /// </para>
         /// </summary>
-        public void Serve(float maxSatiety, float maxHydration, out float satietyGain, out float hydrationGain)
+        public void Serve(float satiety, float maxSatiety, float hydration, float maxHydration,
+                          out float satietyGain, out float hydrationGain)
         {
             satietyGain = 0f;
             hydrationGain = 0f;
             if (_definition == null) return;
 
+            // До какой доли шкалы этот уровень постройки способен наполнить: 0.6 на нуле
+            // умения, 1.0 на пределе. Нижняя планка чуть выше порога комфорта нужд — визит
+            // обязан выводить из штрафной зоны, иначе походы не кончаются никогда. Лерп, а
+            // не жёсткий пол: под полом ступени 1 и 2 были бы неотличимы, и апгрейд первого
+            // уровня не менял бы ничего.
+            float target01 = Mathf.Lerp(0.6f, 1f, _definition.BaseRestore * Efficiency);
+
             if (_definition.Service == BuildingService.Well)
             {
-                hydrationGain = maxHydration * _definition.BaseRestore * Efficiency;
+                hydrationGain = Mathf.Max(0f, maxHydration * target01 - hydration);
             }
             else if (_definition.Service == BuildingService.Kitchen && FindBestFood(out var food, out int available))
             {
                 var storage = FarmingRuntime.Sink as IInventory;
 
-                // Съедаем ровно столько, сколько нужно, чтобы наесться на этом уровне кухни.
-                float perUnit = food.Nutrition * Efficiency;
-                int want = Mathf.Max(1, Mathf.CeilToInt(maxSatiety * Efficiency / Mathf.Max(0.01f, perUnit)));
+                // Съедаем ровно столько, сколько закрывает дефицит до потолка кухни.
+                float deficit = Mathf.Max(0f, maxSatiety * target01 - satiety);
+                float perUnit = Mathf.Max(0.01f, food.Nutrition);
+                int want = Mathf.CeilToInt(deficit / perUnit);
+                if (want <= 0) return;
+
                 int taken = storage.TryRemove(food, Mathf.Min(want, available));
 
                 satietyGain = taken * perUnit;
-                hydrationGain = taken * food.Hydration * Efficiency;
+                hydrationGain = taken * food.Hydration;
             }
 
             if (satietyGain > 0f || hydrationGain > 0f) Raise(Served, satietyGain, hydrationGain);
@@ -186,12 +214,34 @@ namespace Farm.Farming
         /// </summary>
         public static event Action<Building, int> Upgraded;
 
+        /// <summary>
+        /// Набор построек изменился: появилась, исчезла или выросла в уровне. Отдельно от
+        /// <see cref="Upgraded"/>, потому что тому, кто считает общефермовые надбавки, важен
+        /// сам факт, а не какая именно постройка, — и снос постройки для него такое же событие.
+        /// </summary>
+        public static event Action Changed;
+
         internal static void RaiseUpgraded(Building building, int level)
         {
             var handler = Upgraded;
+            if (handler != null)
+            {
+                try { handler(building, level); }
+                catch (Exception e) { Debug.LogException(e, building); }
+            }
+
+            RaiseChanged();
+        }
+
+        /// <summary>Сообщить, что состав или данные построек изменились.</summary>
+        internal static void NotifyChanged() => RaiseChanged();
+
+        private static void RaiseChanged()
+        {
+            var handler = Changed;
             if (handler == null) return;
-            try { handler(building, level); }
-            catch (Exception e) { Debug.LogException(e, building); }
+            try { handler(); }
+            catch (Exception e) { Debug.LogException(e); }
         }
 
         internal static void Register(Building b)
@@ -199,6 +249,7 @@ namespace Farm.Farming
             if (b == null || b.RegistryIndex >= 0) return;
             b.RegistryIndex = _all.Count;
             _all.Add(b);
+            RaiseChanged();
         }
 
         internal static void Unregister(Building b)
@@ -213,6 +264,7 @@ namespace Farm.Farming
             if (_all[i] != null) _all[i].RegistryIndex = i;
             _all.RemoveAt(last);
             b.RegistryIndex = -1;
+            RaiseChanged();
         }
 
         /// <summary>
@@ -264,6 +316,7 @@ namespace Farm.Farming
         {
             _all.Clear();
             Upgraded = null;
+            Changed = null;
         }
     }
 }

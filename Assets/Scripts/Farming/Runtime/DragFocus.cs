@@ -25,11 +25,23 @@ namespace Farm.Farming
         public const float PlayerClaimSeconds = 60f;
 
         private static Transform _current;
+        private static bool _byPlayer;
         private static readonly Dictionary<Transform, double> _playerTouched =
             new Dictionary<Transform, double>();
 
         /// <summary>Что несут, или null.</summary>
         public static Transform Current => _current != null ? _current : null;
+
+        /// <summary>
+        /// Несёт ли это игрок, а не фермер. Ложь, когда в руках пусто.
+        /// <para>
+        /// Отличать нужно интерфейсу: пока ношу ведёт мышь, HUD уступает ей дорогу, а таскает
+        /// фермер почти всё время — на его ходки табло дёргаться не должно. По одной только
+        /// <see cref="IsPlayerClaimed"/> это не читается: метка живёт минуту после того, как
+        /// вещь отпустили.
+        /// </para>
+        /// </summary>
+        public static bool ByPlayer => _current != null && _byPlayer;
 
         /// <summary>Несут ли именно этот объект.</summary>
         public static bool IsDragged(Transform candidate) =>
@@ -49,6 +61,10 @@ namespace Farm.Farming
             if (target == null) target = null;
 
             if (byPlayer && target != null) Claim(target);
+
+            // До проверки на «тот же объект»: сменить руки, не меняя ношу, — тоже смена состояния.
+            _byPlayer = byPlayer && target != null;
+
             if (ReferenceEquals(_current, target)) return;
 
             _current = target;
@@ -87,6 +103,7 @@ namespace Farm.Farming
         private static void ResetStatics()
         {
             _current = null;
+            _byPlayer = false;
             _playerTouched.Clear();
             Changed = null;
         }

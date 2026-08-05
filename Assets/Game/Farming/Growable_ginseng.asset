@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: ginseng
   _displayName: "\u0416\u0435\u043D\u044C\u0448\u0435\u043D\u044C"
   _category: 0
-  _defaultStageDuration: 177.88814
+  _defaultStageDuration: 355.7763
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 177.88814
+    _duration: 355.7763
     _visual: {fileID: 5946907326388120893, guid: f612aa1af8fcd7a40926333049d32fe3, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

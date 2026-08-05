@@ -16,7 +16,14 @@
         <!-- ===== всплывающие числа над событиями ===== -->
         <ui:VisualElement name="floating-text" class="world-layer" picking-mode="Ignore" />
 
-        <!-- ================= HUD ================= -->
+        <!-- ===== первый урок: метки над парой и строка внизу ===== -->
+        <ui:VisualElement name="merge-hint-layer" class="world-layer" picking-mode="Ignore" />
+        <ui:Label name="merge-hint" text="" class="lesson" picking-mode="Ignore" style="display: none;" />
+
+        <!-- ================= HUD =================
+             Клики HUD не перехватывает: picking снимается со всего поддерева разом в
+             GameHud.MakeReadout, и обратно его получают только кнопки. Ставить здесь
+             picking-mode поэлементно не нужно — забытый элемент вернёт мёртвую зону. -->
         <ui:VisualElement name="hud" class="hud">
 
             <ui:VisualElement name="topbar" class="topbar">
@@ -27,6 +34,7 @@
                 <ui:Button name="settings-button" text="Настройки" class="btn" />
                 <ui:Button name="badges-button" text="Уровни" class="btn btn--ghost" />
                 <ui:Button name="collapse-button" text="Скрыть" class="btn btn--ghost" />
+                <ui:Button name="menu-button" text="В меню" class="btn btn--ghost" />
             </ui:VisualElement>
 
             <ui:VisualElement name="hud-panels" class="hud-panels">

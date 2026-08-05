@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: cow
   _displayName: "\u041A\u043E\u0440\u043E\u0432\u0430"
   _category: 1
-  _defaultStageDuration: 27
+  _defaultStageDuration: 54
   _stages:
   - _name: "\u041D\u0430\u043A\u0430\u043F\u043B\u0438\u0432\u0430\u0435\u0442"
-    _duration: 27
+    _duration: 54
     _visual: {fileID: 7625487766511946599, guid: d0db94b65e2acb24894d3005ee13ffe2, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

@@ -9,6 +9,11 @@ namespace Farm.UI
     /// Склад как настоящая сетка ячеек: рисуется каждая, занятая или нет, — игрок видит,
     /// сколько места осталось, а не вычисляет это из числа.
     /// <para>
+    /// Ячейка — это стек, а не вид ресурса: 250 пшеницы при стеке 99 займут три ячейки,
+    /// ровно как их считает сам склад. Сетка, показывающая по ячейке на вид, врала бы про
+    /// оставшееся место — а место здесь и есть единственное, ради чего окно открывают.
+    /// </para>
+    /// <para>
     /// Ячейки строятся один раз и лишь перезаполняются при изменениях — сетка стабильна,
     /// и пересборка элементов на каждую доставку аллоцировала бы впустую и заставляла список мерцать.
     /// </para>
@@ -28,6 +33,10 @@ namespace Farm.UI
         private IInventory _storage;
 
         private readonly List<VisualElement> _cells = new List<VisualElement>();
+
+        /// <summary>Содержимое, разложенное по стекам: ровно то, что рисуется в ячейках.</summary>
+        private readonly List<InventoryEntry> _stacks = new List<InventoryEntry>();
+
         private bool _dirty = true;
 
         public bool IsOpen => _overlay != null && _overlay.style.display != DisplayStyle.None;
@@ -97,14 +106,37 @@ namespace Farm.UI
 
         private void OnStorageChanged(IInventory inventory) => _dirty = true;
 
+        /// <summary>
+        /// Разложить содержимое по стекам. Резать приходится здесь, а не в складе: складу
+        /// хватает числа занятых ячеек, а сетке нужно, что именно лежит в каждой.
+        /// </summary>
+        private void BuildStacks()
+        {
+            _stacks.Clear();
+
+            var entries = _storage?.Entries;
+            if (entries == null) return;
+
+            int stack = Mathf.Max(1, _storage.StackSize);
+            for (int i = 0; i < entries.Count; i++)
+            {
+                int left = entries[i].Amount;
+                while (left > 0)
+                {
+                    int part = Mathf.Min(stack, left);
+                    _stacks.Add(new InventoryEntry(entries[i].Resource, part));
+                    left -= part;
+                }
+            }
+        }
+
         private int CellCount()
         {
             if (_storage != null && _storage.CapacityMode == InventoryCapacity.Slots)
-                return Mathf.Max(_storage.DistinctCount, _storage.Capacity);
+                return Mathf.Max(_stacks.Count, _storage.Capacity);
 
             // Без лимита по ячейкам сетка всё равно нужна — берём столько, чтобы всё поместилось.
-            int used = _storage != null ? _storage.DistinctCount : 0;
-            return Mathf.Max(_fallbackCells, used);
+            return Mathf.Max(_fallbackCells, _stacks.Count);
         }
 
         private void Rebuild()
@@ -112,9 +144,10 @@ namespace Farm.UI
             _dirty = false;
             if (_grid == null) return;
 
+            BuildStacks();
+
             int cellCount = CellCount();
-            var entries = _storage?.Entries;
-            int used = entries?.Count ?? 0;
+            int used = _stacks.Count;
 
             while (_cells.Count < cellCount) _cells.Add(CreateCell());
 
@@ -141,12 +174,15 @@ namespace Farm.UI
                     continue;
                 }
 
-                var entry = entries[i];
+                var entry = _stacks[i];
                 cell.userData = entry.Resource;
                 // Цену спрашиваем у магазина, а не у ресурса: рынок даёт надбавку, и подсказка
                 // не должна обещать меньше, чем реально заплатит кнопка продажи.
+                // Всего — потому что ресурс мог растечься по нескольким ячейкам, а продажа
+                // всё равно берёт со склада целиком.
                 cell.tooltip = entry.Resource != null
-                    ? entry.Resource.DisplayName + " — " + UnitPrice(entry.Resource) + " зол./шт"
+                    ? entry.Resource.DisplayName + " — " + UnitPrice(entry.Resource) + " зол./шт" +
+                      ", всего " + _storage.GetAmount(entry.Resource)
                     : null;
 
                 if (icon != null)

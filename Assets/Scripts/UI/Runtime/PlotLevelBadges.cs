@@ -6,11 +6,18 @@ using Farm.Farming;
 namespace Farm.UI
 {
     /// <summary>
-    /// Вешает плашку уровня над каждой грядкой — игрок с одного взгляда видит, что с чем сливается.
+    /// Вешает плашку над каждой грядкой: чем она занята и какого уровня — игрок с одного взгляда
+    /// видит и что с чем сливается, и что вообще растёт.
     /// <para>
-    /// Один слой с пулом меток вместо world-space канваса на каждую грядку: плашки должны быть
+    /// Один слой с пулом плашек вместо world-space канваса на каждую грядку: плашки должны быть
     /// выровнены по экрану и читаться под любым углом камеры, а канвас на грядку добавил бы
-    /// рендерер и draw call тому, что всегда было двумя символами текста.
+    /// рендерер и draw call тому, что всегда было парой символов.
+    /// </para>
+    /// <para>
+    /// Иконка появилась не для красоты. Восемь пород дерева стоят на ферме одной моделью,
+    /// различаясь приглушённым оттенком, и одна цифра уровня над ними не отвечала на главный
+    /// вопрос — <i>что это</i>. Иконка ресурса берётся та же, что в инвентаре, поэтому цвет
+    /// фишки связывает грядку в мире со строкой на складе без единого слова.
     /// </para>
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
@@ -28,8 +35,16 @@ namespace Farm.UI
         [Tooltip("Показывать плашки. Переключается кнопкой в HUD.")]
         [SerializeField] private bool _visible = true;
 
+        /// <summary>Одна плашка: строка из иконки ресурса и цифры уровня.</summary>
+        private sealed class Badge
+        {
+            public VisualElement Root;
+            public VisualElement Icon;
+            public Label Level;
+        }
+
         private VisualElement _layer;
-        private readonly List<Label> _pool = new List<Label>();
+        private readonly List<Badge> _pool = new List<Badge>();
 
         /// <summary>
         /// Видны ли плашки. Выключенные не просто прячутся — вся покадровая работа
@@ -89,16 +104,22 @@ namespace Farm.UI
                 var badge = GetBadge(shown);
                 Vector2 point = RuntimePanelUtils.CameraTransformWorldToPanel(panel, world, _camera);
 
-                badge.style.left = point.x - badge.resolvedStyle.width * 0.5f;
-                badge.style.top = point.y - badge.resolvedStyle.height;
+                badge.Root.style.left = point.x - badge.Root.resolvedStyle.width * 0.5f;
+                badge.Root.style.top = point.y - badge.Root.resolvedStyle.height;
 
                 int level = plot.Level;
-                badge.text = level.ToString();
-                ApplyLevelClass(badge, level);
+                badge.Level.text = level.ToString();
+                ApplyLevelClass(badge.Root, level);
+
+                // Иконка есть не у всего: у жилы или дерева без назначенного ресурса плашка
+                // просто остаётся цифрой, а не показывает пустой квадрат.
+                var icon = IconOf(plot);
+                badge.Icon.style.backgroundImage = icon != null ? new StyleBackground(icon) : StyleKeyword.None;
+                badge.Icon.style.display = icon != null ? DisplayStyle.Flex : DisplayStyle.None;
 
                 // Готовность подсвечиваем фоном, а не рамкой — рамка держит цвет уровня,
                 // иначе, увидев «готово», игрок терял бы информацию о том, с чем это сливать.
-                badge.EnableInClassList("badge--ready", plot.IsReady);
+                badge.Root.EnableInClassList("badge--ready", plot.IsReady);
 
                 shown++;
             }
@@ -106,28 +127,46 @@ namespace Farm.UI
             HideFrom(shown);
         }
 
-        private Label GetBadge(int index)
+        /// <summary>Иконка того, что грядка производит. Null — показывать нечего.</summary>
+        private static Sprite IconOf(Growable plot)
+        {
+            var resource = plot.Definition != null ? plot.Definition.YieldResource : null;
+            return resource != null ? resource.Icon : null;
+        }
+
+        private Badge GetBadge(int index)
         {
             while (_pool.Count <= index)
             {
-                var created = new Label();
-                created.AddToClassList("badge");
-                created.pickingMode = PickingMode.Ignore;
-                _layer.Add(created);
-                _pool.Add(created);
+                var root = new VisualElement();
+                root.AddToClassList("badge");
+                root.pickingMode = PickingMode.Ignore;
+
+                var icon = new VisualElement();
+                icon.AddToClassList("badge__icon");
+                icon.pickingMode = PickingMode.Ignore;
+                root.Add(icon);
+
+                var level = new Label();
+                level.AddToClassList("badge__level");
+                level.pickingMode = PickingMode.Ignore;
+                root.Add(level);
+
+                _layer.Add(root);
+                _pool.Add(new Badge { Root = root, Icon = icon, Level = level });
             }
 
             var badge = _pool[index];
-            badge.style.display = DisplayStyle.Flex;
+            badge.Root.style.display = DisplayStyle.Flex;
             return badge;
         }
 
         private void HideFrom(int index)
         {
-            for (int i = index; i < _pool.Count; i++) _pool[i].style.display = DisplayStyle.None;
+            for (int i = index; i < _pool.Count; i++) _pool[i].Root.style.display = DisplayStyle.None;
         }
 
-        private static void ApplyLevelClass(Label badge, int level)
+        private static void ApplyLevelClass(VisualElement badge, int level)
         {
             int tier = Mathf.Clamp(level, 1, 5);
             for (int i = 1; i <= 5; i++) badge.EnableInClassList("badge--lvl" + i, i == tier);

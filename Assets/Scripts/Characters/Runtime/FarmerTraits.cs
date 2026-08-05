@@ -55,6 +55,29 @@ namespace Farm.Characters
         /// <summary>Нейтральное значение черты, когда компонента на персонаже нет.</summary>
         public const float Neutral = 0.5f;
 
+        /// <summary>Характер как пять чисел — для сохранения. Порядок фиксирован.</summary>
+        public float[] CaptureState()
+        {
+            EnsureReady();
+            return new[] { _oreLover, _homebody, _earlyRiser, _tidiness, _nightCourage };
+        }
+
+        /// <summary>
+        /// Вернуть характер из сохранения. Короткий массив достраивается нейтральными:
+        /// добавленная позже черта не должна ломать загрузку старой партии.
+        /// </summary>
+        public void RestoreState(float[] traits)
+        {
+            _ready = true;   // сохранённый характер важнее того, что бы выпало по зерну
+            if (traits == null) return;
+
+            if (traits.Length > 0) _oreLover = Mathf.Clamp01(traits[0]);
+            if (traits.Length > 1) _homebody = Mathf.Clamp01(traits[1]);
+            if (traits.Length > 2) _earlyRiser = Mathf.Clamp01(traits[2]);
+            if (traits.Length > 3) _tidiness = Mathf.Clamp01(traits[3]);
+            if (traits.Length > 4) _nightCourage = Mathf.Clamp01(traits[4]);
+        }
+
         private void Awake() => EnsureReady();
 
         private void EnsureReady()

@@ -45,6 +45,11 @@ namespace Farm.Characters
         [Tooltip("Ниже этой доли фермер бросает работу и идёт спать.")]
         [SerializeField, Range(0f, 1f)] private float _tiredThreshold = 0.18f;
 
+        [Tooltip("Во сколько раз медленнее тают голод и жажда во сне.\n" +
+                 "Единица превращает каждое утро в кризис: за ночь при полной скорости уходит " +
+                 "половина воды, а колодец столько за визит не возвращает.")]
+        [SerializeField, Range(0f, 1f)] private float _sleepNeedsDrainScale = 0.25f;
+
         [Header("Пороги")]
         [Tooltip("Ниже этой доли считается, что персонаж голоден / хочет пить.")]
         [SerializeField, Range(0f, 1f)] private float _lowThreshold = 0.25f;
@@ -72,6 +77,14 @@ namespace Farm.Characters
         /// </para>
         /// </summary>
         public float Exertion { get; set; }
+
+        /// <summary>
+        /// Спит ли персонаж — выставляет агент, тем же жестом, что <see cref="Exertion"/>.
+        /// Во сне голод и жажда тают медленнее (<see cref="_sleepNeedsDrainScale"/>):
+        /// тело в покое, и «проголодаться сильнее, чем колодец способен напоить» —
+        /// ровно тот кризис, который ломал каждое утро.
+        /// </summary>
+        public bool IsSleeping { get; set; }
 
         /// <summary>Опустился ниже нижнего порога.</summary>
         public event Action<CharacterNeeds> BecameHungry;
@@ -143,8 +156,17 @@ namespace Farm.Characters
             float dt = Time.deltaTime;
             float drain = Mathf.Lerp(_energyDrainResting, _energyDrainWorking, Mathf.Clamp01(Exertion));
 
-            Set(_satiety - _satietyDrainPerSecond * dt,
-                _hydration - _hydrationDrainPerSecond * dt,
+            // Постройки-усилители замедляют все три шкалы разом: смысл такой постройки в том,
+            // что фермер реже уходит с поля, а уходит он по худшей из нужд. По месту: уют
+            // курятника действует рядом с курятником, и его ставят туда, где фермер живёт.
+            dt *= Farm.Farming.FarmBuffs.NeedsDrainAt(transform.position);
+
+            // Спящий тратит меньше — только на голод и жажду: бодростью и так управляет
+            // сон через Sleep(), и трогать её здесь значило бы считать её дважды.
+            float bodyDt = IsSleeping ? dt * _sleepNeedsDrainScale : dt;
+
+            Set(_satiety - _satietyDrainPerSecond * bodyDt,
+                _hydration - _hydrationDrainPerSecond * bodyDt,
                 _energy - drain * dt);
         }
 
@@ -157,6 +179,22 @@ namespace Farm.Characters
 
         /// <summary>Наполнить все шкалы доверху.</summary>
         public void Restore() => Set(_maxSatiety, _maxHydration, _maxEnergy);
+
+        /// <summary>
+        /// Состояние шкал долями, а не единицами: сохранение переживёт правку максимумов
+        /// в инспекторе — «был сыт наполовину» осмысленно при любой шкале.
+        /// </summary>
+        public void CaptureState(out float satiety01, out float hydration01, out float energy01)
+        {
+            satiety01 = Satiety01;
+            hydration01 = Hydration01;
+            energy01 = Energy01;
+        }
+
+        public void RestoreState(float satiety01, float hydration01, float energy01) =>
+            Set(Mathf.Clamp01(satiety01) * _maxSatiety,
+                Mathf.Clamp01(hydration01) * _maxHydration,
+                Mathf.Clamp01(energy01) * _maxEnergy);
 
         private void Set(float satiety, float hydration, float energy)
         {

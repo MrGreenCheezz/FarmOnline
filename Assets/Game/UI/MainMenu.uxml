@@ -1,0 +1,49 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/Game/UI/MainMenu.uss" />
+
+    <ui:VisualElement name="menu-root" class="menu">
+        <ui:VisualElement name="menu-panel" class="menu__panel">
+            <ui:Label text="ФЕРМА" class="menu__title" />
+            <ui:Label text="тихое место, где всё растёт само" class="menu__subtitle" />
+
+            <ui:VisualElement class="menu__rule" />
+
+            <ui:Label name="menu-save-info" text="—" class="menu__info" />
+
+            <ui:Button name="menu-continue" text="Продолжить" class="menu__button menu__button--primary" />
+            <ui:Button name="menu-new" text="Новая игра" class="menu__button" />
+            <ui:Button name="menu-settings" text="Звук" class="menu__button" />
+            <ui:Button name="menu-quit" text="Выход" class="menu__button menu__button--quiet" />
+        </ui:VisualElement>
+
+        <ui:VisualElement name="menu-settings-overlay" class="menu__overlay">
+            <ui:VisualElement class="menu__dialog">
+                <ui:Label text="Звук" class="menu__dialog-title" />
+
+                <ui:Label name="menu-volume-master-label" text="Общая громкость" class="menu__setting-label" />
+                <ui:Slider name="menu-volume-master" low-value="0" high-value="1" value="0.8" class="menu__slider" />
+
+                <ui:Label name="menu-volume-effects-label" text="Эффекты" class="menu__setting-label" />
+                <ui:Slider name="menu-volume-effects" low-value="0" high-value="1" value="1" class="menu__slider" />
+
+                <ui:Label text="Настройки сохраняются автоматически и действуют в игре." class="menu__dialog-text" />
+
+                <ui:VisualElement class="menu__dialog-row">
+                    <ui:Button name="menu-volume-test" text="Проверить" class="menu__button menu__button--quiet" />
+                    <ui:Button name="menu-settings-close" text="Готово" class="menu__button menu__button--primary" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <ui:VisualElement name="menu-confirm" class="menu__overlay">
+            <ui:VisualElement class="menu__dialog">
+                <ui:Label text="Начать заново?" class="menu__dialog-title" />
+                <ui:Label text="Нынешняя ферма будет стёрта без возврата." class="menu__dialog-text" />
+                <ui:VisualElement class="menu__dialog-row">
+                    <ui:Button name="menu-confirm-no" text="Оставить" class="menu__button menu__button--quiet" />
+                    <ui:Button name="menu-confirm-yes" text="Начать заново" class="menu__button menu__button--danger" />
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

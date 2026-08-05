@@ -21,7 +21,8 @@ namespace Farm.Farming
         [Tooltip("Уровень слияния. Два уровня N сливаются в один N+1; уровень масштабирует урожай.")]
         [SerializeField, Min(1)] private int _level = 1;
 
-        [Tooltip("Множитель скорости роста. Сюда цепляются баффы, инструменты и постройки.")]
+        [Tooltip("Собственный множитель скорости роста этой грядки. Надбавки построек " +
+                 "накладываются сверху и это число не затирают.")]
         [SerializeField, Min(0.01f)] private float _growthSpeed = 1f;
 
         [SerializeField] private bool _plantOnStart = true;
@@ -31,6 +32,10 @@ namespace Farm.Farming
         private double _plantedAt;
         private double _readyAt;
         private int _handle = GrowthScheduler.InvalidHandle;
+
+        /// <summary>Скорость грядки без общефермовых надбавок; запоминается при первом включении.</summary>
+        private float _ownGrowthSpeed = 1f;
+        private bool _ownSpeedCaptured;
 
         // Служебные индексы, которыми владеет GrowableRegistry, — держат его операции O(1).
         internal int RegistryIndex = -1;
@@ -164,6 +169,15 @@ namespace Farm.Farming
         {
             GrowableRegistry.Register(this);
 
+            // Подхватить текущие надбавки сразу: грядка, купленная в ауре уже стоящего ветряка,
+            // обязана расти быстро с первой секунды, а не дожидаться следующей постройки.
+            if (!_ownSpeedCaptured)
+            {
+                _ownGrowthSpeed = _growthSpeed;
+                _ownSpeedCaptured = true;
+            }
+            ApplyGrowthBuff(FarmBuffs.GrowthSpeedAt(transform.position, Category));
+
             var scheduler = GrowthScheduler.Instance;
             if (scheduler != null) _handle = scheduler.Register(this);
 
@@ -233,6 +247,13 @@ namespace Farm.Farming
             if (_phase != GrowthPhase.Ready || _definition == null) return false;
 
             int amount = _definition.YieldFor(_level);
+
+            // Надбавка построек считается здесь, а не у того, кто собирает: урожай обязан быть
+            // одним и тем же, снял его фермер днём или игрок кликом ночью. По месту грядки:
+            // амбар усиливает то, что стоит рядом с ним, — в этом и есть смысл размещения.
+            float yieldBuff = FarmBuffs.HarvestYieldAt(transform.position, Category);
+            if (yieldBuff > 1f) amount = Mathf.Max(amount, Mathf.RoundToInt(amount * yieldBuff));
+
             result = new HarvestResult(this, _definition.YieldResource, amount, _level);
 
             (into ?? FarmingRuntime.Sink).Add(result.Resource, result.Amount);
@@ -293,6 +314,82 @@ namespace Farm.Farming
             return true;
         }
 
+        /// <summary>
+        /// Наложить общефермовую надбавку поверх собственной скорости грядки.
+        /// Зовёт <see cref="FarmBuffs"/>, когда набор построек изменился; прогресс роста
+        /// при этом сохраняется — за это отвечает сеттер <see cref="GrowthSpeed"/>.
+        /// </summary>
+        internal void ApplyGrowthBuff(float multiplier)
+        {
+            if (!_ownSpeedCaptured)
+            {
+                _ownGrowthSpeed = _growthSpeed;
+                _ownSpeedCaptured = true;
+            }
+
+            GrowthSpeed = _ownGrowthSpeed * Mathf.Max(0.01f, multiplier);
+        }
+
+        // ---- сохранение ----
+
+        /// <summary>
+        /// Снять состояние роста для сохранения. Время меряется <b>наработанными секундами
+        /// роста</b>, а не таймстампом: <see cref="FarmingRuntime.Now"/> отсчитывается от запуска
+        /// приложения, и сохранённый таймстамп в новой сессии означал бы совсем другой момент.
+        /// </summary>
+        public void CaptureState(out double elapsedGrowth, out double ripeSeconds, out float ownGrowthSpeed)
+        {
+            elapsedGrowth = _phase == GrowthPhase.Growing
+                ? ElapsedGrowth(FarmingRuntime.Now)
+                : (_definition != null ? _definition.TotalGrowTime : 0.0);
+
+            ripeSeconds = RipeSeconds;
+            ownGrowthSpeed = _ownGrowthSpeed;
+        }
+
+        /// <summary>
+        /// Восстановить рост из сохранения.
+        /// <para>
+        /// Нарочно тихо: событий <see cref="Planted"/> и <see cref="Ready"/> не поднимает —
+        /// иначе загрузка фермы с двумя десятками грядок обернулась бы залпом звуков посадки
+        /// и вспышек созревания. Поднимается только смена стадии: по ней обновляется меш,
+        /// а отклик на неё никто не вешает.
+        /// </para>
+        /// </summary>
+        public void RestoreState(GrowableDefinition definition, int level, bool ready,
+                                 double elapsedGrowth, double ripeSeconds, float ownGrowthSpeed)
+        {
+            if (definition == null || definition.StageCount == 0) return;
+
+            _definition = definition;
+            _level = Mathf.Max(1, level);
+
+            _ownGrowthSpeed = Mathf.Max(0.01f, ownGrowthSpeed);
+            _ownSpeedCaptured = true;
+            _growthSpeed = _ownGrowthSpeed * Mathf.Max(0.01f, FarmBuffs.GrowthSpeedAt(transform.position, Category));
+
+            double now = FarmingRuntime.Now;
+            _plantedAt = now - Math.Max(0.0, elapsedGrowth) / _growthSpeed;
+            _phase = GrowthPhase.Growing;
+            _stageIndex = Mathf.Clamp(definition.StageAtElapsed(elapsedGrowth), 0, definition.LastStageIndex);
+
+            if (ready || _stageIndex >= definition.LastStageIndex)
+            {
+                _stageIndex = definition.LastStageIndex;
+                _phase = GrowthPhase.Ready;
+                _readyAt = now - Math.Max(0.0, ripeSeconds);
+                GrowableRegistry.SetReady(this, true);
+            }
+            else
+            {
+                GrowableRegistry.SetReady(this, false);
+            }
+
+            Raise(StageAdvanced, _stageIndex);
+            FarmingEvents.RaiseStageAdvanced(this, _stageIndex);
+            ScheduleNext();
+        }
+
         /// <summary>Перескочить сразу к спелости. Для бустеров, читов и тестов.</summary>
         public void ForceReady()
         {
@@ -313,6 +410,11 @@ namespace Farm.Farming
         /// <summary>Начать цикл роста со стадии <paramref name="fromStage"/> (0 — заново, больше — отрастание).</summary>
         private void StartCycle(int fromStage)
         {
+            // Пересадка спелой грядки публичным Plant не проходит через TryHarvest/Clear,
+            // и без снятия флага в Ready-списке оставался призрак: мозг фермера выбирал
+            // его, агент приходил, разворачивался — и выбирал снова.
+            GrowableRegistry.SetReady(this, false);
+
             int stage = Mathf.Clamp(fromStage, 0, _definition.LastStageIndex);
             double now = FarmingRuntime.Now;
 
@@ -429,7 +531,21 @@ namespace Farm.Farming
                     break;
 
                 case GrowthPhase.Ready:
-                    if (_definition != null && _definition.WitherAfter > 0f) Wither();
+                    if (_definition == null || _definition.WitherAfter <= 0f) break;
+
+                    // Под пугалом спелое не портится. Проверка в момент, когда пора вянуть,
+                    // а не при созревании: пугало могли поставить или унести, пока стояло.
+                    // Защищённое откладывает вопрос ещё на один срок — унесут пугало,
+                    // и таймер порчи честно пойдёт заново.
+                    if (FarmBuffs.WitherGuardedAt(transform.position, Category))
+                    {
+                        var scheduler = GrowthScheduler.Instance;
+                        if (scheduler != null && _handle != GrowthScheduler.InvalidHandle)
+                            scheduler.Schedule(_handle, now + _definition.WitherAfter);
+                        break;
+                    }
+
+                    Wither();
                     break;
             }
         }

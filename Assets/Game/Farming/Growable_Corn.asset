@@ -15,16 +15,16 @@ MonoBehaviour:
   _id: corn
   _displayName: "\u041A\u0443\u043A\u0443\u0440\u0443\u0437\u0430"
   _category: 0
-  _defaultStageDuration: 6
+  _defaultStageDuration: 12
   _stages:
   - _name: "\u0420\u043E\u0441\u0442\u043E\u043A"
-    _duration: 6
+    _duration: 12
     _visual: {fileID: 919132149155446097, guid: ed2041e0d966be94daeb2772b5ed1718, type: 3}
   - _name: "\u041C\u043E\u043B\u043E\u0434\u0430\u044F"
-    _duration: 6
+    _duration: 12
     _visual: {fileID: 919132149155446097, guid: 2c621e3b8831eff4b9bfe0c530e958c2, type: 3}
   - _name: "\u0420\u043E\u0441\u043B\u0430\u044F"
-    _duration: 9
+    _duration: 18
     _visual: {fileID: 919132149155446097, guid: 81a89cce1660f0342827d897ec1ac8f1, type: 3}
   - _name: "\u0421\u043F\u0435\u043B\u0430\u044F"
     _duration: 0

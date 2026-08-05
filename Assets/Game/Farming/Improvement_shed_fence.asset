@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 637c7baae8a698e469f055d74f969fcf, type: 3}
+  m_Name: Improvement_shed_fence
+  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.ImprovementDefinition
+  _id: shed_fence
+  _thought: "\u043E\u0433\u043E\u0440\u043E\u0436\u0443 \u0445\u043B\u0435\u0432"
+  _prefab: {fileID: 919132149155446097, guid: afaae033cd5501a4a8fad148d11cca53, type: 3}
+  _cost:
+    Resource: {fileID: 11400000, guid: 4e1b1690ff8cb9e4ea0c362f99990416, type: 2}
+    Amount: 2
+  _buildSeconds: 5
+  _minDay: 1
+  _minHarvested: 30
+  _anchor: 2
+  _anchorBuilding: {fileID: 11400000, guid: 22ca0745b03e53a44851187daca54f48, type: 2}
+  _anchorRadius: {x: 1.8, y: 3.2}
+  _maxCount: 3
+  _order: 1
+  _weight: 1

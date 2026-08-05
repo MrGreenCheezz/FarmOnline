@@ -98,8 +98,7 @@ namespace Farm.Farming
             var storage = FarmingRuntime.Sink as IInventory;
             int stored = storage != null ? storage.TryAdd(recipe.Output, recipe.OutputAmount) : 0;
 
-            // Склад может отказать (когда появится лимит) — тогда партия пропадает, но
-            // молча этого делать нельзя.
+            // Полный склад откажет — тогда партия пропадает, но молча этого делать нельзя.
             if (stored < recipe.OutputAmount)
                 Debug.LogWarning("[Workshop] " + name + ": склад не принял " +
                                  (recipe.OutputAmount - stored) + " " + recipe.Output.DisplayName, this);

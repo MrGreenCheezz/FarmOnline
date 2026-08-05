@@ -27,10 +27,14 @@ namespace Farm.UI
         private const string PrefCollapsed = "hud.collapsed";
         private const string PrefBadges = "hud.badges";
 
+        /// <summary>Колонка статуса отступила: игрок ведёт ношу и должен видеть поле под ней.</summary>
+        private const string BusyClass = "hud-panels--busy";
+
         private UIDocument _document;
         private ShopWindow _shop;
         private InventoryWindow _inventory;
         private SettingsWindow _settings;
+        private VisualElement _hud;
         private VisualElement _panels;
         private Button _collapseButton;
         private bool _collapsed;
@@ -41,6 +45,7 @@ namespace Farm.UI
         private VisualElement _root;
         private Label _goldValue;
         private Label _clockValue;
+        private DayNightCycle _clock;
         private Label _storageSummary;
         private Label _farmerState;
         private Label _farmerThought;
@@ -125,6 +130,7 @@ namespace Farm.UI
             var settingsButton = root.Q<Button>("settings-button");
             if (settingsButton != null) settingsButton.clicked += () => { CloseSellMenu(); _settings?.Toggle(); };
 
+            _hud = root.Q<VisualElement>("hud");
             _panels = root.Q<VisualElement>("hud-panels");
             _collapseButton = root.Q<Button>("collapse-button");
             if (_collapseButton != null) _collapseButton.clicked += TogglePanels;
@@ -139,10 +145,21 @@ namespace Farm.UI
             if (_badges != null) _badges.Visible = PlayerPrefs.GetInt(PrefBadges, 1) == 1;
             ApplyBadges();
 
+            // Панель следит за первым жителем; появятся другие — HUD не сломается, а выбор
+            // «за кем следить» станет отдельной задачей интерфейса.
+            if (_farmer == null) _farmer = FarmerRegistry.Primary;
             if (_farmer == null) _farmer = FindFirstObjectByType<FarmerAgent>();
             if (_farmer != null) _needs = _farmer.GetComponent<CharacterNeeds>();
 
             BuildSkillRows();
+
+            // После сборки строк навыков: они создаются кодом и приходят с обычным picking.
+            MakeReadout(_hud);
+
+            DragFocus.Changed += OnCarryChanged;
+            GatherFocus.Changed += OnGatherChanged;
+            ApplyBusy();
+
             Bind();
             Refresh();
         }
@@ -151,10 +168,15 @@ namespace Farm.UI
         {
             if (_storage != null) _storage.Changed -= OnStorageChanged;
             if (_wallet != null) _wallet.Changed -= OnWalletChanged;
+            if (_clock != null) _clock.DayStarted -= OnDayStarted;
             if (_root != null) _root.UnregisterCallback<PointerDownEvent>(OnRootPointerDown, TrickleDown.TrickleDown);
+
+            DragFocus.Changed -= OnCarryChanged;
+            GatherFocus.Changed -= OnGatherChanged;
 
             _storage = null;
             _wallet = null;
+            _clock = null;
             _root = null;
         }
 
@@ -179,6 +201,12 @@ namespace Farm.UI
                 _wallet = Wallet.Instance != null ? Wallet.Instance : FindFirstObjectByType<Wallet>();
                 if (_wallet != null) _wallet.Changed += OnWalletChanged;
             }
+
+            if (_clock == null)
+            {
+                _clock = DayNightCycle.Instance;
+                if (_clock != null) _clock.DayStarted += OnDayStarted;
+            }
         }
 
         private void OnStorageChanged(IInventory inventory) => RefreshStorageSummary();
@@ -189,23 +217,40 @@ namespace Farm.UI
 
             // Счётчик обязан отреагировать физически: цифра, которая просто меняется,
             // не читается как награда.
-            if (_goldValue != null) StartCoroutine(PunchGold(delta > 0 ? 0.28f : 0.14f));
+            Punch(_goldValue, delta > 0 ? 0.28f : 0.14f);
         }
 
-        private System.Collections.IEnumerator PunchGold(float strength)
+        /// <summary>
+        /// Заря — единственная веха, которая приходит сама, без действий игрока. Раньше
+        /// её не отмечало вообще ничто: `DayStarted` поднимался в пустоту. Отмечаем скромно,
+        /// самой плашкой дня, — это раз в десять минут, и фанфары тут были бы навязчивы.
+        /// </summary>
+        private void OnDayStarted(DayNightCycle clock, int day)
+        {
+            RefreshClock();
+            Punch(_clockValue, 0.3f);
+        }
+
+        private void Punch(Label label, float strength)
+        {
+            if (label != null && isActiveAndEnabled) StartCoroutine(PunchRoutine(label, strength));
+        }
+
+        private System.Collections.IEnumerator PunchRoutine(Label label, float strength)
         {
             const float duration = 0.26f;
             float t = 0f;
 
+            // Немасштабируемое время: отклик интерфейса не должен зависеть от скорости игры.
             while (t < 1f)
             {
                 t += Time.unscaledDeltaTime / duration;
                 float s = 1f + Mathf.Sin(Mathf.Clamp01(t) * Mathf.PI) * strength;
-                _goldValue.style.scale = new StyleScale(new Scale(new Vector2(s, s)));
+                label.style.scale = new StyleScale(new Scale(new Vector2(s, s)));
                 yield return null;
             }
 
-            _goldValue.style.scale = new StyleScale(new Scale(Vector2.one));
+            label.style.scale = new StyleScale(new Scale(Vector2.one));
         }
 
         private void Refresh()
@@ -312,9 +357,20 @@ namespace Farm.UI
 
             if (_storage == null) { _storageSummary.text = "Склад: —"; return; }
 
-            _storageSummary.text = _storage.CapacityMode == InventoryCapacity.Slots
-                ? "Склад: " + _storage.DistinctCount + " / " + _storage.Capacity + " ячеек, " + _storage.TotalUnits + " ед."
+            bool slots = _storage.CapacityMode == InventoryCapacity.Slots;
+
+            // Ячейки, а не виды ресурсов: строка обязана считать ровно то же, чем склад
+            // меряет свою полноту, иначе «12 / 48» перестанет объяснять отказ.
+            _storageSummary.text = slots
+                ? "Склад: " + _storage.UsedSlots + " / " + _storage.Capacity + " ячеек, " + _storage.TotalUnits + " ед."
                 : "Склад: " + _storage.TotalUnits + " ед.";
+
+            // Полный склад останавливает доставки фермера. Он должен быть виден до того,
+            // как игрок заметит, что счётчик перестал расти, — и при ЛЮБОМ режиме ёмкости:
+            // привязка тревоги к Slots делала отказ в режиме Units невидимым.
+            bool full = _storage.IsFull;
+            _storageSummary.EnableInClassList("row--alert", full);
+            if (full) _storageSummary.text += " — полон!";
         }
 
         // ---- меню продажи ----
@@ -380,11 +436,59 @@ namespace Farm.UI
             if (_contextMenu != null) _contextMenu.style.display = DisplayStyle.None;
         }
 
+        // ---- HUD не ловит клики ----
+
+        /// <summary>
+        /// Сделать HUD табло: клик перехватывают только кнопки, всё остальное уходит в мир.
+        /// <para>
+        /// UI Toolkit съедает клик под любым нарисованным элементом — а «нарисован» тут не только
+        /// тёмный прямоугольник панели. Контейнер <c>hud</c> тянется по ширине панели инструментов
+        /// и по высоте всей колонки, и эта прозрачная четверть экрана глотала клики молча: игрок
+        /// видел грядку сквозь пустоту, целился в неё и не понимал, почему она не берётся. Сами
+        /// панели ничем не лучше — сквозь них нарочно видно ферму, а нажать в них нечего.
+        /// </para>
+        /// <para>
+        /// Правило простое: отвечает на клик — ловит клик. В HUD отвечают только кнопки.
+        /// </para>
+        /// <para>
+        /// Разом по поддереву, а не атрибутом <c>picking-mode</c> у каждой строки в UXML: первая же
+        /// добавленная потом строка тихо вернула бы мёртвую зону, и связать её с этим местом было
+        /// бы нечем.
+        /// </para>
+        /// </summary>
+        private static void MakeReadout(VisualElement hud)
+        {
+            if (hud == null) return;
+
+            hud.pickingMode = PickingMode.Ignore;
+            hud.Query<VisualElement>().ForEach(e => e.pickingMode = PickingMode.Ignore);
+            hud.Query<Button>().ForEach(b => b.pickingMode = PickingMode.Position);
+        }
+
+        private void OnCarryChanged(Transform carried) => ApplyBusy();
+
+        private void OnGatherChanged(Gatherable node) => ApplyBusy();
+
+        /// <summary>
+        /// Пока игрок ведёт ношу или собирает узел, колонка статуса отступает.
+        /// <para>
+        /// Клики она больше не перехватывает, но остаётся тёмной доской над углом поля, и грядка
+        /// в руке уезжала бы под неё вслепую. Заодно это и объяснение: панель, которая при первом
+        /// же переносе отходит в сторону, читается как табло, а не как преграда.
+        /// </para>
+        /// </summary>
+        private void ApplyBusy()
+        {
+            if (_panels == null) return;
+
+            _panels.EnableInClassList(BusyClass, DragFocus.ByPlayer || GatherFocus.Current != null);
+        }
+
         // ---- сворачивание панелей ----
 
         /// <summary>
-        /// Спрятать колонку с панелями. UI Toolkit съедает клики под любым нарисованным элементом,
-        /// и панели были мёртвой зоной над третью поля — игрок должен уметь убрать их с дороги,
+        /// Спрятать колонку с панелями. Клики она не ест (см. <see cref="MakeReadout"/>), но
+        /// закрывает собой угол поля — на маленьком экране игрок должен уметь убрать её с глаз,
         /// не теряя панель инструментов.
         /// </summary>
         public void TogglePanels()
@@ -528,7 +632,10 @@ namespace Farm.UI
                 case FarmerState.UsingService: return "ест и пьёт";
                 case FarmerState.GoingToMarket: return "идёт на рынок";
                 case FarmerState.AtMarket: return "торгует";
+                case FarmerState.GoingToSleep: return "идёт спать";
                 case FarmerState.Sleeping: return "спит";
+                case FarmerState.GoingToImprove: return "идёт обустраивать";
+                case FarmerState.Improving: return "мастерит";
                 case FarmerState.Thinking: return "прикидывает";
                 case FarmerState.Relaxing: return "отдыхает";
                 case FarmerState.Awaiting: return "ждёт урожай";

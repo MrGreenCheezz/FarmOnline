@@ -14,7 +14,57 @@ namespace Farm.Farming
         /// <summary>Перерабатывает сырьё в лучшее. Работает сама — см. <see cref="Workshop"/>.</summary>
         Workshop = 2,
         /// <summary>Платит надбавку с каждой продажи. Пассивен, ходить не к чему.</summary>
-        Market = 3
+        Market = 3,
+        /// <summary>
+        /// Постоянно усиливает всю ферму — что именно, говорит <see cref="BuildingDefinition.Boost"/>.
+        /// Пассивна: работает фактом своего существования, ходить не к чему.
+        /// </summary>
+        Boost = 4
+    }
+
+    /// <summary>
+    /// Что усиливает постройка-усилитель. Значения сериализуются — добавляй в конец.
+    /// <para>
+    /// Это нарочно список <i>узких мест</i>, а не список ресурсов: ускорять «пшеницу» —
+    /// это контент, который придётся дописывать под каждый новый ассет, а ускорять «рост»
+    /// работает для всего, что вырастет в игре потом. Выбор игрока при этом остаётся
+    /// стратегическим: усилители дороги, и вкладываться сразу во все не выйдет.
+    /// </para>
+    /// </summary>
+    public enum FarmBoost
+    {
+        None = 0,
+        /// <summary>Множитель скорости роста всех грядок, загонов и жил.</summary>
+        GrowthSpeed = 1,
+        /// <summary>Добавка к урожаю каждого сбора, долей.</summary>
+        HarvestYield = 2,
+        /// <summary>Множитель скорости ходьбы фермера.</summary>
+        MoveSpeed = 3,
+        /// <summary>Дополнительные ячейки склада, штук. По природе глобален — радиус его не касается.</summary>
+        StorageSlots = 4,
+        /// <summary>Насколько медленнее садятся нужды фермера, долей.</summary>
+        Vigor = 5,
+        /// <summary>Защита от увядания: спелое в ауре не портится, сколько бы ни стояло.</summary>
+        WitherGuard = 6
+    }
+
+    /// <summary>
+    /// Кого касается аура усилителя. Значения сериализуются — добавляй в конец.
+    /// <para>
+    /// Фильтр — это личность постройки: пасека, которая усиливает и руду, — не пасека,
+    /// а безликий «усилитель №3». Узкая аура и читается лучше, и дешевле стоит.
+    /// </para>
+    /// </summary>
+    public enum AuraFilter
+    {
+        /// <summary>Всё, что растёт (или сам фермер — для его аур).</summary>
+        Everything = 0,
+        /// <summary>Только посевы и деревья.</summary>
+        Crops = 1,
+        /// <summary>Только живность.</summary>
+        Livestock = 2,
+        /// <summary>Только жилы.</summary>
+        Ore = 3
     }
 
     /// <summary>Одна ступень лестницы улучшений постройки.</summary>
@@ -108,11 +158,49 @@ namespace Farm.Farming
         [Tooltip("Что эта постройка умеет перерабатывать. Только для службы Workshop.")]
         [SerializeField] private WorkshopRecipe[] _recipes = Array.Empty<WorkshopRecipe>();
 
+        [Header("Усилитель")]
+        [Tooltip("Что усиливает постройка. Только для службы Boost; величина берётся из Output уровня.")]
+        [SerializeField] private FarmBoost _boost = FarmBoost.None;
+
+        [Tooltip("Радиус действия на первом уровне, метров. 0 — вся ферма (для того, что глобально " +
+                 "по природе, вроде ячеек склада). Радиус и делает постройку решением о размещении, " +
+                 "а не строчкой в списке покупок.")]
+        [SerializeField, Min(0f)] private float _auraRadius;
+
+        [Tooltip("На сколько метров аура растёт с каждым уровнем после первого.")]
+        [SerializeField, Min(0f)] private float _auraRadiusPerLevel = 1f;
+
+        [Tooltip("Кого касается аура. Узкая — дешевле и читается как личность постройки.")]
+        [SerializeField] private AuraFilter _auraFilter = AuraFilter.Everything;
+
         public string Id => string.IsNullOrEmpty(_id) ? name : _id;
         public string DisplayName => string.IsNullOrEmpty(_displayName) ? Id : _displayName;
         public string Description => _description;
         public Sprite Icon => _icon;
         public BuildingService Service => _service;
+
+        /// <summary>Что усиливает. <see cref="FarmBoost.None"/> у всего, что не усилитель.</summary>
+        public FarmBoost Boost => _service == BuildingService.Boost ? _boost : FarmBoost.None;
+
+        /// <summary>Кого касается аура усилителя.</summary>
+        public AuraFilter AuraFilter => _auraFilter;
+
+        /// <summary>Радиус ауры на уровне. 0 — действует на всю ферму.</summary>
+        public float AuraRadiusAt(int level) =>
+            _auraRadius <= 0f ? 0f : _auraRadius + _auraRadiusPerLevel * Mathf.Max(0, level - 1);
+
+        /// <summary>Подходит ли категория растимого под фильтр ауры.</summary>
+        public bool AuraCovers(ResourceCategory category)
+        {
+            switch (_auraFilter)
+            {
+                case AuraFilter.Crops: return category == ResourceCategory.Crop;
+                case AuraFilter.Livestock: return category == ResourceCategory.Livestock;
+                case AuraFilter.Ore: return category == ResourceCategory.Ore;
+                default: return true;
+            }
+        }
+
         public GameObject Prefab => _prefab;
         public float ServiceDuration => _serviceDuration;
         public float BaseRestore => _baseRestore;

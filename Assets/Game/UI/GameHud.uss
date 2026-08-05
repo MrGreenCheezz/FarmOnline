@@ -24,12 +24,15 @@
 .gold {
     font-size: 24px;
     -unity-font-style: bold;
-    color: rgb(255, 205, 90);
-    background-color: rgba(18, 22, 28, 0.88);
-    border-radius: 6px;
+    color: rgb(255, 210, 110);
+    background-color: rgba(26, 19, 13, 0.88);
+    border-radius: 5px;
+    border-width: 1px;
+    border-color: rgba(150, 108, 62, 0.7);
     padding: 5px 14px 6px 14px;
     margin-right: 10px;
     -unity-text-align: middle-center;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .gold--inline {
@@ -40,20 +43,27 @@
 .hud-panels {
     flex-direction: column;
     align-items: flex-start;
+    transition-property: opacity;
+    transition-duration: 0.16s;
 }
+
+/* Игрок ведёт ношу мимо колонки — колонка уступает дорогу (GameHud.ApplyBusy).
+   Не до нуля: пропавшее табло читалось бы как сбой, а не как вежливость. */
+.hud-panels--busy { opacity: 0.25; }
 
 .btn--ghost {
-    background-color: rgba(30, 36, 45, 0.75);
-    color: rgba(228, 234, 240, 0.65);
+    color: rgba(246, 232, 210, 0.66);
+    -unity-font-style: normal;
     margin-left: 4px;
+    opacity: 0.82;
 }
 
-.btn--ghost:hover { color: rgb(232, 238, 244); }
+.btn--ghost:hover { color: rgb(252, 240, 220); opacity: 1; }
 
 /* Выключенный переключатель: тусклее обычного, чтобы состояние читалось без чтения текста. */
 .btn--muted {
-    color: rgba(228, 234, 240, 0.34);
-    background-color: rgba(30, 36, 45, 0.5);
+    color: rgba(246, 232, 210, 0.34);
+    opacity: 0.6;
 }
 
 /* ---- настройки ---- */
@@ -89,12 +99,14 @@
     margin-top: -5px;
 }
 
+/* Панели HUD остаются тёмными и полупрозрачными: сквозь них видно ферму, и доска
+   на пол-экрана закрыла бы то, ради чего игра. Деревенское тут — тёплая окантовка. */
 .panel {
-    background-color: rgba(18, 22, 28, 0.88);
-    border-left-color: rgba(120, 200, 140, 0.95);
+    background-color: rgba(26, 19, 13, 0.85);
+    border-left-color: rgb(150, 108, 62);
     border-left-width: 4px;
-    border-top-right-radius: 8px;
-    border-bottom-right-radius: 8px;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
     padding: 10px 16px 12px 12px;
     margin-bottom: 10px;
     min-width: 300px;
@@ -115,6 +127,11 @@
 }
 
 .row--muted { color: rgba(228, 234, 240, 0.45); }
+
+.row--alert {
+    color: rgb(240, 128, 116);
+    -unity-font-style: bold;
+}
 
 .row--strong {
     -unity-font-style: bold;
@@ -189,15 +206,28 @@
 
 .badge {
     position: absolute;
+    flex-direction: row;
+    align-items: center;
+    background-color: rgba(20, 24, 30, 0.85);
+    border-radius: 9px;
+    border-width: 2px;
+    padding: 2px 6px 2px 3px;
+}
+
+/* Что растёт. Иконка та же, что в инвентаре: цвет фишки связывает грядку со складом. */
+.badge__icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 3px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+.badge__level {
     font-size: 14px;
     -unity-font-style: bold;
     -unity-text-align: middle-center;
     color: rgb(255, 255, 255);
-    background-color: rgba(20, 24, 30, 0.85);
-    border-radius: 9px;
-    border-width: 2px;
-    padding: 1px 7px 2px 7px;
-    min-width: 26px;
+    min-width: 12px;
 }
 
 /* Цвет — быстрый способ увидеть, что с чем сливать, не читая цифру. */
@@ -211,6 +241,32 @@
 .badge--ready {
     background-color: rgb(70, 142, 86);
     color: rgb(255, 255, 255);
+}
+
+/* ---- первый урок ---- */
+
+/* Внизу по центру: верх экрана занят HUD, а середина — та самая пара, на которую смотрят.
+   Без подложки — строка живёт минуту за партию, и плашка ради неё утяжелила бы кадр. */
+.lesson {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 44px;
+    font-size: 19px;
+    color: rgb(255, 236, 190);
+    -unity-text-align: middle-center;
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+/* Кольцо над грядкой. Пустое внутри: закрасить грядку значило бы спрятать то,
+   на что показываешь. Пульс задаётся из кода — покадрово и немасштабируемым временем. */
+.merge-mark {
+    position: absolute;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border-width: 3px;
+    border-color: rgb(255, 236, 150);
 }
 
 /* ---- всплывающие числа ---- */
@@ -324,23 +380,31 @@
 
 /* ================= кнопки ================= */
 
+/* Деревянные кнопки: те же 9-slice доски, что в меню. Одна тема на всю игру —
+   интерфейс, который в меню деревенский, а в игре стеклянный, читается как два разных. */
 .btn {
     font-size: 15px;
-    color: rgb(232, 238, 244);
-    background-color: rgba(52, 62, 74, 0.95);
+    color: rgb(252, 240, 220);
+    -unity-font-style: bold;
+
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: tiled;
+    background-color: rgba(0, 0, 0, 0);
     border-width: 0;
-    border-radius: 6px;
-    padding: 7px 14px 8px 14px;
+
+    padding: 8px 15px 9px 15px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
 }
 
-.btn:hover { background-color: rgba(74, 88, 104, 1); }
+.btn:hover { background-image: url("project://database/Assets/Game/UI/Skin/wood_button_hover.png"); }
 .btn:disabled { opacity: 0.4; }
 
 .btn--accent {
-    background-color: rgba(72, 132, 88, 0.95);
-    -unity-font-style: bold;
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green.png");
+    color: rgb(250, 255, 240);
 }
-.btn--accent:hover { background-color: rgb(96, 168, 112); }
+.btn--accent:hover { background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green.png"); }
 
 .btn--icon {
     font-size: 16px;
@@ -394,13 +458,13 @@
 
 .window--narrow { width: 420px; }
 
+/* Окна — тот же сколоченный щит, что и панель меню. */
 .window {
     width: 620px;
     max-height: 78%;
-    background-color: rgb(24, 29, 36);
-    border-radius: 10px;
-    border-width: 1px;
-    border-color: rgba(255, 255, 255, 0.12);
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_panel.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: tiled;
     padding: 0;
     overflow: hidden;
 }
@@ -408,16 +472,19 @@
 .window__header {
     flex-direction: row;
     align-items: center;
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(0, 0, 0, 0.28);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 226, 180, 0.12);
     padding: 10px 12px 10px 16px;
 }
 
 .window__title {
     font-size: 18px;
     -unity-font-style: bold;
-    color: rgb(150, 210, 165);
+    color: rgb(255, 219, 138);
     letter-spacing: 2px;
     flex-grow: 1;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
 }
 
 .window__body {

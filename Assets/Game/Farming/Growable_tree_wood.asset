@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: tree_wood
   _displayName: "\u0414\u0435\u0440\u0435\u0432\u043E"
   _category: 0
-  _defaultStageDuration: 24
+  _defaultStageDuration: 48
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 24
+    _duration: 48
     _visual: {fileID: 919132149155446097, guid: 6dda7df3f97caf549a4e54c5120dff53, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

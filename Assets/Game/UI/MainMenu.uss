@@ -1,0 +1,184 @@
+/* Главное меню. Панель прижата влево: справа должна оставаться живая ферма — она здесь
+   не фон, а половина обещания, ради которого игрок и нажимает «Продолжить». */
+
+.menu {
+    flex-grow: 1;
+    flex-direction: row;
+    align-items: center;
+}
+
+/* Дерево вместо стекла: панель — сколоченный щит, кнопки — доски с гвоздиками.
+   Спрайты 9-slice лежат в Assets/Game/UI/Skin и нарисованы кодом в палитре фермы.
+
+   Середина мостится, а не тянется. Спрайт панели — 64×64, из них на середину
+   приходится 48×48; растянутая на всю панель, она давала десятикратное увеличение,
+   и волокна дерева превращались в горизонтальные разводы. Замощение показывает
+   рисунок в родном масштабе — доски повторяются, что щиту и полагается. */
+.menu__panel {
+    flex-direction: column;
+    align-items: flex-start;
+    margin-left: 9%;
+    padding: 34px 40px 36px 40px;
+    min-width: 340px;
+
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_panel.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: tiled;
+}
+
+.menu__title {
+    font-size: 62px;
+    -unity-font-style: bold;
+    color: rgb(255, 219, 138);
+    letter-spacing: 6px;
+    margin-bottom: 2px;
+    text-shadow: 2px 2px 3px rgba(0, 0, 0, 0.65);
+}
+
+.menu__subtitle {
+    font-size: 16px;
+    color: rgba(246, 232, 210, 0.6);
+    margin-bottom: 18px;
+}
+
+/* Не линия, а прибитая планка — щит из досок скрепляют поперечиной. */
+.menu__rule {
+    height: 3px;
+    width: 100%;
+    background-color: rgba(28, 18, 11, 0.7);
+    border-bottom-width: 1px;
+    border-bottom-color: rgba(255, 226, 180, 0.14);
+    margin-bottom: 14px;
+}
+
+/* Строка состояния партии: она отвечает на «а что там у меня было». */
+.menu__info {
+    font-size: 15px;
+    color: rgb(186, 226, 158);
+    margin-bottom: 20px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.menu__info--empty { color: rgba(246, 232, 210, 0.42); }
+
+.menu__button {
+    width: 100%;
+    font-size: 20px;
+    color: rgb(252, 240, 220);
+    -unity-font-style: bold;
+
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: tiled;
+    background-color: rgba(0, 0, 0, 0);
+    border-width: 0;
+
+    padding: 13px 20px 14px 20px;
+    margin: 0 0 9px 0;
+    -unity-text-align: middle-left;
+
+    /* Тёмная подложка под текстом: на доске светлые буквы иначе теряются в волокнах. */
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.75);
+}
+
+.menu__button:hover {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_hover.png");
+    color: rgb(255, 250, 236);
+}
+
+/* Главный путь выделен цветом доски, а не размером: ряд из кнопок разной высоты выглядит сломанным. */
+.menu__button--primary {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green.png");
+    color: rgb(250, 255, 240);
+}
+
+.menu__button--primary:hover {
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_button_green.png");
+    color: rgb(255, 255, 255);
+}
+
+.menu__button--quiet {
+    color: rgba(246, 232, 210, 0.72);
+    -unity-font-style: normal;
+}
+
+.menu__button--quiet:hover { color: rgb(252, 240, 220); }
+
+.menu__button--danger { color: rgb(255, 214, 202); }
+
+/* ---- подтверждение ---- */
+
+.menu__overlay {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(8, 10, 14, 0.72);
+    align-items: center;
+    justify-content: center;
+}
+
+.menu__dialog {
+    flex-direction: column;
+    padding: 26px 30px 26px 30px;
+    min-width: 380px;
+
+    background-image: url("project://database/Assets/Game/UI/Skin/wood_panel.png");
+    -unity-slice-scale: 1px;
+    -unity-slice-type: tiled;
+}
+
+.menu__dialog-title {
+    font-size: 24px;
+    -unity-font-style: bold;
+    color: rgb(255, 219, 138);
+    margin-bottom: 6px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.menu__dialog-text {
+    font-size: 15px;
+    color: rgba(246, 232, 210, 0.72);
+    margin-bottom: 18px;
+    white-space: normal;
+}
+
+/* ---- ползунки звука ---- */
+
+.menu__setting-label {
+    font-size: 15px;
+    color: rgba(228, 234, 240, 0.75);
+    margin-bottom: 4px;
+}
+
+.menu__slider {
+    margin-bottom: 14px;
+}
+
+.menu__slider .unity-base-slider__tracker {
+    background-color: rgba(255, 255, 255, 0.12);
+    border-width: 0;
+    height: 5px;
+    border-radius: 3px;
+}
+
+.menu__slider .unity-base-slider__dragger {
+    background-color: rgb(168, 226, 178);
+    border-width: 0;
+    border-radius: 8px;
+    width: 16px;
+    height: 16px;
+    margin-top: -6px;
+}
+
+.menu__dialog-row {
+    flex-direction: row;
+    justify-content: flex-end;
+}
+
+.menu__dialog-row .menu__button {
+    width: auto;
+    margin: 0 0 0 10px;
+    -unity-text-align: middle-center;
+}

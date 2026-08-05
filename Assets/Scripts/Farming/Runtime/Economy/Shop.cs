@@ -67,6 +67,27 @@ namespace Farm.Farming
             return count;
         }
 
+        // ---- сохранение ----
+
+        /// <summary>Что и сколько куплено — лимиты «одна на ферму» обязаны пережить загрузку.</summary>
+        public IReadOnlyDictionary<ShopItemDefinition, int> CaptureOwned() => _owned;
+
+        public void RestoreOwned(ShopItemDefinition item, int count)
+        {
+            if (item == null || count <= 0) return;
+            _owned[item] = count;
+        }
+
+        /// <summary>
+        /// Записать объект в занятые места. Загрузка ставит купленное сама, минуя
+        /// <see cref="TryBuy"/>, — без этого магазин считал бы ферму пустой и ронял
+        /// новые покупки прямо в стоящие постройки.
+        /// </summary>
+        public void RegisterPlaced(Transform placed)
+        {
+            if (placed != null) _placed.Add(placed);
+        }
+
         // ---- покупка ----
 
         public bool CanBuy(ShopItemDefinition item, out string reason)

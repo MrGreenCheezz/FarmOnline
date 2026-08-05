@@ -212,6 +212,13 @@ namespace Farm.Farming
             Apply();
         }
 
+        /// <summary>Вернуть часы из сохранения: и время суток, и номер дня.</summary>
+        public void RestoreState(float time01, int day)
+        {
+            _day = Mathf.Max(1, day);
+            SetTime(time01);
+        }
+
         private void Apply()
         {
             if (_sun == null) return;

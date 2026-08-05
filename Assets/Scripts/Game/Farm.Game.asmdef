@@ -1,0 +1,17 @@
+{
+    "name": "Farm.Game",
+    "rootNamespace": "Farm.Game",
+    "references": [
+        "Farm.Farming",
+        "Farm.Characters"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

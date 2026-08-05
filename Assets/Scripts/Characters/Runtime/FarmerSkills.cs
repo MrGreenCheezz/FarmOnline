@@ -120,6 +120,34 @@ namespace Farm.Characters
             if (_levels[index] >= _maxLevel) _xp[index] = 0f;
         }
 
+        // ---- сохранение ----
+
+        /// <summary>Уровни и недобранный опыт по порядку enum. Длина — <see cref="SkillCount"/>.</summary>
+        public void CaptureState(out int[] levels, out float[] xp)
+        {
+            EnsureReady();
+            levels = (int[])_levels.Clone();
+            xp = (float[])_xp.Clone();
+        }
+
+        /// <summary>
+        /// Вернуть уровни из сохранения. Короткий массив (сейв старой версии, где навыков
+        /// было меньше) достраивается стартовыми — новый навык начинается с нуля, а не ломает загрузку.
+        /// </summary>
+        public void RestoreState(int[] levels, float[] xp)
+        {
+            EnsureReady();
+
+            for (int i = 0; i < SkillCount; i++)
+            {
+                _levels[i] = levels != null && i < levels.Length
+                    ? Mathf.Clamp(levels[i], 1, _maxLevel)
+                    : Mathf.Max(1, _startingLevel);
+
+                _xp[i] = xp != null && i < xp.Length ? Mathf.Max(0f, xp[i]) : 0f;
+            }
+        }
+
         // ---- что это даёт ----
 
         /// <summary>Множитель скорости сбора.</summary>

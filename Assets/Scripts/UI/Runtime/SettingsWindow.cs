@@ -9,13 +9,31 @@ namespace Farm.UI
     /// срабатывает только по «применить», заставляет игрока угадывать, что он выбирает.
     /// <para>
     /// Сохранение живёт в <see cref="Sfx"/>, а не здесь: настройка обязана пережить закрытие
-    /// окна, перезагрузку сцены и полную замену интерфейса.
+    /// окна, перезагрузку сцены и полную замену интерфейса. Оттуда же её видит и главное меню —
+    /// это одна настройка на игру, а не две одинаковые в разных местах.
+    /// </para>
+    /// <para>
+    /// Имена элементов вынесены в поля, чтобы то же окно работало и в меню, где своя разметка.
+    /// Дублировать сорок строк биндинга ради второй сцены было бы обидно вдвойне: два экземпляра
+    /// одной настройки — это два места, где она однажды разойдётся.
     /// </para>
     /// </summary>
     [RequireComponent(typeof(UIDocument))]
     [AddComponentMenu("Farm/UI/Settings Window")]
     public sealed class SettingsWindow : MonoBehaviour
     {
+        [Header("Имена элементов в разметке")]
+        [SerializeField] private string _overlayName = "settings-overlay";
+        [SerializeField] private string _masterName = "volume-master";
+        [SerializeField] private string _effectsName = "volume-effects";
+        [SerializeField] private string _masterLabelName = "volume-master-label";
+        [SerializeField] private string _effectsLabelName = "volume-effects-label";
+        [SerializeField] private string _closeName = "settings-close";
+        [SerializeField] private string _testName = "volume-test";
+
+        [Tooltip("Кнопка, открывающая окно. Пусто — окно открывает кто-то снаружи (в игре это GameHud).")]
+        [SerializeField] private string _openName = "";
+
         private VisualElement _overlay;
         private Slider _master;
         private Slider _effects;
@@ -29,17 +47,23 @@ namespace Farm.UI
             var root = GetComponent<UIDocument>()?.rootVisualElement;
             if (root == null) { enabled = false; return; }
 
-            _overlay = root.Q<VisualElement>("settings-overlay");
-            _master = root.Q<Slider>("volume-master");
-            _effects = root.Q<Slider>("volume-effects");
-            _masterLabel = root.Q<Label>("volume-master-label");
-            _effectsLabel = root.Q<Label>("volume-effects-label");
+            _overlay = root.Q<VisualElement>(_overlayName);
+            _master = root.Q<Slider>(_masterName);
+            _effects = root.Q<Slider>(_effectsName);
+            _masterLabel = root.Q<Label>(_masterLabelName);
+            _effectsLabel = root.Q<Label>(_effectsLabelName);
 
-            var close = root.Q<Button>("settings-close");
+            var close = root.Q<Button>(_closeName);
             if (close != null) close.clicked += Close;
 
-            var test = root.Q<Button>("volume-test");
+            var test = root.Q<Button>(_testName);
             if (test != null) test.clicked += () => Sfx.Play(b => b.Merge);
+
+            if (!string.IsNullOrEmpty(_openName))
+            {
+                var open = root.Q<Button>(_openName);
+                if (open != null) open.clicked += Open;
+            }
 
             if (_overlay != null) _overlay.RegisterCallback<ClickEvent>(OnOverlayClick);
 

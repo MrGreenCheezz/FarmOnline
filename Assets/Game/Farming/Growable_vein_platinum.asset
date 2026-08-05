@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: vein_platinum
   _displayName: "\u041F\u043B\u0430\u0442\u0438\u043D\u043E\u0432\u0430\u044F \u0436\u0438\u043B\u0430"
   _category: 2
-  _defaultStageDuration: 177.88814
+  _defaultStageDuration: 355.7763
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 177.88814
+    _duration: 355.7763
     _visual: {fileID: 5027417899829189703, guid: 48b833f370a6fbe46b27d0a9f827ea1e, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

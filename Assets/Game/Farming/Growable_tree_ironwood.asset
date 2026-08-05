@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: tree_ironwood
   _displayName: "\u0416\u0435\u043B\u0435\u0437\u043D\u043E\u0435 \u0434\u0435\u0440\u0435\u0432\u043E"
   _category: 0
-  _defaultStageDuration: 65.34
+  _defaultStageDuration: 130.68
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 65.34
+    _duration: 130.68
     _visual: {fileID: 919132149155446097, guid: 409ba83a38e994e4e978d4940db22f0d, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

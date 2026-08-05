@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: vein_gold
   _displayName: "\u0417\u043E\u043B\u043E\u0442\u0430\u044F \u0436\u0438\u043B\u0430"
   _category: 2
-  _defaultStageDuration: 107.811005
+  _defaultStageDuration: 215.622
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 107.811005
+    _duration: 215.622
     _visual: {fileID: 5675987132674519758, guid: d547065c5de5399499878110de039057, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

@@ -175,9 +175,13 @@ namespace Farm.Farming
                 Quaternion.LookRotation(direction, Vector3.up),
                 _turnSpeed * Time.deltaTime);
 
-            Vector3 next = transform.position + direction * Mathf.Min(_speed * Time.deltaTime, distance);
+            Vector3 previous = transform.position;
+            Vector3 next = previous + direction * Mathf.Min(_speed * Time.deltaTime, distance);
             next.y = _groundY + FarmingRuntime.Ground.SampleHeight(next);
             transform.position = next;
+
+            // Скотина тоже топчет — вокруг загона сама собой появляется вытоптанная земля.
+            Footpaths.Report(previous, next);
 
             float step = Mathf.Min(_speed * Time.deltaTime, distance);
 

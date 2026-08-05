@@ -19,7 +19,7 @@ MonoBehaviour:
   _icon: {fileID: 21300000, guid: 20d8f92c9d5a45046926a98e577f445e, type: 3}
   _category: 0
   _price:
-    Gold: 42
+    Gold: 68
     Resources:
     - Resource: {fileID: 11400000, guid: 455db639183c5884eb92aed3433d92cc, type: 2}
       Amount: 10

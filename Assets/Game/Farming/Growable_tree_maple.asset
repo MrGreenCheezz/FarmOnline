@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: tree_maple
   _displayName: "\u041A\u043B\u0451\u043D"
   _category: 0
-  _defaultStageDuration: 107.811005
+  _defaultStageDuration: 215.622
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 107.811005
+    _duration: 215.622
     _visual: {fileID: 919132149155446097, guid: f0a552d270054804aa1853fef542bbe0, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

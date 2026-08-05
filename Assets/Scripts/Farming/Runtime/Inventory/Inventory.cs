@@ -34,21 +34,39 @@ namespace Farm.Farming
     /// </summary>
     public class Inventory : IInventory
     {
+        /// <summary>Сколько единиц кладётся в ячейку, если не сказано иное.</summary>
+        public const int DefaultStackSize = 99;
+
         private readonly List<InventoryEntry> _entries = new List<InventoryEntry>(8);
+
+        private int _stackSize = DefaultStackSize;
 
         public Inventory() : this(InventoryCapacity.Unlimited, 0) { }
 
-        public Inventory(InventoryCapacity mode, int capacity, bool allowOverflow = false)
+        public Inventory(InventoryCapacity mode, int capacity, bool allowOverflow = false,
+                         int stackSize = DefaultStackSize)
         {
             CapacityMode = mode;
             Capacity = capacity;
             AllowOverflow = allowOverflow;
+            StackSize = stackSize;
         }
 
         public InventoryCapacity CapacityMode { get; set; }
 
-        /// <summary>Смысл зависит от <see cref="CapacityMode"/>: единицы или число разных ресурсов.</summary>
+        /// <summary>Смысл зависит от <see cref="CapacityMode"/>: единицы или ячейки.</summary>
         public int Capacity { get; set; }
+
+        /// <summary>
+        /// Вместимость одной ячейки в единицах. Это то, что делает лимит независимым от
+        /// контента: ячейка меряет объём, поэтому новый вид ресурса ничего не занимает,
+        /// пока его реально не принесли.
+        /// </summary>
+        public int StackSize
+        {
+            get => _stackSize;
+            set => _stackSize = Mathf.Max(1, value);
+        }
 
         /// <summary>
         /// Когда включено, одно добавление никогда не урезается, даже сверх лимита —
@@ -65,6 +83,23 @@ namespace Farm.Farming
         public int DistinctCount => _entries.Count;
         public bool IsEmpty => TotalUnits == 0;
 
+        /// <summary>
+        /// Считается проходом, а не счётчиком: записей десятки, а кэш пришлось бы чинить
+        /// в четырёх местах и заново при смене <see cref="StackSize"/> — цена расхождения
+        /// здесь выше цены цикла.
+        /// </summary>
+        public int UsedSlots
+        {
+            get
+            {
+                int stack = _stackSize;
+                int slots = 0;
+                for (int i = 0; i < _entries.Count; i++)
+                    slots += (_entries[i].Amount + stack - 1) / stack;
+                return slots;
+            }
+        }
+
         public IReadOnlyList<InventoryEntry> Entries => _entries;
 
         public event Action<IInventory> Changed;
@@ -79,7 +114,7 @@ namespace Farm.Farming
                 switch (CapacityMode)
                 {
                     case InventoryCapacity.Units: return TotalUnits >= Capacity;
-                    case InventoryCapacity.Slots: return DistinctCount >= Capacity;
+                    case InventoryCapacity.Slots: return UsedSlots >= Capacity;
                     default: return false;
                 }
             }
@@ -92,8 +127,9 @@ namespace Farm.Farming
                 switch (CapacityMode)
                 {
                     case InventoryCapacity.Units: return Mathf.Max(0, Capacity - TotalUnits);
-                    // Ячейки не ограничивают единицы — только число разных ресурсов.
-                    case InventoryCapacity.Slots: return DistinctCount < Capacity ? int.MaxValue : 0;
+                    // Только целые ячейки: недобитый стек примет свой ресурс и откажет
+                    // любому другому, поэтому обещать его «вообще всем» нельзя.
+                    case InventoryCapacity.Slots: return ClampToInt(FreeSlotUnits());
                     default: return int.MaxValue;
                 }
             }
@@ -250,21 +286,41 @@ namespace Farm.Farming
             }
         }
 
-        // ---- внутренности ----
-
-        private int FreeUnitsFor(ResourceDefinition resource)
+        /// <summary>
+        /// Сколько единиц этого ресурса инвентарь ещё примет. Публичный не для галочки:
+        /// мозг фермера спрашивает это перед доставкой — нести урожай на склад, который
+        /// его не возьмёт, значит уничтожить урожай и соврать игроку об успехе.
+        /// </summary>
+        public int FreeUnitsFor(ResourceDefinition resource)
         {
             switch (CapacityMode)
             {
                 case InventoryCapacity.Units:
                     return Mathf.Max(0, Capacity - TotalUnits);
                 case InventoryCapacity.Slots:
-                    // Существующий стек не кончается никогда; новому нужна свободная ячейка.
-                    return IndexOf(resource) >= 0 || DistinctCount < Capacity ? int.MaxValue : 0;
+                {
+                    long units = FreeSlotUnits();
+
+                    // Верхний стек этого ресурса мог остаться недобитым — в него ещё влезет,
+                    // и это единственное, что отличает «место для него» от «места вообще».
+                    int tail = GetAmount(resource) % _stackSize;
+                    if (tail > 0) units += _stackSize - tail;
+
+                    return ClampToInt(units);
+                }
                 default:
                     return int.MaxValue;
             }
         }
+
+        /// <summary>Целые свободные ячейки, переведённые в единицы. long — чтобы большой склад не переполнил int.</summary>
+        private long FreeSlotUnits()
+        {
+            int free = Capacity - UsedSlots;
+            return free > 0 ? (long)free * _stackSize : 0L;
+        }
+
+        private static int ClampToInt(long units) => units >= int.MaxValue ? int.MaxValue : (int)units;
 
         private int IndexOf(ResourceDefinition resource)
         {

@@ -9,6 +9,9 @@
 /[Mm]emoryCaptures/
 /[Rr]ecordings/
 
+# Burst роняет сюда сгенерированный код при веб-сборке — это вывод, а не исходник
+/Data/
+
 # Кэш Visual Scripting
 /[Aa]ssets/Plugins/Editor/JetBrains*
 

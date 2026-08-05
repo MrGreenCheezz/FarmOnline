@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 637c7baae8a698e469f055d74f969fcf, type: 3}
+  m_Name: Improvement_signpost
+  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.ImprovementDefinition
+  _id: signpost
+  _thought: "\u043F\u043E\u0441\u0442\u0430\u0432\u043B\u044E \u0443\u043A\u0430\u0437\u0430\u0442\u0435\u043B\u044C"
+  _prefab: {fileID: 8602832566322071134, guid: 05b01e7b6fdb38d439e47cc4721709b7, type: 3}
+  _cost:
+    Resource: {fileID: 11400000, guid: 4e1b1690ff8cb9e4ea0c362f99990416, type: 2}
+    Amount: 2
+  _buildSeconds: 6
+  _minDay: 2
+  _minHarvested: 250
+  _anchor: 0
+  _anchorBuilding: {fileID: 0}
+  _anchorRadius: {x: 2.5, y: 4}
+  _maxCount: 1
+  _order: 1
+  _weight: 1

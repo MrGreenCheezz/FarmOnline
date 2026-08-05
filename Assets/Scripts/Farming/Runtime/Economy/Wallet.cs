@@ -71,6 +71,15 @@ namespace Farm.Farming
             return true;
         }
 
+        /// <summary>Поставить золото как есть — для загрузки сохранения. Событие поднимается с дельтой.</summary>
+        public void RestoreState(int gold)
+        {
+            int delta = Mathf.Max(0, gold) - Gold;
+            _gold = Mathf.Max(0, gold);
+            _initialised = true;
+            if (delta != 0) Raise(delta);
+        }
+
         private void Raise(int delta)
         {
             var handler = Changed;

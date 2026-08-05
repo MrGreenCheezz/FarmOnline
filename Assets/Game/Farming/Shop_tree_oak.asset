@@ -21,8 +21,10 @@ MonoBehaviour:
   _icon: {fileID: 21300000, guid: 984b408f02a718f459d490881eea7616, type: 3}
   _category: 0
   _price:
-    Gold: 70
-    Resources: []
+    Gold: 113
+    Resources:
+    - Resource: {fileID: 11400000, guid: 4e1b1690ff8cb9e4ea0c362f99990416, type: 2}
+      Amount: 10
   _kind: 0
   _growable: {fileID: 11400000, guid: 4e04e1ccd51c1114189ac0f159d04fab, type: 2}
   _prefab: {fileID: 0}

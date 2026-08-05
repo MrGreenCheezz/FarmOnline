@@ -15,10 +15,10 @@ MonoBehaviour:
   _id: tree_ebony
   _displayName: "\u042D\u0431\u0435\u043D"
   _category: 0
-  _defaultStageDuration: 293.51544
+  _defaultStageDuration: 587.0309
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
-    _duration: 293.51544
+    _duration: 587.0309
     _visual: {fileID: 919132149155446097, guid: 774c510d5ab7f6b49b67af9e13636d26, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0

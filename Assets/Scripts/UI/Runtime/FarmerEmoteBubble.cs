@@ -67,6 +67,7 @@ namespace Farm.UI
             _layer = root?.Q<VisualElement>("emote-layer");
 
             if (_camera == null) _camera = Camera.main;
+            if (_farmer == null) _farmer = FarmerRegistry.Primary;
             if (_farmer == null) _farmer = FindFirstObjectByType<FarmerAgent>();
             if (_layer == null) { enabled = false; return; }
 
