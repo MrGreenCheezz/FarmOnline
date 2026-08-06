@@ -12,7 +12,6 @@ namespace Farm.Juice
         public GameObject Harvest;
         public GameObject Plant;
         public GameObject Ready;
-        public GameObject Wither;
         public GameObject Place;
     }
 }

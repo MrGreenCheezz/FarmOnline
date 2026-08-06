@@ -66,10 +66,6 @@ namespace Farm.Farming
                  "Без этого поле зарастает невидимыми мёртвыми объектами, которые всё ещё можно схватить.")]
         [SerializeField] private bool _removeWhenEmpty = true;
 
-        [Header("Порча")]
-        [Tooltip("Сколько секунд спелая грядка может стоять несобранной до порчи. 0 — не портится.")]
-        [SerializeField, Min(0f)] private float _witherAfter;
-
         // Накопленные секунды роста, с которых начинается каждая стадия; [0] всегда 0.
         [NonSerialized] private double[] _stageStart;
 
@@ -79,7 +75,6 @@ namespace Farm.Farming
         public ResourceDefinition YieldResource => _yieldResource;
         public bool Regrows => _regrows;
         public bool RemoveWhenEmpty => _removeWhenEmpty;
-        public float WitherAfter => _witherAfter;
 
         public int StageCount => _stages != null ? _stages.Length : 0;
         public int LastStageIndex => StageCount - 1;

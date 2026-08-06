@@ -59,7 +59,6 @@ namespace Farm.Juice
             FarmingEvents.Ready += OnReady;
             FarmingEvents.Harvested += OnHarvested;
             FarmingEvents.Merged += OnMerged;
-            FarmingEvents.Withered += OnWithered;
             BuildingRegistry.Upgraded += OnBuildingUpgraded;
 
             EnsureCameraBreath();
@@ -81,7 +80,6 @@ namespace Farm.Juice
             FarmingEvents.Ready -= OnReady;
             FarmingEvents.Harvested -= OnHarvested;
             FarmingEvents.Merged -= OnMerged;
-            FarmingEvents.Withered -= OnWithered;
             BuildingRegistry.Upgraded -= OnBuildingUpgraded;
 
             if (_shop != null)
@@ -274,15 +272,6 @@ namespace Farm.Juice
 
             float pitchOffset = Mathf.Clamp(level - 1, 0, 6) * _mergePitchPerLevel;
             sfx.Play(sfx.Bank.Merge, pitchOffset);
-        }
-
-        private void OnWithered(Growable g)
-        {
-            if (g == null) return;
-
-            Tween.Squash(g.transform, 0.4f, 0.35f);
-            Effects.Play(l => l.Wither, g.transform.position + Vector3.up * 0.3f);
-            Sfx.Play(b => b.Wither);
         }
 
         // ---- экономика ----

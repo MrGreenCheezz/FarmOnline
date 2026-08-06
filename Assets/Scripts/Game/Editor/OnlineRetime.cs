@@ -16,8 +16,6 @@ namespace Farm.Game.EditorTools
     /// <para>
     /// Стадии масштабируются пропорционально своей доле в старой длительности — форма кривой
     /// роста (когда семечко становится ростком) сохраняется, меняется только масштаб.
-    /// Порча обнуляется: пока увядание означает потерю самой грядки, восьмичасовая отлучка
-    /// стирала бы ферму (docs/ONLINE.md, «Время»).
     /// </para>
     /// </summary>
     public static class OnlineRetime
@@ -60,7 +58,6 @@ namespace Farm.Game.EditorTools
                     if (duration.floatValue > 0f) duration.floatValue *= scale;
                 }
 
-                so.FindProperty("_witherAfter").floatValue = 0f;
                 so.ApplyModifiedPropertiesWithoutUndo();
                 EditorUtility.SetDirty(def);
                 changed++;

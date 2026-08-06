@@ -422,6 +422,11 @@ namespace Farm.Game
         /// <summary>Собственно раскладка. Порядок строк здесь — не косметика, см. комментарии.</summary>
         private static void ApplyState(FarmSaveData data, ContentRegistry registry, double offlineSeconds)
         {
+            // До сноса сцены — запомнить её стартовые службы: партии, сохранённые раньше,
+            // чем колодец с кухней попали в сейв, иначе оставались бы без них навсегда
+            // (сервер хранит такие сейвы, и каждая загрузка стирала бы сценовые).
+            var starters = CaptureSceneStarters();
+
             ClearScene();
 
             // Уровень — самым первым из всего состояния, и уж точно раньше построек и грядок:
@@ -458,6 +463,11 @@ namespace Farm.Game
             FarmAchievements.RestoreState(data.Achievements, data.OrdersFilled);
 
             var buildings = ApplyBuildings(data, registry);
+
+            // Миграция старых партий: в сейве нет ни колодца, ни кухни — вернуть стартовые
+            // с их сценовых мест. До воды (её вместимость считает сам колодец) и до аур.
+            RestoreMissingStarters(data, starters);
+
             FarmBuffs.Refresh();   // ауры готовы — теперь грядкам есть что спросить
 
             // Партии мастерских — сразу после построек: сырьё уже списано в снимке,
@@ -494,6 +504,82 @@ namespace Farm.Game
             FarmBuffs.Refresh();
 
             Debug.Log("[Save] Загружено: " + data.Describe());
+        }
+
+        /// <summary>Стартовая служба сцены: чем была и где стояла — для миграции старых партий.</summary>
+        private struct SceneStarter
+        {
+            public BuildingDefinition Definition;
+            public Vector3 Position;
+            public float Yaw;
+        }
+
+        /// <summary>
+        /// Запомнить сценовые колодец и кухню до сноса. По одному на службу: сцена ставит
+        /// ровно по одному, а больше и не нужно — это страховка выживания, не расстановка.
+        /// </summary>
+        private static List<SceneStarter> CaptureSceneStarters()
+        {
+            var starters = new List<SceneStarter>(2);
+
+            foreach (var building in BuildingRegistry.All)
+            {
+                if (building == null || building.Definition == null || building.Definition.Prefab == null) continue;
+
+                var service = building.Definition.Service;
+                if (service != BuildingService.Well && service != BuildingService.Kitchen) continue;
+
+                bool known = false;
+                foreach (var starter in starters)
+                    if (starter.Definition.Service == service) { known = true; break; }
+                if (known) continue;
+
+                starters.Add(new SceneStarter
+                {
+                    Definition = building.Definition,
+                    Position = building.transform.position,
+                    Yaw = building.transform.eulerAngles.y
+                });
+            }
+
+            return starters;
+        }
+
+        /// <summary>
+        /// Вернуть старой партии стартовые службы, которых нет в её сейве. Продажи построек
+        /// в игре нет, поэтому отсутствие колодца — это всегда сейв эпохи до стартовых
+        /// построек, а не выбор игрока. Отказ заметен: каждая постановка пишется в лог.
+        /// </summary>
+        private static void RestoreMissingStarters(FarmSaveData data, List<SceneStarter> starters)
+        {
+            var shop = Shop.Instance;
+
+            foreach (var starter in starters)
+            {
+                bool present = false;
+                foreach (var save in data.Buildings)
+                {
+                    var definition = ContentRegistry.Instance != null
+                        ? ContentRegistry.Instance.Building(save.BuildingId) : null;
+                    if (definition != null && definition.Service == starter.Definition.Service)
+                    { present = true; break; }
+                }
+                if (present) continue;
+
+                var instance = UnityEngine.Object.Instantiate(
+                    starter.Definition.Prefab, starter.Position, Quaternion.Euler(0f, starter.Yaw, 0f));
+                instance.name = "Building_" + starter.Definition.Id;
+
+                var building = instance.GetComponent<Building>();
+                if (building == null) building = instance.AddComponent<Building>();
+                building.Configure(starter.Definition, 1);
+
+                if (instance.GetComponent<Movable>() == null) instance.AddComponent<Movable>();
+                if (shop != null) shop.RegisterPlaced(instance.transform);
+
+                Debug.Log("[Save] Старая партия без «" + starter.Definition.DisplayName +
+                          "» — поставлена стартовая (первый же сейв запишет её насовсем)");
+            }
         }
 
         /// <summary>

@@ -18,7 +18,6 @@ namespace Farm.Farming.Samples
             FarmingEvents.StageAdvanced += OnStageAdvanced;
             FarmingEvents.Ready += OnReady;
             FarmingEvents.Harvested += OnHarvested;
-            FarmingEvents.Withered += OnWithered;
             FarmingEvents.Cleared += OnCleared;
         }
 
@@ -28,7 +27,6 @@ namespace Farm.Farming.Samples
             FarmingEvents.StageAdvanced -= OnStageAdvanced;
             FarmingEvents.Ready -= OnReady;
             FarmingEvents.Harvested -= OnHarvested;
-            FarmingEvents.Withered -= OnWithered;
             FarmingEvents.Cleared -= OnCleared;
         }
 
@@ -55,9 +53,6 @@ namespace Farm.Farming.Samples
 
         private void OnHarvested(Growable g, HarvestResult r) =>
             Debug.Log("[Farm] СОБРАНО    " + Name(g) + "  -> " + r, g);
-
-        private void OnWithered(Growable g) =>
-            Debug.Log("[Farm] ИСПОРТИЛОСЬ " + Name(g), g);
 
         private void OnCleared(Growable g) =>
             Debug.Log("[Farm] ОПУСТЕЛО   " + Name(g), g);

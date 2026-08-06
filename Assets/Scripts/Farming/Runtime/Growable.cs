@@ -90,9 +90,6 @@ namespace Farm.Farming
         /// <summary>Собрана; урожай уже в стоке.</summary>
         public event Action<Growable, HarvestResult> Harvested;
 
-        /// <summary>Испортилась, простояв спелой слишком долго.</summary>
-        public event Action<Growable> Withered;
-
         /// <summary>Опустела.</summary>
         public event Action<Growable> Cleared;
 
@@ -650,24 +647,14 @@ namespace Farm.Farming
             _phase = GrowthPhase.Ready;
             _stageIndex = _definition.LastStageIndex;
 
-            // Точный момент созревания, а не момент, когда мы заметили, — держит порчу честной.
+            // Точный момент созревания, а не момент, когда мы заметили, — от него честно
+            // считается RipeSeconds, а по нему забытые грядки всплывают в оценке сбора.
             _readyAt = _plantedAt + _definition.TotalGrowTime / _growthSpeed;
             if (_readyAt > now) _readyAt = now;
 
             GrowableRegistry.SetReady(this, true);
             Raise(Ready);
             FarmingEvents.RaiseReady(this);
-        }
-
-        private void Wither()
-        {
-            _phase = GrowthPhase.Withered;
-            GrowableRegistry.SetReady(this, false);
-
-            Raise(Withered);
-            FarmingEvents.RaiseWithered(this);
-
-            ClearInternal();
         }
 
         private void ClearInternal()
@@ -699,12 +686,9 @@ namespace Farm.Farming
                 return;
             }
 
-            if (_phase == GrowthPhase.Ready && _definition != null && _definition.WitherAfter > 0f)
-            {
-                scheduler.Schedule(_handle, _readyAt + _definition.WitherAfter);
-                return;
-            }
-
+            // Спелая не будится: порча исключена решением владельца 06.08.2026 — с
+            // реальными часами увядание стирало бы ферму за ночь. Спелое ждёт руки
+            // игрока сколько угодно.
             scheduler.Cancel(_handle);
         }
 
@@ -716,31 +700,11 @@ namespace Farm.Farming
 
         void IGrowthScheduled.OnScheduledDue(double now)
         {
-            switch (_phase)
-            {
-                case GrowthPhase.Growing:
-                    AdvanceTo(now);
-                    ScheduleNext();
-                    break;
+            // Будят только растущую: спелая лежит до руки игрока (порча исключена).
+            if (_phase != GrowthPhase.Growing) return;
 
-                case GrowthPhase.Ready:
-                    if (_definition == null || _definition.WitherAfter <= 0f) break;
-
-                    // Под пугалом спелое не портится. Проверка в момент, когда пора вянуть,
-                    // а не при созревании: пугало могли поставить или унести, пока стояло.
-                    // Защищённое откладывает вопрос ещё на один срок — унесут пугало,
-                    // и таймер порчи честно пойдёт заново.
-                    if (FarmBuffs.WitherGuardedAt(transform.position, Category))
-                    {
-                        var scheduler = GrowthScheduler.Instance;
-                        if (scheduler != null && _handle != GrowthScheduler.InvalidHandle)
-                            scheduler.Schedule(_handle, now + _definition.WitherAfter);
-                        break;
-                    }
-
-                    Wither();
-                    break;
-            }
+            AdvanceTo(now);
+            ScheduleNext();
         }
 
         // Исключение подписчика не должно ломать грядку, поднявшую событие.

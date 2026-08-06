@@ -75,10 +75,6 @@ namespace Farm.Farming
         public static float NeedsDrainAt(Vector3 position) =>
             Mathf.Max(MinNeedsDrain, 1f - BonusAt(FarmBoost.Vigor, position));
 
-        /// <summary>Защищено ли спелое в этой точке от увядания.</summary>
-        public static bool WitherGuardedAt(Vector3 position, ResourceCategory category) =>
-            BonusAt(FarmBoost.WitherGuard, position, category) > 0f;
-
         /// <summary>
         /// Сколько ячеек добавлено складу. Глобален по природе: ячейки лежат на складе,
         /// а не разбросаны по полю, поэтому радиус силоса — 0 и позиция не спрашивается.
@@ -110,7 +106,6 @@ namespace Farm.Farming
                 case FarmBoost.MoveSpeed: return "+" + Percent(amount) + "% к скорости фермера";
                 case FarmBoost.StorageSlots: return "+" + Mathf.RoundToInt(amount) + " ячеек склада";
                 case FarmBoost.Vigor: return "нужды садятся на " + Percent(amount) + "% медленнее";
-                case FarmBoost.WitherGuard: return "спелое не портится";
                 default: return "";
             }
         }

@@ -59,7 +59,7 @@ MonoBehaviour:
   _serviceDuration: 1
   _baseRestore: 1
   _recipes: []
-  _boost: 6
+  _boost: 0
   _auraRadius: 5
   _auraRadiusPerLevel: 1.5
   _auraFilter: 0

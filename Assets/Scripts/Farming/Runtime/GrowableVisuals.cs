@@ -34,7 +34,6 @@ namespace Farm.Farming
             _growable.Planted += OnPlanted;
             _growable.StageAdvanced += OnStageAdvanced;
             _growable.Cleared += OnCleared;
-            _growable.Withered += OnCleared;
 
             Show(_growable.Phase == GrowthPhase.Empty ? -1 : _growable.StageIndex);
         }
@@ -44,7 +43,6 @@ namespace Farm.Farming
             _growable.Planted -= OnPlanted;
             _growable.StageAdvanced -= OnStageAdvanced;
             _growable.Cleared -= OnCleared;
-            _growable.Withered -= OnCleared;
         }
 
         private void OnDestroy() => DestroyInstances();

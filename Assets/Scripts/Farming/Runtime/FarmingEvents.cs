@@ -23,10 +23,7 @@ namespace Farm.Farming
         /// <summary>Собрано. Урожай уже отправлен в <see cref="FarmingRuntime.Sink"/>.</summary>
         public static event Action<Growable, HarvestResult> Harvested;
 
-        /// <summary>Простояло спелым дольше таймаута и испортилось.</summary>
-        public static event Action<Growable> Withered;
-
-        /// <summary>Опустело — собрано без отрастания, испортилось или очищено вручную.</summary>
+        /// <summary>Опустело — собрано без отрастания или очищено вручную.</summary>
         public static event Action<Growable> Cleared;
 
         /// <summary>
@@ -37,7 +34,6 @@ namespace Farm.Farming
 
         internal static void RaisePlanted(Growable g) => Safe(Planted, g, nameof(Planted));
         internal static void RaiseReady(Growable g) => Safe(Ready, g, nameof(Ready));
-        internal static void RaiseWithered(Growable g) => Safe(Withered, g, nameof(Withered));
         internal static void RaiseCleared(Growable g) => Safe(Cleared, g, nameof(Cleared));
 
         internal static void RaiseStageAdvanced(Growable g, int stage)
@@ -83,7 +79,6 @@ namespace Farm.Farming
             StageAdvanced = null;
             Ready = null;
             Harvested = null;
-            Withered = null;
             Cleared = null;
             Merged = null;
         }

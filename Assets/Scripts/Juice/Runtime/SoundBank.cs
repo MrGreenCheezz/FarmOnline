@@ -31,7 +31,6 @@ namespace Farm.Juice
         public Cue Ready;
         public Cue Harvest;
         public Cue Merge;
-        public Cue Wither;
 
         [Header("Игрок")]
         public Cue PickUp;
