@@ -196,8 +196,17 @@ namespace Farm.Farming
         /// <summary>Полита ли грядка в текущем цикле.</summary>
         public bool Watered => _watered;
 
-        /// <summary>Можно ли полить прямо сейчас: растёт и в этом цикле ещё не полита.</summary>
-        public bool CanWater => _phase == GrowthPhase.Growing && _definition != null && !_watered;
+        /// <summary>
+        /// Можно ли полить прямо сейчас: растёт, в этом цикле ещё не полита — и это растение.
+        /// <para>
+        /// Только растения, и это не мелочь: тап по растущей корове предлагал «полить» её,
+        /// а при пустом колодце корова отвечала «колодец пуст» — игрок читал это как
+        /// бессмыслицу, и был прав. Поливают посевы и деревья; у скотины и жил будет
+        /// свой уход, когда он придумается, а не позаимствованный у грядок.
+        /// </para>
+        /// </summary>
+        public bool CanWater => _phase == GrowthPhase.Growing && _definition != null && !_watered
+                                && Category == ResourceCategory.Crop;
 
         /// <summary>
         /// Полить: разовое начисление секунд роста, а не множитель скорости.
@@ -260,8 +269,9 @@ namespace Farm.Farming
         public int QualityBonus =>
             _careStreak >= PrimeCareStreak ? 2 : _careStreak >= GoodCareStreak ? 1 : 0;
 
-        /// <summary>Можно ли подкормить: растёт и в этом цикле ещё не подкормлена.</summary>
-        public bool CanFertilize => _phase == GrowthPhase.Growing && _definition != null && !_fertilized;
+        /// <summary>Можно ли подкормить: растёт, не подкормлена — и это растение, как и полив.</summary>
+        public bool CanFertilize => _phase == GrowthPhase.Growing && _definition != null && !_fertilized
+                                    && Category == ResourceCategory.Crop;
 
         /// <summary>
         /// Подкормить. Только отметка: сколько она добавит, решается на сборе — иначе урожай

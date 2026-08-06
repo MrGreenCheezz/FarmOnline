@@ -217,20 +217,30 @@ namespace Farm.UI
 
                 ApplyWait(badge, plot);
 
-                // Заехала под HUD — не показываем вовсе. Прижимать её в сторону значило бы врать
-                // о том, где грядка: плашка обязана стоять над своей грядкой или не стоять.
+                badge.Root.style.display = DisplayStyle.Flex;
+
+                // Заехала под HUD — не показываем. Прятать обязаны visibility, а не display:
+                // выключенная из раскладки плашка теряет измеренный размер, и на следующем
+                // кадре проверка пересечения видела нулевой прямоугольник — «свободно» —
+                // показывала — раскладка меряла — «занято» — прятала. Это и было мерцание
+                // на кромке панелей. Невидимая плашка размер сохраняет, и решение стоит.
                 //
-                // Порог несимметричен нарочно: спрятанная возвращается, только отойдя от панели
-                // на _blockSlack. Ровный порог у самой кромки даёт дребезг — камера идёт плавно,
-                // и плашка успевает моргнуть десяток раз, пока пересекает границу.
+                // Порог несимметричен: спрятанная возвращается, лишь отойдя от панели на
+                // _blockSlack, — ровный порог дребезжит на плавном ходе камеры.
                 var size = badge.Root.resolvedStyle;
-                var rect = new Rect(point.x - size.width * 0.5f, point.y - size.height, size.width, size.height);
-                float slack = badge.Blocked ? _blockSlack : 0f;
+                bool measured = !float.IsNaN(size.width) && size.width > 0f;
 
-                badge.Blocked = BlockedBy(new Rect(rect.x - slack, rect.y - slack,
-                                                   rect.width + slack * 2f, rect.height + slack * 2f));
+                if (measured)
+                {
+                    var rect = new Rect(point.x - size.width * 0.5f, point.y - size.height, size.width, size.height);
+                    float slack = badge.Blocked ? _blockSlack : 0f;
 
-                badge.Root.style.display = badge.Blocked ? DisplayStyle.None : DisplayStyle.Flex;
+                    badge.Blocked = BlockedBy(new Rect(rect.x - slack, rect.y - slack,
+                                                       rect.width + slack * 2f, rect.height + slack * 2f));
+                }
+                // Неизмеренная (первый кадр жизни) держит прошлое решение — гадать нечем.
+
+                badge.Root.style.visibility = badge.Blocked ? Visibility.Hidden : Visibility.Visible;
             }
 
             HideFrom(plots.Count);
@@ -239,6 +249,7 @@ namespace Farm.UI
         private static void Hide(Badge badge)
         {
             badge.Root.style.display = DisplayStyle.None;
+            badge.Root.style.visibility = Visibility.Visible;
             badge.Blocked = false;
         }
 

@@ -24,8 +24,15 @@ namespace Farm.Farming
     /// </summary>
     public static class FarmWater
     {
-        /// <summary>Сколько реальных секунд копится одно ведро. Шесть в сутки при полном колодце.</summary>
-        public const double SecondsPerCharge = 4.0 * 3600.0;
+        /// <summary>
+        /// Сколько реальных секунд копится одно ведро.
+        /// <para>
+        /// Было 4 часа — по живому отзыву это читалось как стена, а не как ритм: игрок,
+        /// потративший колодец, уходил до вечера. Два часа дают дюжину вёдер в сутки —
+        /// решать, куда лить, всё ещё приходится, но зайти после обеда уже есть зачем.
+        /// </para>
+        /// </summary>
+        public const double SecondsPerCharge = 2.0 * 3600.0;
 
         /// <summary>Вместимость колодца первого уровня.</summary>
         public const int BaseCapacity = 6;

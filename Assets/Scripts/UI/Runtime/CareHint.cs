@@ -19,8 +19,8 @@ namespace Farm.UI
     [AddComponentMenu("Farm/UI/Care Hint")]
     public sealed class CareHint : MonoBehaviour
     {
-        private const string WaterLesson = "растущую грядку можно полить — тапни по ней, и она созреет раньше";
-        private const string WaterLearned = "полито! вода набегает в колодец сама — ведро за четыре часа";
+        private const string WaterLesson = "посевы и деревья можно полить, пока растут, — тапни, созреют раньше";
+        private const string WaterLearned = "полито! вода набегает в колодец сама — ведро каждые два часа";
         private const string FeedLesson = "за заказ дали подкормку — тапни по политой грядке ещё раз, урожай удвоится";
         private const string FeedLearned = "подкормлено! урожай с этой грядки будет двойным";
 
