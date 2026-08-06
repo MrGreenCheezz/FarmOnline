@@ -894,6 +894,13 @@ namespace Farm.Characters
             // проверка стоит ПОСЛЕ накопления именно поэтому.
             if (Night || !_agent.Pack.IsEmpty) return FarmerDecision.None;
 
+            // Слот переноски один на ферму (DragFocus), и пока другой житель несёт свою
+            // ношу, начинать уборку бессмысленно: дорога кончилась бы молчаливым
+            // разворотом у занятого слота (страж в EnterHauling), а молчаливый разворот
+            // читается как поломка. Рука игрока сюда не входит: его метка держит только
+            // конкретную грядку, и это отдельная проверка в CanTidy.
+            if (DragFocus.Current != null && !DragFocus.ByPlayer) return FarmerDecision.None;
+
             if (!FindTidyJob(out Growable move, out Vector3 spot)) return FarmerDecision.None;
 
             float score = ScoreLiving + 0.9f + tidiness * 1.5f - Travel(move.transform.position) * 0.8f;
@@ -903,6 +910,10 @@ namespace Farm.Characters
             // КОГДА терпение кончится, а не в том, кончится ли: иначе половина фермеров
             // не прибирается никогда, и черта читается как поломка.
             float patience = Mathf.Lerp(MessPatience * 2f, MessPatience * 0.5f, tidiness);
+
+            // Рвение из определения жителя — тем же манером: делит терпение, не двигая
+            // потолок. Рьяный дозревает до TidyCeiling раньше, но выше не заберётся.
+            patience /= _agent.TidyZeal;
             float nagged = Mathf.Clamp01((float)(now - _messSince) / patience);
 
             // Тянем к потолку, а не прибавляем к оценке: прибавка сложилась бы со штрафом
@@ -996,6 +1007,9 @@ namespace Farm.Characters
 
             // Спелое сначала собирают, а не носят.
             if (plot.IsReady) return false;
+
+            // Сосед уже идёт за ней или несёт её — вдвоём одну грядку не переставляют.
+            if (TidyClaims.HeldByOther(_agent, plot)) return false;
 
             // Главное правило: не трогать то, что игрок только что поставил сам.
             return !DragFocus.IsPlayerClaimed(plot.transform);

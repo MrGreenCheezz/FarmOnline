@@ -43,6 +43,12 @@ namespace Farm.UI
         private PlotLevelBadges _badges;
         private Button _badgesButton;
 
+        /// <summary>Вкладки жителей над панелью фермера. Null, пока житель один.</summary>
+        private VisualElement _residentTabs;
+
+        /// <summary>Игрок выбрал вкладку сам — авто-переключение на жителя №1 больше не трогает выбор.</summary>
+        private bool _followChosen;
+
         private VisualElement _root;
         private VisualElement _screen;
         private Label _goldValue;
@@ -185,10 +191,16 @@ namespace Farm.UI
             if (_farmer == null) _farmer = FindFirstObjectByType<FarmerAgent>();
             if (_farmer != null) _needs = _farmer.GetComponent<CharacterNeeds>();
 
+            BuildResidentTabs();
             BuildSkillRows();
 
             // После сборки строк навыков: они создаются кодом и приходят с обычным picking.
             MakeReadout(_hud);
+
+            // Жители регистрируются в OnEnable, а порядок OnEnable между объектами Unity
+            // не обещает: на этом кадре реестр может быть ещё пуст. Пересобираем вкладки
+            // по событию — когда состав действительно известен.
+            FarmerRegistry.Changed += OnResidentsChanged;
 
             DragFocus.Changed += OnCarryChanged;
             GatherFocus.Changed += OnGatherChanged;
@@ -218,6 +230,7 @@ namespace Farm.UI
             if (_root != null) _root.UnregisterCallback<PointerDownEvent>(OnRootPointerDown, TrickleDown.TrickleDown);
             if (_screen != null) _screen.UnregisterCallback<GeometryChangedEvent>(OnScreenResized);
 
+            FarmerRegistry.Changed -= OnResidentsChanged;
             DragFocus.Changed -= OnCarryChanged;
             GatherFocus.Changed -= OnGatherChanged;
             NetStatus.Changed -= OnNetStatusChanged;
@@ -426,6 +439,92 @@ namespace Farm.UI
         private void OnXpChanged() => RefreshLevel();
 
         // ---- навыки ----
+
+        /// <summary>
+        /// Вкладки жителей под заголовком «ФЕРМЕР». При единственном жителе не строятся
+        /// вовсе: панель выглядит как в эпоху одного фермера, лишней хромоты в HUD нет.
+        /// Состав жителей за партию не меняется, поэтому строится один раз в OnEnable.
+        /// </summary>
+        /// <summary>Состав жителей стал известен или поменялся — вкладки и слежка заново.</summary>
+        private void OnResidentsChanged()
+        {
+            // Пока игрок не выбрал сам, панель следит за жителем №1 — им же, каким бы
+            // ни был порядок регистрации: назначение ростера приходит этим же событием.
+            if (!_followChosen && FarmerRegistry.Primary != null && _farmer != FarmerRegistry.Primary)
+            {
+                _farmer = FarmerRegistry.Primary;
+                _needs = _farmer.GetComponent<CharacterNeeds>();
+            }
+
+            BuildResidentTabs();
+        }
+
+        private void BuildResidentTabs()
+        {
+            var panel = _root != null ? _root.Q<VisualElement>("panel-farmer") : null;
+            if (panel == null) return;
+
+            if (_residentTabs != null) { _residentTabs.RemoveFromHierarchy(); _residentTabs = null; }
+
+            // Житель №1 — первым: порядок вкладок это порядок состава, а не гонка
+            // регистраций (порядок OnEnable Unity не обещает).
+            var residents = new List<FarmerAgent>();
+            var primary = FarmerRegistry.Primary;
+            if (primary != null) residents.Add(primary);
+            foreach (var agent in FarmerRegistry.All)
+                if (agent != null && agent != primary) residents.Add(agent);
+
+            if (residents.Count < 2)
+            {
+                // Вкладок нет — и заголовок обязан вернуться к правде одного фермера.
+                var soloTitle = panel.Q<Label>(className: "panel__title");
+                if (soloTitle != null) soloTitle.text = "ФЕРМЕР";
+                return;
+            }
+
+            _residentTabs = new VisualElement();
+            _residentTabs.AddToClassList("resident-tabs");
+
+            // Контейнер строится после общего прохода MakeReadout, поэтому прозрачность
+            // для кликов ему выставляется здесь: ловят только сами кнопки-вкладки.
+            _residentTabs.pickingMode = PickingMode.Ignore;
+
+            foreach (var resident in residents)
+            {
+                var self = resident;
+                var tab = new Button(() => FollowResident(self)) { text = self.name, userData = self };
+                tab.AddToClassList("resident-tab");
+                _residentTabs.Add(tab);
+            }
+
+            panel.Insert(1, _residentTabs);   // сразу под заголовком, выше состояния
+
+            // Заголовок панели говорит правду: над вкладками двоих «ФЕРМЕР» — враньё.
+            var title = panel.Q<Label>(className: "panel__title");
+            if (title != null) title.text = "ЖИТЕЛИ";
+
+            RefreshResidentTabs();
+        }
+
+        /// <summary>Панель следит дальше за этим жителем.</summary>
+        private void FollowResident(FarmerAgent resident)
+        {
+            if (resident == null || resident == _farmer) return;
+
+            _followChosen = true;
+            _farmer = resident;
+            _needs = resident.GetComponent<CharacterNeeds>();
+            RefreshResidentTabs();
+            Refresh();
+        }
+
+        private void RefreshResidentTabs()
+        {
+            if (_residentTabs == null) return;
+
+            foreach (var child in _residentTabs.Children())
+                child.EnableInClassList("resident-tab--on", ReferenceEquals(child.userData, _farmer));
+        }
 
         private void BuildSkillRows()
         {

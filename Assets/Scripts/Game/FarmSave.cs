@@ -298,13 +298,32 @@ namespace Farm.Game
             data.Workshops = shops.ToArray();
         }
 
+        /// <summary>
+        /// Жители в порядке сейва: житель №1 первым, дальше остальные. Порядок регистрации
+        /// не годится — это порядок OnEnable, и Unity его не обещает (замер дал обратный
+        /// при прямом порядке в иерархии). А от порядка здесь зависит, в кого ляжет
+        /// безымянный сейв эпохи одного фермера: своё место обязан держать номер один.
+        /// </summary>
+        private static List<FarmerAgent> ResidentsInSaveOrder()
+        {
+            var ordered = new List<FarmerAgent>(FarmerRegistry.Count);
+
+            var primary = FarmerRegistry.Primary;
+            if (primary != null) ordered.Add(primary);
+
+            foreach (var farmer in FarmerRegistry.All)
+                if (farmer != null && farmer != primary) ordered.Add(farmer);
+
+            return ordered;
+        }
+
         private static void CaptureFarmer(FarmSaveData data, Dictionary<Building, int> buildingIndex)
         {
             // Все жители, а не Primary: колония (этап 0, 06.08.2026). Пока житель один,
             // массив длиной один — партия эпохи одного фермера остаётся собой.
             var residents = new List<FarmerSave>();
 
-            foreach (var farmer in FarmerRegistry.All)
+            foreach (var farmer in ResidentsInSaveOrder())
             {
                 if (farmer == null) continue;
 
@@ -612,9 +631,9 @@ namespace Farm.Game
                 ? data.Residents
                 : data.Farmer != null ? new[] { Legacy(data) } : System.Array.Empty<FarmerSave>();
 
-            var agents = new List<FarmerAgent>();
-            foreach (var agent in FarmerRegistry.All)
-                if (agent != null) agents.Add(agent);
+            // Тот же порядок, что у снимка: безымянный или переименованный сейв ложится
+            // по месту в списке, и место №0 обязано быть жителем №1.
+            var agents = ResidentsInSaveOrder();
 
             for (int i = 0; i < saves.Length; i++)
             {

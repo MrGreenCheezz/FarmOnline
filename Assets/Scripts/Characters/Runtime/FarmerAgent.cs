@@ -511,6 +511,43 @@ namespace Farm.Characters
         /// <summary>Вернуть наём из сохранения.</summary>
         public void RestoreHired(double hiredUntil) => _hiredUntil = hiredUntil;
 
+        /// <summary>Рвение к порядку из определения жителя. Читает мозг при оценке уборки.</summary>
+        internal float TidyZeal => _tidyZeal;
+
+        private float _tidyZeal = 1f;
+
+        /// <summary>
+        /// Применить определение жителя: имя-идентичность, койку, рвения, личные замыслы.
+        /// Зовёт <see cref="ColonyRoster"/> в Awake — раньше Start, где из койки считается
+        /// место сна, и раньше пересева черт с загрузкой (SaveRunner, order 100): их данные
+        /// главнее и лягут поверх.
+        /// </summary>
+        internal void ApplyDefinition(ResidentDefinition definition, Transform bed, Transform home)
+        {
+            if (definition == null) return;
+
+            if (!string.IsNullOrEmpty(definition.DisplayName)) name = definition.DisplayName;
+            if (bed != null) _bed = bed;
+            if (home != null) _home = home;
+
+            _tidyZeal = Mathf.Clamp(definition.TidyZeal, 0.5f, 2f);
+
+            // Тяга к обустройству делит срок дозревания желания: рьяный хочет строить
+            // раньше. Деление готовой настройки, а не своё поле в мозге, — мозг читает
+            // ImprovementUrge01 как раньше, и полосы оценок разницы не видят.
+            _improvementUrgeTime = Mathf.Max(10f, _improvementUrgeTime /
+                Mathf.Clamp(definition.ProjectZeal, 0.5f, 2f));
+
+            if (definition.Improvements != null && definition.Improvements.Length > 0)
+                _improvements = (ImprovementDefinition[])definition.Improvements.Clone();
+
+            // Характер от имени по определению: свой у каждого жителя и одинаковый от
+            // запуска к запуску даже без входа в аккаунт. Пересев от имени игрока и
+            // характер из сейва придут позже и перепишут этот — так и задумано.
+            var traits = GetComponent<FarmerTraits>();
+            if (traits != null) traits.Reroll(name);
+        }
+
         #region Жизненный цикл
 
         private void Awake()
@@ -1285,6 +1322,9 @@ namespace Farm.Characters
                 return;
             }
 
+            // Метка живёт, пока живо дело: перестал продлевать — протухла сама.
+            TidyClaims.Stamp(this, _target);
+
             if (_mover.HasArrived)
             {
                 EnterHauling();
@@ -1319,6 +1359,10 @@ namespace Farm.Characters
                 return;
             }
 
+            // Метка живёт и на ходке с ношей — иначе на долгой дороге она протухла бы,
+            // и сосед посчитал бы несомую грядку свободной парой для своей уборки.
+            TidyClaims.Stamp(this, _target);
+
             // Груз висит перед фермером и едет вместе с ним, по рельефу под ногами.
             Vector3 carried = transform.position + transform.forward * _carryReach;
             carried.y = FarmingRuntime.Ground.SampleHeight(carried) + _carryHeight;
@@ -1352,6 +1396,10 @@ namespace Farm.Characters
             // Созрела по дороге — правило мозга «спелое сначала собирают» действует и тут:
             // нести спелую грядку через ферму вместо сбора выглядит как издевательство.
             if (_target.IsReady) return false;
+
+            // Сосед застолбил раньше (гонка одного кадра на входе). Дело ещё не начато,
+            // и уступка отсюда выглядит обычной сменой намерения, а не поломкой.
+            if (TidyClaims.HeldByOther(this, _target)) return false;
 
             // Игрок взялся за неё сам — его ход важнее наведения порядка.
             return !DragFocus.IsPlayerClaimed(_target.transform);
@@ -1760,6 +1808,10 @@ namespace Farm.Characters
 
         private void EnterGoingToTidy(Growable plot, Vector3 spot)
         {
+            // Застолбить на входе: сосед, выбравший ту же грядку в этом же кадре, увидит
+            // чужую метку в первом своём тике и отступится (TidyClaims не даст перебить).
+            TidyClaims.Stamp(this, plot);
+
             _target = plot;
             _tidySpot = spot;
             _mover.SetDestination(plot.transform.position);

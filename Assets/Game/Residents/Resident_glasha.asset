@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 06fc6c9197c588e43a0ef72008d6704d, type: 3}
+  m_Name: Resident_glasha
+  m_EditorClassIdentifier: Farm.Characters::Farm.Characters.ResidentDefinition
+  _displayName: "\u0413\u043B\u0430\u0448\u0430"
+  _tidyZeal: 1.4
+  _projectZeal: 0.8
+  _improvements:
+  - {fileID: 11400000, guid: d7c703b300a20ef43b875e7ebd0efd3d, type: 2}
+  - {fileID: 11400000, guid: 3e1452393b7c99a419ae703b9ed16fb0, type: 2}
+  - {fileID: 11400000, guid: 5e4c0ea777057984bbe8613a0a0091d6, type: 2}
+  - {fileID: 11400000, guid: fd61f7ed921106e419266ade9ae07c37, type: 2}
+  - {fileID: 11400000, guid: 1ed38d2fc3e17ab4ebd1623acbaf5a1f, type: 2}

@@ -210,6 +210,38 @@
     margin-bottom: 4px;
 }
 
+/* Вкладки жителей (строит код: GameHud.BuildResidentTabs). При одном жителе их нет —
+   панель обязана выглядеть как в эпоху одного фермера. Тихие вуали, а не доски:
+   переключатель наблюдения — служебная мелочь, ей нельзя спорить с кнопками дел. */
+.resident-tabs {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-bottom: 4px;
+}
+
+.resident-tab {
+    background-image: none;
+    background-color: var(--veil-2);
+    border-width: 0;
+    border-radius: 4px;
+    color: var(--ink-soft);
+    font-size: var(--text-sm);
+    padding: 2px 8px;
+    margin: 0 4px 2px 0;
+}
+
+.resident-tab:hover {
+    background-color: var(--veil-3);
+    color: var(--ink);
+}
+
+/* За кем панель следит сейчас. Золото — тот же голос, что у farmer-state строкой ниже. */
+.resident-tab--on {
+    background-color: var(--veil-3);
+    color: var(--gold);
+    -unity-font-style: bold;
+}
+
 .hint {
     font-size: var(--text-sm);
     color: var(--muted);

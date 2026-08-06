@@ -18,11 +18,31 @@ namespace Farm.Characters
     {
         private static readonly List<FarmerAgent> _all = new List<FarmerAgent>(4);
 
+        /// <summary>Назначенный житель №1. Null — берётся первый зарегистрированный.</summary>
+        private static FarmerAgent _designated;
+
         public static IReadOnlyList<FarmerAgent> All => _all;
         public static int Count => _all.Count;
 
-        /// <summary>Первый житель — тот, за кем следит однофермерский UI.</summary>
-        public static FarmerAgent Primary => _all.Count > 0 ? _all[0] : null;
+        /// <summary>
+        /// Житель №1 — за ним следит однофермерский UI, в него ложатся сейвы эпохи одного
+        /// фермера. Назначение ростера главнее порядка регистрации: порядок — это порядок
+        /// OnEnable, а его Unity не обещает (замер 06.08.2026 дал обратный при прямом
+        /// порядке в иерархии). Уничтоженный назначенец сам отпадает юнити-null'ом.
+        /// </summary>
+        public static FarmerAgent Primary =>
+            _designated != null ? _designated : _all.Count > 0 ? _all[0] : null;
+
+        /// <summary>
+        /// Назначить житель №1 явно. Зовёт <see cref="ColonyRoster"/> первым делом партии:
+        /// состав колонии — решение данных, а не гонки колбэков.
+        /// </summary>
+        internal static void Designate(FarmerAgent agent)
+        {
+            if (_designated == agent) return;
+            _designated = agent;
+            RaiseChanged();
+        }
 
         /// <summary>Состав жителей изменился. Дирижёры отклика перевешивают подписки здесь.</summary>
         public static event Action Changed;
@@ -62,6 +82,7 @@ namespace Farm.Characters
         private static void ResetStatics()
         {
             _all.Clear();
+            _designated = null;
             Changed = null;
         }
     }
