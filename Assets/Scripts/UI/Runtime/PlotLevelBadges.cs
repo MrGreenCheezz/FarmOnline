@@ -35,12 +35,28 @@ namespace Farm.UI
         [Tooltip("Показывать плашки. Переключается кнопкой в HUD.")]
         [SerializeField] private bool _visible = true;
 
-        /// <summary>Одна плашка: строка из иконки ресурса и цифры уровня.</summary>
+        [Tooltip("На сколько пикселей спрятанная плашка обязана отойти от панели, чтобы вернуться.\n" +
+                 "Ноль означает дребезг: камера идёт плавно, и плашка моргает, пока пересекает кромку.")]
+        [SerializeField, Min(0f)] private float _blockSlack = 8f;
+
+        /// <summary>Одна плашка: строка из иконки, уровня и отсчёта, под ней — полоса роста.</summary>
         private sealed class Badge
         {
             public VisualElement Root;
             public VisualElement Icon;
             public Label Level;
+            public Label Quality;
+            public Label Time;
+            public VisualElement Bar;
+            public VisualElement Fill;
+
+            /// <summary>Что уже написано и налито. Присваивать текст и ширину каждый кадр
+            /// значит перестраивать раскладку полутора десятков плашек на ровном месте.</summary>
+            public string TimeText;
+            public int FillPercent = -1;
+
+            /// <summary>Спрятана ли под HUD. Помнится ради несимметричного порога — см. LateUpdate.</summary>
+            public bool Blocked;
         }
 
         private VisualElement _layer;
@@ -152,42 +168,42 @@ namespace Farm.UI
             if (AnyWindowOpen()) { HideFrom(0); return; }
 
             var plots = GrowableRegistry.All;
-            int shown = 0;
             float maxSqr = _maxDistance * _maxDistance;
             Vector3 camPos = _camera.transform.position;
 
             for (int i = 0; i < plots.Count; i++)
             {
+                // Слот пула закреплён за грядкой по её месту в реестре, а не за счётчиком
+                // показанных. Со счётчиком любая плашка, ушедшая под HUD, сдвигала все
+                // следующие на слот назад: содержимое слотов менялось, вместе с ним менялась
+                // ширина — а позиция считается по ширине прошлого кадра. Это и было мерцание
+                // на краю экрана при движении камеры.
+                var badge = GetBadge(i);
                 var plot = plots[i];
-                if (plot == null) continue;
 
-                // Пустая грядка ничего не выращивает — уровень над ней бессмысленен.
-                if (plot.Phase == GrowthPhase.Empty) continue;
+                if (plot == null || plot.Phase == GrowthPhase.Empty) { Hide(badge); continue; }
 
                 Vector3 world = plot.transform.position + Vector3.up * _worldHeight;
-                if ((world - camPos).sqrMagnitude > maxSqr) continue;
+                if ((world - camPos).sqrMagnitude > maxSqr) { Hide(badge); continue; }
 
                 // Позади камеры рисовать нечего — иначе плашка «отразится» на другую сторону экрана.
-                if (_camera.WorldToViewportPoint(world).z <= 0f) continue;
+                if (_camera.WorldToViewportPoint(world).z <= 0f) { Hide(badge); continue; }
 
-                var badge = GetBadge(shown);
+                // Привязываемся точкой над грядкой, а центрирование отдано раскладке
+                // (translate в процентах, см. Make). Считать сдвиг самим значило бы спрашивать
+                // ширину, которой на кадре смены содержимого ещё нет.
                 Vector2 point = RuntimePanelUtils.CameraTransformWorldToPanel(panel, world, _camera);
-
-                float left = point.x - badge.Root.resolvedStyle.width * 0.5f;
-                float top = point.y - badge.Root.resolvedStyle.height;
-
-                // Заехала под HUD — не показываем вовсе. Прижимать её в сторону значило бы врать
-                // о том, где грядка: плашка обязана стоять над своей грядкой или не стоять.
-                if (BlockedBy(new Rect(left, top,
-                        badge.Root.resolvedStyle.width, badge.Root.resolvedStyle.height)))
-                    continue;
-
-                badge.Root.style.left = left;
-                badge.Root.style.top = top;
+                badge.Root.style.left = point.x;
+                badge.Root.style.top = point.y;
 
                 int level = plot.Level;
                 badge.Level.text = level.ToString();
                 ApplyLevelClass(badge.Root, level);
+
+                // Качество земли — звёздами, отдельно от уровня: уровень говорит «с чем сливать»,
+                // звезда — «эту грядку выхаживали». Пустая строка сжимается раскладкой сама.
+                int bonus = plot.QualityBonus;
+                badge.Quality.text = bonus >= 2 ? "★★" : bonus == 1 ? "★" : "";
 
                 // Иконка есть не у всего: у жилы или дерева без назначенного ресурса плашка
                 // просто остаётся цифрой, а не показывает пустой квадрат.
@@ -199,10 +215,91 @@ namespace Farm.UI
                 // иначе, увидев «готово», игрок терял бы информацию о том, с чем это сливать.
                 badge.Root.EnableInClassList("badge--ready", plot.IsReady);
 
-                shown++;
+                ApplyWait(badge, plot);
+
+                // Заехала под HUD — не показываем вовсе. Прижимать её в сторону значило бы врать
+                // о том, где грядка: плашка обязана стоять над своей грядкой или не стоять.
+                //
+                // Порог несимметричен нарочно: спрятанная возвращается, только отойдя от панели
+                // на _blockSlack. Ровный порог у самой кромки даёт дребезг — камера идёт плавно,
+                // и плашка успевает моргнуть десяток раз, пока пересекает границу.
+                var size = badge.Root.resolvedStyle;
+                var rect = new Rect(point.x - size.width * 0.5f, point.y - size.height, size.width, size.height);
+                float slack = badge.Blocked ? _blockSlack : 0f;
+
+                badge.Blocked = BlockedBy(new Rect(rect.x - slack, rect.y - slack,
+                                                   rect.width + slack * 2f, rect.height + slack * 2f));
+
+                badge.Root.style.display = badge.Blocked ? DisplayStyle.None : DisplayStyle.Flex;
             }
 
-            HideFrom(shown);
+            HideFrom(plots.Count);
+        }
+
+        private static void Hide(Badge badge)
+        {
+            badge.Root.style.display = DisplayStyle.None;
+            badge.Blocked = false;
+        }
+
+        /// <summary>
+        /// Долго ли ещё ждать. Отсчёт и полоса живут только у растущей грядки: у спелой их
+        /// нет вовсе, и это не экономия места, а разница, которую видно боковым зрением —
+        /// спелые отличаются от остальных не только цветом фона, но и формой плашки.
+        /// <para>
+        /// Полоса и цифры отвечают на разные вопросы и потому стоят вместе: полоса —
+        /// «скоро ли» одним взглядом через всё поле, цифры — «успею ли до автобуса».
+        /// </para>
+        /// </summary>
+        private static void ApplyWait(Badge badge, Growable plot)
+        {
+            double wait = plot.IsReady ? 0.0 : plot.TimeUntilReady;
+
+            // -1 значит «ничего не растёт»: увядшая или замершая грядка. Врать ей отсчётом
+            // хуже, чем молчать, — игрок пошёл бы ждать урожай, которого не будет.
+            if (plot.IsReady || wait < 0.0)
+            {
+                badge.Time.style.display = DisplayStyle.None;
+                badge.Bar.style.display = DisplayStyle.None;
+                return;
+            }
+
+            string text = FormatWait(wait);
+            if (badge.TimeText != text)
+            {
+                badge.Time.text = text;
+                badge.TimeText = text;
+            }
+
+            int percent = Mathf.Clamp(Mathf.RoundToInt(plot.Progress01 * 100f), 0, 100);
+            if (badge.FillPercent != percent)
+            {
+                badge.Fill.style.width = Length.Percent(percent);
+                badge.FillPercent = percent;
+            }
+
+            badge.Time.style.display = DisplayStyle.Flex;
+            badge.Bar.style.display = DisplayStyle.Flex;
+        }
+
+        /// <summary>
+        /// Сколько ждать, словами. Округление всегда вверх: «1 м» на грядке, которой осталось
+        /// пять секунд, читается как обман, а лишние пять секунд ожидания — нет.
+        /// <para>
+        /// Дальше десяти часов минуты не показываются: за таким урожаем возвращаются не
+        /// «через 11 ч 20 м», а завтра, и вторая цифра только съедает место на плашке.
+        /// </para>
+        /// </summary>
+        private static string FormatWait(double seconds)
+        {
+            if (seconds < 60.0) return Mathf.CeilToInt((float)seconds) + " с";
+            if (seconds < 3600.0) return Mathf.CeilToInt((float)(seconds / 60.0)) + " м";
+
+            int hours = (int)(seconds / 3600.0);
+            int minutes = Mathf.CeilToInt((float)((seconds - hours * 3600.0) / 60.0));
+            if (minutes >= 60) { hours++; minutes = 0; }
+
+            return hours >= 10 || minutes == 0 ? hours + " ч" : hours + " ч " + minutes + " м";
         }
 
         /// <summary>Иконка того, что грядка производит. Null — показывать нечего.</summary>
@@ -216,27 +313,47 @@ namespace Farm.UI
         {
             while (_pool.Count <= index)
             {
-                var root = new VisualElement();
-                root.AddToClassList("badge");
-                root.pickingMode = PickingMode.Ignore;
+                // Мир не отвечает на клик, и плашка тоже: правило «отвечает на клик — ловит
+                // клик» держится одним проходом, а не разметкой каждого нового элемента.
+                var root = Make<VisualElement>("badge");
 
-                var icon = new VisualElement();
-                icon.AddToClassList("badge__icon");
-                icon.pickingMode = PickingMode.Ignore;
-                root.Add(icon);
+                // Плашка привязана точкой над грядкой и сама сдвигается на полширины влево
+                // и на всю высоту вверх. Раскладка знает свой размер в том же кадре, в котором
+                // он изменился, — а код, спрашивающий resolvedStyle, всегда знает вчерашний.
+                root.style.translate = new Translate(Length.Percent(-50f), Length.Percent(-100f));
 
-                var level = new Label();
-                level.AddToClassList("badge__level");
-                level.pickingMode = PickingMode.Ignore;
-                root.Add(level);
+                var row = Make<VisualElement>("badge__row");
+                root.Add(row);
+
+                var icon = Make<VisualElement>("badge__icon");
+                row.Add(icon);
+
+                var level = Make<Label>("badge__level");
+                row.Add(level);
+
+                var quality = Make<Label>("badge__quality");
+                row.Add(quality);
+
+                var time = Make<Label>("badge__time");
+                row.Add(time);
+
+                var bar = Make<VisualElement>("badge__bar");
+                var fill = Make<VisualElement>("badge__fill");
+                bar.Add(fill);
+                root.Add(bar);
 
                 _layer.Add(root);
-                _pool.Add(new Badge { Root = root, Icon = icon, Level = level });
+                _pool.Add(new Badge { Root = root, Icon = icon, Level = level, Quality = quality, Time = time, Bar = bar, Fill = fill });
             }
 
-            var badge = _pool[index];
-            badge.Root.style.display = DisplayStyle.Flex;
-            return badge;
+            return _pool[index];
+        }
+
+        private static T Make<T>(string className) where T : VisualElement, new()
+        {
+            var element = new T { pickingMode = PickingMode.Ignore };
+            element.AddToClassList(className);
+            return element;
         }
 
         private void HideFrom(int index)

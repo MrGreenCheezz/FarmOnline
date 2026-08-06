@@ -66,9 +66,12 @@ namespace Farm.Farming
             new Achievement("farm_2",         "Ферма подросла",       AchievementCounter.FarmLevel,     2,    300),
             new Achievement("farm_4",         "Хозяин поля",          AchievementCounter.FarmLevel,     4,   4000),
             new Achievement("farm_6",         "Вся долина",           AchievementCounter.FarmLevel,     6,  40000),
+            new Achievement("farm_8",         "Холмы и перелески",    AchievementCounter.FarmLevel,     8, 300000),
+            new Achievement("farm_10",        "Земля до горизонта",   AchievementCounter.FarmLevel,    10, 1500000),
 
             new Achievement("order_1",        "Первый заказ",         AchievementCounter.OrdersFilled,  1,    100),
             new Achievement("order_25",       "Поставщик деревни",    AchievementCounter.OrdersFilled, 25,   2500),
+            new Achievement("order_100",      "Кормилец округи",      AchievementCounter.OrdersFilled, 100, 12000),
 
             // Название обязано сходиться с порогом в той же строке: «первая тысяча» при десяти
             // тысячах — единственное место в интерфейсе, где текст опровергался соседним числом.

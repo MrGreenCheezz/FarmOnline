@@ -145,6 +145,12 @@ namespace Farm.Game
             data.TotalHarvested = FarmProgress.TotalHarvested;
             data.TotalMerges = FarmProgress.TotalMerges;
             data.FarmLevel = FarmLevels.Current;
+
+            FarmWater.Capture(out int water, out double waterFilled);
+            data.WaterCharges = water;
+            data.WaterFilledUnix = waterFilled;
+            data.FertilizerCharges = FarmFertilizer.Charges;
+            data.TotalXp = FarmExperience.TotalXp;
             data.FilledOrders = FarmOrders.CaptureFilled();
             data.Achievements = FarmAchievements.CaptureState();
             data.OrdersFilled = FarmAchievements.OrdersFilled;
@@ -184,6 +190,10 @@ namespace Farm.Game
                     ElapsedGrowth = elapsed,
                     RipeSeconds = ripe,
                     OwnGrowthSpeed = ownSpeed,
+                    Watered = plot.Watered,
+                    Fertilized = plot.Fertilized,
+                    CareStreak = plot.CareStreak,
+                    CycleId = plot.CycleId,
                     Position = plot.transform.position,
                     Yaw = plot.transform.eulerAngles.y
                 });
@@ -378,6 +388,16 @@ namespace Farm.Game
             if (clock != null) clock.RestoreState(data.Time01, data.Day);
 
             FarmProgress.RestoreState(data.TotalHarvested, data.TotalMerges);
+
+            // Партии старше опыта досыпаем его задним числом по счётчикам: игрок с фермой
+            // восьмой ступени не должен упереться в «нужен уровень 14» на грядке, которую
+            // покупал уже десять раз. Формула повторяет живые начисления — сбор, слияние, заказ.
+            int xp = data.TotalXp;
+            if (xp <= 0 && data.TotalHarvested > 0)
+                xp = data.TotalHarvested * 3 + data.TotalMerges * FarmExperience.PerMerge
+                   + data.OrdersFilled * FarmExperience.PerOrder;
+
+            FarmExperience.Restore(xp);
             FarmOrders.RestoreState(data.FilledOrders);
             FarmAchievements.RestoreState(data.Achievements, data.OrdersFilled);
 
@@ -388,6 +408,16 @@ namespace Farm.Game
             ApplyImprovements(data, registry);
             ApplyShop(data, registry);
             ApplyFarmer(data, registry, buildings);
+
+            // Вода — после построек, и это не вкусовщина: вместимость колодца считается по
+            // самому колодцу, а до ApplyBuildings его на ферме ещё нет. Восстанови раньше —
+            // и догон отсутствия упрётся в нулевой потолок, то есть тихо пропадёт.
+            //
+            // Сейв времён до полива (нулевая отметка часов) получает полный колодец, а не
+            // пустой: первое знакомство с механикой не должно быть отказом «колодец пуст».
+            if (data.WaterFilledUnix <= 0.0) FarmWater.ResetForNewFarm();
+            else FarmWater.Restore(data.WaterCharges, data.WaterFilledUnix);
+            FarmFertilizer.Restore(data.FertilizerCharges);
 
             Footpaths.RestoreWorn(data.Footpaths);
             FarmBuffs.Refresh();
@@ -477,6 +507,7 @@ namespace Farm.Game
                 growable.RestoreState(definition, save.Level, save.Ready,
                                       save.ElapsedGrowth, save.RipeSeconds, save.OwnGrowthSpeed,
                                       offlineSeconds, save.Uid);
+                growable.RestoreCare(save.Watered, save.Fertilized, save.CareStreak, save.CycleId);
 
                 if (shop != null) shop.RegisterPlaced(go.transform);
             }

@@ -270,9 +270,10 @@ namespace Farm.Game.EditorTools
         /// Снять префаб в PNG через сцену-превью и обычную камеру: так рендерит проектный
         /// URP, а не встроенный пайплайн. Возвращает false с причиной — молчаливого отказа
         /// у этого инструмента быть не должно.
+        /// <para>Публичный: тем же рендером снимает исходники и генератор ступеней 9–12.</para>
         /// </summary>
-        private static bool RenderPrefab(GameObject prefab, string pngPath, int size, out string why,
-                                         float lift = DecorLift, float yaw = 0f)
+        public static bool RenderPrefab(GameObject prefab, string pngPath, int size, out string why,
+                                        float lift = DecorLift, float yaw = 0f)
         {
             int shot = size * Supersample;
 

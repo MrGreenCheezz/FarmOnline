@@ -3,6 +3,19 @@ using UnityEngine;
 
 namespace Farm.Farming
 {
+    /// <summary>Запись об одном поливе в гостях. Uid называет грядку, номер цикла — сам посев.</summary>
+    public readonly struct CareReport
+    {
+        public readonly string Uid;
+        public readonly int CycleId;
+
+        public CareReport(string uid, int cycleId)
+        {
+            Uid = uid;
+            CycleId = cycleId;
+        }
+    }
+
     /// <summary>Запись об одной собранной в гостях грядке — уезжает событием хозяину.</summary>
     public readonly struct HelpReport
     {
@@ -45,18 +58,26 @@ namespace Farm.Farming
         /// <summary>Сколько грядок можно собрать за один визит. Классика жанра: помощь — жест, а не батрачество.</summary>
         public const int HelpLimit = 5;
 
+        /// <summary>Сколько чужих грядок можно полить за визит. Свой лимит: сбор и полив — разные жесты.</summary>
+        public const int CareLimit = 5;
+
         public static bool IsGuest { get; private set; }
         public static int OwnerId { get; private set; }
         public static string OwnerName { get; private set; } = "";
         public static int HelpUsed { get; private set; }
+        public static int CareUsed { get; private set; }
 
         public static bool CanHelp => IsGuest && HelpUsed < HelpLimit;
+        public static bool CanCare => IsGuest && CareUsed < CareLimit;
 
         /// <summary>Вход/выход из гостей или потрачена помощь — HUD перерисовывает плашку.</summary>
         public static event Action Changed;
 
         /// <summary>Гость собрал грядку хозяину. Слушает сетевой слой — он превратит это в события.</summary>
         public static event Action<HelpReport> Helped;
+
+        /// <summary>Гость полил чужую грядку. Тоже уезжает событием — хозяин увидит и получит.</summary>
+        public static event Action<CareReport> Cared;
 
         /// <summary>Помощь кончилась, а игрок ещё кликает. Отказ обязан быть заметным — UI скажет вслух.</summary>
         public static event Action HelpRefused;
@@ -67,6 +88,7 @@ namespace Farm.Farming
             OwnerId = ownerId;
             OwnerName = ownerName ?? "";
             HelpUsed = 0;
+            CareUsed = 0;
             Raise(Changed);
         }
 
@@ -77,6 +99,7 @@ namespace Farm.Farming
             OwnerId = 0;
             OwnerName = "";
             HelpUsed = 0;
+            CareUsed = 0;
             Raise(Changed);
         }
 
@@ -96,6 +119,20 @@ namespace Farm.Farming
 
         public static void RefuseHelp() => Raise(HelpRefused);
 
+        /// <summary>Засчитать полив в гостях. Зовётся ПОСЛЕ того, как жест принят.</summary>
+        public static void ReportCare(in CareReport report)
+        {
+            if (!IsGuest) return;
+
+            CareUsed++;
+            Raise(Changed);
+
+            var handler = Cared;
+            if (handler == null) return;
+            try { handler(report); }
+            catch (Exception e) { Debug.LogException(e); }
+        }
+
         private static void Raise(Action handler)
         {
             if (handler == null) return;
@@ -112,8 +149,10 @@ namespace Farm.Farming
             OwnerId = 0;
             OwnerName = "";
             HelpUsed = 0;
+            CareUsed = 0;
             Changed = null;
             Helped = null;
+            Cared = null;
             HelpRefused = null;
         }
     }

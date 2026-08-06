@@ -38,6 +38,34 @@ namespace Farm.Farming
         private bool _ownSpeedCaptured;
 
         /// <summary>
+        /// Полита ли в этом цикле. Флаг, а не множитель, — и это главное решение в поливе.
+        /// <para>
+        /// Множитель пришлось бы класть в <see cref="_ownGrowthSpeed"/>, а он уезжает в сейв
+        /// свободным числом: сервер тогда навсегда теряет право требовать «скорость равна
+        /// единице» и не отличит честные 1.25 от 25. Флаг же проверяется точно, а насколько
+        /// полив помогает — знает каталог, а не сейв.
+        /// </para>
+        /// </summary>
+        private bool _watered;
+
+        /// <summary>Подкормлена ли в этом цикле. Флагом и по той же причине, что и полив.</summary>
+        private bool _fertilized;
+
+        /// <summary>
+        /// Сколько циклов подряд грядку поливали — память ухода, из которой растёт качество.
+        /// Живёт на грядке, а не на посеве: пересадка её не трогает. Ухоженная земля — свойство
+        /// места; это и делает уход вложением, а не расходом.
+        /// </summary>
+        private int _careStreak;
+
+        /// <summary>
+        /// Номер цикла роста, с единицы. Нужен событиям друзей: гость видел снимок, и его
+        /// «я полил» может приехать, когда здесь давно другой посев. Uid называет грядку,
+        /// номер цикла — тот самый посев; без него чужая помощь ускоряла бы не то, что видела.
+        /// </summary>
+        private int _cycleId;
+
+        /// <summary>
         /// Стабильное имя грядки между клиентами и сейвами. Позиция и индекс в массиве
         /// ссылками быть не могут: грядку двигают и сливают, — а «друг собрал грядку N»
         /// обязано находить ровно её. Родится лениво, переживает сохранение.
@@ -165,6 +193,88 @@ namespace Farm.Farming
         public double RipeSeconds =>
             _phase == GrowthPhase.Ready ? Math.Max(0.0, FarmingRuntime.Now - _readyAt) : 0.0;
 
+        /// <summary>Полита ли грядка в текущем цикле.</summary>
+        public bool Watered => _watered;
+
+        /// <summary>Можно ли полить прямо сейчас: растёт и в этом цикле ещё не полита.</summary>
+        public bool CanWater => _phase == GrowthPhase.Growing && _definition != null && !_watered;
+
+        /// <summary>
+        /// Полить: разовое начисление секунд роста, а не множитель скорости.
+        /// <para>
+        /// Разница принципиальная, а не вкусовая. Множитель применился бы и к оффлайну —
+        /// догон отсутствия идёт одним куском (<c>elapsed += offline * speed</c>), и полив
+        /// «до конца цикла» молча ускорил бы все восемь часов сна. Тогда ухода за фермой
+        /// не возникает вовсе: достаточно полить в момент посадки и уйти.
+        /// </para>
+        /// <para>
+        /// Начисление же исчерпывается там, где сделано. Приём тот же, каким живут
+        /// <see cref="StartCycle"/> и <see cref="ForceReady"/>: сдвигаем таймстамп посадки,
+        /// а не трогаем скорость.
+        /// </para>
+        /// </summary>
+        /// <param name="cycleFraction">Какую долю полного цикла засчитать. 0.1 — десятую часть.</param>
+        public bool TryWater(float cycleFraction)
+        {
+            if (!CanWater || cycleFraction <= 0f) return false;
+
+            double total = _definition.TotalGrowTime;
+            if (total <= 0.0) return false;
+
+            // Делим на скорость: сдвиг живёт в настенных секундах, а начислить надо секунды роста.
+            _plantedAt -= total * cycleFraction / _growthSpeed;
+            _watered = true;
+
+            double now = FarmingRuntime.Now;
+            AdvanceTo(now);
+            ScheduleNext();
+            return true;
+        }
+
+        /// <summary>Подкормлена ли грядка в текущем цикле.</summary>
+        public bool Fertilized => _fertilized;
+
+        /// <summary>Потолок ухоженности. Выше него полив всё ещё ускоряет, но качества не копит.</summary>
+        public const int CareStreakMax = 9;
+
+        /// <summary>С какого счёта земля «хорошая» (+1 к урожаю).</summary>
+        public const int GoodCareStreak = 2;
+
+        /// <summary>С какого — «отборная» (+2 к урожаю).</summary>
+        public const int PrimeCareStreak = 5;
+
+        /// <summary>Счёт ухоженных циклов подряд.</summary>
+        public int CareStreak => _careStreak;
+
+        /// <summary>Номер текущего цикла роста, с единицы.</summary>
+        public int CycleId => _cycleId;
+
+        /// <summary>
+        /// Прибавка качества к базовому урожаю, в штуках.
+        /// <para>
+        /// Целым числом до всех множителей, а не долей после: базовый урожай почти всюду
+        /// единица, и любая доля сгорела бы в округлении. «+1 за хорошую землю» к тому же
+        /// объяснимо словами — а поведение, которое нельзя объяснить, читается как случайное.
+        /// </para>
+        /// </summary>
+        public int QualityBonus =>
+            _careStreak >= PrimeCareStreak ? 2 : _careStreak >= GoodCareStreak ? 1 : 0;
+
+        /// <summary>Можно ли подкормить: растёт и в этом цикле ещё не подкормлена.</summary>
+        public bool CanFertilize => _phase == GrowthPhase.Growing && _definition != null && !_fertilized;
+
+        /// <summary>
+        /// Подкормить. Только отметка: сколько она добавит, решается на сборе — иначе урожай
+        /// пришлось бы фиксировать в момент подкормки, и уровень, поднятый слиянием после неё,
+        /// пропал бы даром.
+        /// </summary>
+        public bool TryFertilize()
+        {
+            if (!CanFertilize) return false;
+            _fertilized = true;
+            return true;
+        }
+
         /// <summary>Реальные секунды до следующей смены стадии. -1, когда ничего не растёт.</summary>
         public double TimeUntilNextStage
         {
@@ -263,7 +373,19 @@ namespace Farm.Farming
             result = default;
             if (_phase != GrowthPhase.Ready || _definition == null) return false;
 
-            int amount = _definition.YieldFor(_level);
+            // Качество земли — по счёту, накопленному прошлыми циклами: этот цикл пойдёт
+            // в счёт следующего сбора. Уход — вложение, и платит он со следующего урожая.
+            int amount = _definition.YieldFor(_level) + QualityBonus;
+
+            // Подкормка — до аур и целым множителем, а не долей: у почти всех культур базовый
+            // урожай равен единице, и любая дробная надбавка сгорела бы в округлении ниже.
+            if (_fertilized) amount *= FarmFertilizer.YieldMultiplier;
+
+            // Политый цикл растит счёт, брошенный — снимает одну отметку, а не всё: серия
+            // из недели ухода не должна сгорать за один пропущенный вечер.
+            _careStreak = _watered
+                ? Mathf.Min(CareStreakMax, _careStreak + 1)
+                : Mathf.Max(0, _careStreak - 1);
 
             // Надбавка построек считается здесь, а не у того, кто собирает: урожай обязан быть
             // одним и тем же, снял его фермер днём или игрок кликом ночью. По месту грядки:
@@ -323,6 +445,11 @@ namespace Farm.Farming
 
             _level++;
 
+            // Ухоженность переживает слияние лучшей из двух: сливая выхоженную грядку
+            // с запущенной, игрок не теряет вложенный уход — иначе слияние и уход спорили бы
+            // друг с другом, а они обязаны складываться.
+            _careStreak = Mathf.Max(_careStreak, other._careStreak);
+
             Raise(Merged, other);
             FarmingEvents.RaiseMerged(this, other);
 
@@ -362,6 +489,22 @@ namespace Farm.Farming
 
             ripeSeconds = RipeSeconds;
             ownGrowthSpeed = _ownGrowthSpeed;
+        }
+
+        /// <summary>
+        /// Вернуть отметку полива из сохранения. Отдельным вызовом, а не параметром
+        /// <see cref="RestoreState"/>: секунды роста полив уже отдал — в сейве лежит их сумма,
+        /// — и восстанавливать надо не эффект, а только запрет полить второй раз за цикл.
+        /// </summary>
+        public void RestoreCare(bool watered, bool fertilized, int careStreak, int cycleId)
+        {
+            _watered = watered;
+            _fertilized = fertilized;
+            _careStreak = Mathf.Clamp(careStreak, 0, CareStreakMax);
+
+            // Восстановление проходит через StartCycle и уже накрутило счётчик — возвращаем
+            // сохранённый, иначе каждый вход в игру «пересаживал» бы все грядки для событий друзей.
+            if (cycleId > 0) _cycleId = cycleId;
         }
 
         /// <summary>
@@ -450,6 +593,13 @@ namespace Farm.Farming
 
             int stage = Mathf.Clamp(fromStage, 0, _definition.LastStageIndex);
             double now = FarmingRuntime.Now;
+
+            // Новый цикл — новая жажда. Без этих двух строк отрастающая культура (Regrows)
+            // осталась бы политой и подкормленной навсегда после первого же сбора, и разовый
+            // уход превратился бы в постоянную прибавку, которую никто не покупал.
+            _watered = false;
+            _fertilized = false;
+            _cycleId++;
 
             // Перебазируем таймстамп так, чтобы «прошло» уже покрывало пропускаемые стадии.
             _plantedAt = now - _definition.StageStartTime(stage) / _growthSpeed;

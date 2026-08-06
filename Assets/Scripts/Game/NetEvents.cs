@@ -43,8 +43,32 @@ namespace Farm.Game
             public int Amount;
         }
 
+        /// <summary>
+        /// Payload рыночных событий. Их создаёт ТОЛЬКО сервер: в POST /api/events эти типы
+        /// не входят, и клиентская подделка «мне продали за миллион» умирает на сервере.
+        /// </summary>
+        [Serializable]
+        public sealed class MarketPayload
+        {
+            public string ResourceId;
+            public int Amount;
+            public int Gold;
+        }
+
+        [Serializable]
+        public sealed class CarePayload
+        {
+            public string Uid;
+
+            /// <summary>Номер посева. Пришёл не тот — грядку пересадили, событие честно протухло.</summary>
+            public int CycleId;
+        }
+
         /// <summary>Доля продажной цены, которую гость получает за собранную грядку.</summary>
         private const float HelpRewardShare = 0.05f;
+
+        /// <summary>Золото гостю за полив чужой грядки. Жест вежливости, а не заработок.</summary>
+        private const int CareRewardGold = 3;
 
         /// <summary>Дальше этого от записанной точки грядку хозяина не признаём той самой.</summary>
         private const float HelpMatchRadius = 0.75f;
@@ -60,6 +84,33 @@ namespace Farm.Game
             InboxReady = null;
             GuestMode.Helped -= OnHelped;
             GuestMode.Helped += OnHelped;
+            GuestMode.Cared -= OnCared;
+            GuestMode.Cared += OnCared;
+        }
+
+        /// <summary>
+        /// Гость полил чужую грядку: событие ухода — хозяину, символическая награда — себе.
+        /// Награда едет событием, а не кладётся в кошелёк: гостевая сцена — черновик, и всё,
+        /// что гость «заработал» в ней, его ферма получит только при следующем входе домой.
+        /// </summary>
+        private static async void OnCared(CareReport report)
+        {
+            if (!NetSession.LoggedIn || !GuestMode.IsGuest) return;
+
+            var care = JsonUtility.ToJson(new CarePayload { Uid = report.Uid, CycleId = report.CycleId });
+
+            try
+            {
+                var sent = await ApiClient.SendEventAsync(GuestMode.OwnerId, "care", care);
+                if (!sent.Transport || sent.Value == null || !sent.Value.ok) return;
+
+                var reward = JsonUtility.ToJson(new RewardPayload { Gold = CareRewardGold });
+                await ApiClient.SendEventAsync(NetSession.PlayerId, "help_reward", reward);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
         }
 
         /// <summary>
@@ -114,6 +165,14 @@ namespace Farm.Game
         public static async void SendGift(int friendId, string friendName, ResourceDefinition resource, int amount)
         {
             if (!NetSession.LoggedIn || resource == null || amount <= 0) return;
+
+            // Сейвы стоят после конфликта ревизий — подарок при этом спишется со склада,
+            // который никуда не запишется. Та же причина, по которой закрыт рынок.
+            if (NetSession.PutBlocked)
+            {
+                NetStatus.Set("ферма открыта в другом окне — подарки закрыты");
+                return;
+            }
 
             var storage = FarmingRuntime.Sink as Inventory;
             if (storage == null) return;
@@ -284,6 +343,51 @@ namespace Farm.Game
                     return;
                 }
 
+                case "care":
+                {
+                    var care = JsonUtility.FromJson<CarePayload>(ev.payload);
+                    if (care == null || string.IsNullOrEmpty(care.Uid)) return;
+
+                    var plot = FindPlotByUid(care.Uid);
+
+                    // Три честных «протухло»: грядки нет, посев сменился, уже полита —
+                    // в том числе вторым другом, чьё событие пришло раньше. Полив идёт
+                    // мимо колодца: воду хозяина чужая забота тратить не может.
+                    if (plot == null || plot.CycleId != care.CycleId || !plot.CanWater) return;
+                    if (!plot.TryWater(FarmWater.CycleFraction)) return;
+
+                    summary.Add(ev.fromName + " полил(а) твою грядку");
+                    return;
+                }
+
+                case "market_sold":
+                {
+                    var deal = JsonUtility.FromJson<MarketPayload>(ev.payload);
+                    if (deal == null || deal.Gold <= 0) return;
+
+                    var wallet = Wallet.Instance;
+                    if (wallet != null) wallet.Add(deal.Gold);
+
+                    var sold = registry != null ? registry.Resource(deal.ResourceId) : null;
+                    summary.Add("на рынке купили " + deal.Amount + " × "
+                                + (sold != null ? sold.DisplayName : deal.ResourceId)
+                                + ": +" + deal.Gold + " зол.");
+                    return;
+                }
+
+                case "market_returned":
+                {
+                    var back = JsonUtility.FromJson<MarketPayload>(ev.payload);
+                    var returned = back != null && registry != null ? registry.Resource(back.ResourceId) : null;
+                    if (returned == null || back.Amount <= 0) return;
+
+                    // С переливом: вернувшийся лот — собственность игрока, и потолок склада
+                    // не повод её уничтожить.
+                    NetMarket.AddWithOverflow(returned, back.Amount);
+                    summary.Add("лот не нашёл покупателя, вернулось " + back.Amount + " × " + returned.DisplayName);
+                    return;
+                }
+
                 case "help_reward":
                 {
                     var reward = JsonUtility.FromJson<RewardPayload>(ev.payload);
@@ -299,6 +403,17 @@ namespace Farm.Game
                     Debug.LogWarning("[События] Неизвестный тип '" + ev.type + "' — пропущен");
                     return;
             }
+        }
+
+        private static Growable FindPlotByUid(string uid)
+        {
+            var all = GrowableRegistry.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var plot = all[i];
+                if (plot != null && plot.Uid == uid) return plot;
+            }
+            return null;
         }
 
         /// <summary>

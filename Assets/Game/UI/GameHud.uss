@@ -286,12 +286,16 @@
    и шаг в 4 пикселя раздул бы её вдвое. Здесь сетка не действует. */
 .badge {
     position: absolute;
-    flex-direction: row;
-    align-items: center;
+    flex-direction: column;
     background-color: var(--panel-cool);
     border-radius: 8px;
     border-width: 2px;
-    padding: 2px 6px 2px 3px;
+    padding: 2px 6px 3px 3px;
+}
+
+.badge__row {
+    flex-direction: row;
+    align-items: center;
 }
 
 /* Что растёт. Иконка та же, что в инвентаре: цвет фишки связывает грядку со складом. */
@@ -308,6 +312,39 @@
     -unity-text-align: middle-center;
     color: var(--ink-hi);
     min-width: 12px;
+}
+
+/* Качество земли. Золотом — это заработанная звезда, а не служебная цифра. */
+.badge__quality {
+    font-size: var(--text-xs);
+    -unity-text-align: middle-center;
+    color: var(--gold);
+    margin-left: 3px;
+}
+
+/* Сколько ждать. Тише уровня намеренно: уровень отвечает «с чем это сливать» и нужен
+   всегда, а время — «когда возвращаться», и спорить с уровнем за взгляд оно не должно. */
+.badge__time {
+    font-size: var(--text-xs);
+    -unity-text-align: middle-center;
+    color: var(--ink-soft);
+    margin-left: 5px;
+}
+
+/* Полоса роста. Три пикселя — намеренно: она отвечает на «скоро ли» через всё поле сразу,
+   а точное время стоит рядом цифрами. Толстая читалась бы как полоса здоровья. */
+.badge__bar {
+    height: 3px;
+    margin-top: 3px;
+    border-radius: 2px;
+    background-color: rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+}
+
+.badge__fill {
+    height: 100%;
+    border-radius: 2px;
+    background-color: var(--accent);
 }
 
 /* Лестница уровней — единственное место в файле, где цвет назван числом, и так и останется.

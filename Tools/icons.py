@@ -86,8 +86,10 @@ TARGET_LUMA = 0.27
 # можно быть сочной.
 LINES = {
     "crop":      (0.30, 0.40, ["wheat", "corn", "pumpkin", "melon", "bamboo", "ginseng", "goldbloom"]),
-    "wood":      (0.055, 0.50, ["wood", "oak", "ironwood", "maple", "yew", "ebony", "crimsonwood", "spiritwood"]),
-    "ore":       (0.58, 0.16, ["copper", "iron", "silver", "gold", "platinum", "mithril", "adamant", "starmetal"]),
+    "wood":      (0.055, 0.50, ["wood", "oak", "ironwood", "maple", "yew", "ebony", "crimsonwood", "spiritwood",
+                                "moonwood", "sunwood", "stormwood", "worldtree"]),
+    "ore":       (0.58, 0.16, ["copper", "iron", "silver", "gold", "platinum", "mithril", "adamant", "starmetal",
+                               "orichalcum", "moonstone", "dragonite", "starheart"]),
     "livestock": (0.95, 0.36, ["meat", "cheese", "bacon", "eggs", "honey", "down", "antler"]),
     "crafted":   (0.72, 0.28, ["plank", "beam", "ingot_copper", "ingot_iron"]),
     "night":     (0.47, 0.32, ["firefly", "moondew"]),
@@ -282,13 +284,19 @@ def pips(image, color, step):
         return
 
     draw = ImageDraw.Draw(image)
-    width = step * PIP_W + (step - 1) * PIP_GAP
+
+    # Со ступенями 9–12 (06.08.2026) полный ряд перестал влезать: 12 насечек прежним
+    # шагом — это 151 px при холсте 128. Ужимается ШАГ, а не число насечек: длина ряда —
+    # главный канал чтения, и резать её значило бы врать про ступень.
+    pip_w, pip_gap = (PIP_W, PIP_GAP) if step <= 8 else (6, 3)
+
+    width = step * pip_w + (step - 1) * pip_gap
     x = (SIZE - width) // 2
     ink = shade(color, 0.30) + (235,)
 
     for _ in range(step):
-        draw.rounded_rectangle([x, PIP_Y, x + PIP_W - 1, PIP_Y + PIP_H - 1], 2, fill=ink)
-        x += PIP_W + PIP_GAP
+        draw.rounded_rectangle([x, PIP_Y, x + pip_w - 1, PIP_Y + PIP_H - 1], 2, fill=ink)
+        x += pip_w + pip_gap
 
 
 def badge(image, color, anchor):

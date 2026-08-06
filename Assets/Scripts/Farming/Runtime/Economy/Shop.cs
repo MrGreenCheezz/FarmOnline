@@ -109,6 +109,19 @@ namespace Farm.Farming
                 return false;
             }
 
+            // Ворота уровня — только на грядки: ступень меряет глубину прогрессии, и перескочить
+            // её кошельком нельзя. Постройки и декор уровня не спрашивают — они про обустройство,
+            // а не про лестницу.
+            if (item.Growable != null && item.Growable.YieldResource != null)
+            {
+                int need = FarmExperience.LevelForTier(item.Growable.YieldResource.Tier);
+                if (FarmExperience.Level < need)
+                {
+                    reason = "нужен уровень " + need;
+                    return false;
+                }
+            }
+
             int gold = Wallet != null ? Wallet.Gold : 0;
             return item.Price.CanPay(gold, Storage, out reason);
         }

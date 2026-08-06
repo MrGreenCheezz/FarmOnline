@@ -37,6 +37,6 @@ Material:
     - _WindStrength: 0.07
     - _WindTurbulence: 0.3
     m_Colors:
-    - _BaseColor: {r: 0.30980393, g: 0.6039216, b: 0.30588236, a: 1}
+    - _BaseColor: {r: 0.34509805, g: 0.5803922, b: 0.2901961, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

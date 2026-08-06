@@ -354,5 +354,24 @@ namespace Farm.Net
             string body = JsonUtility.ToJson(new SendEventBody { toPlayerId = toPlayerId, type = type, payload = payload });
             return Report(await Send<OkResponse>("POST", "/api/events", body, auth: true), "отправка события");
         }
+
+        // ---- рынок ----
+
+        public static async Awaitable<NetResult<MarketResponse>> GetMarketAsync()
+        {
+            return Report(await Send<MarketResponse>("GET", "/api/market", null, auth: true), "рынок");
+        }
+
+        public static async Awaitable<NetResult<MarketListedResponse>> ListLotAsync(string resourceId, int amount)
+        {
+            string body = JsonUtility.ToJson(new MarketListBody { resourceId = resourceId, amount = amount });
+            return Report(await Send<MarketListedResponse>("POST", "/api/market/list", body, auth: true), "лот");
+        }
+
+        public static async Awaitable<NetResult<MarketBoughtResponse>> BuyLotAsync(int lotId)
+        {
+            string body = JsonUtility.ToJson(new MarketBuyBody { lotId = lotId });
+            return Report(await Send<MarketBoughtResponse>("POST", "/api/market/buy", body, auth: true), "покупка");
+        }
     }
 }

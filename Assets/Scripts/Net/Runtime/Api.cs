@@ -226,4 +226,65 @@ namespace Farm.Net
         public double serverNow;
         public string error;
     }
+
+    /// <summary>Один лот рынка. <c>gold</c> — что заплатит покупатель.</summary>
+    [Serializable]
+    public class MarketLot
+    {
+        public int id;
+        public int sellerId;
+        public string sellerName;
+        public string resourceId;
+        public int amount;
+        public int gold;
+    }
+
+    /// <summary>GET /api/market.</summary>
+    [Serializable]
+    public class MarketResponse
+    {
+        public bool ok;
+        public MarketLot[] lots;
+        public string error;
+    }
+
+    /// <summary>POST /api/market/list — тело.</summary>
+    [Serializable]
+    public class MarketListBody
+    {
+        public string resourceId;
+        public int amount;
+    }
+
+    /// <summary>POST /api/market/list — ответ: лот принят, вот его цены.</summary>
+    [Serializable]
+    public class MarketListedResponse
+    {
+        public bool ok;
+        public int lotId;
+        public int sellerGold;
+        public int buyerGold;
+        public string error;
+    }
+
+    /// <summary>POST /api/market/buy — тело.</summary>
+    [Serializable]
+    public class MarketBuyBody
+    {
+        public int lotId;
+    }
+
+    /// <summary>
+    /// POST /api/market/buy — ответ. Покупатель списывает золото и кладёт ресурс
+    /// ТОЛЬКО из этого ответа: событие ему не шлётся, чтобы не зачислить дважды.
+    /// </summary>
+    [Serializable]
+    public class MarketBoughtResponse
+    {
+        public bool ok;
+        public string resourceId;
+        public int amount;
+        public int gold;
+        public string error;
+    }
 }

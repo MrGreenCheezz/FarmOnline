@@ -31,6 +31,7 @@
         <!-- ===== первый урок: метки над парой и строка внизу ===== -->
         <ui:VisualElement name="merge-hint-layer" class="world-layer" picking-mode="Ignore" />
         <ui:Label name="merge-hint" text="" class="lesson" picking-mode="Ignore" style="display: none;" />
+        <ui:Label name="care-hint" text="" class="lesson" picking-mode="Ignore" style="display: none;" />
 
         <!-- ================= HUD =================
              Клики HUD не перехватывает: picking снимается со всего поддерева разом в
@@ -49,12 +50,15 @@
             <ui:VisualElement name="topbar" class="topbar">
                 <ui:Label name="gold-value" text="0" class="gold" />
                 <ui:Label name="clock-value" text="—" class="gold gold--clock" />
+                <ui:Label name="water-value" text="" class="gold gold--clock" style="display: none;" />
+                <ui:Label name="level-value" text="" class="gold gold--clock" />
                 <ui:Label name="guest-title" text="" class="gold guest-title" style="display: none;" />
                 <ui:Label name="guest-help" text="" class="gold gold--clock" style="display: none;" />
                 <ui:Button name="guest-home" text="Домой" class="btn btn--accent" style="display: none;" />
                 <ui:Button name="inventory-button" text="Склад" class="btn" />
                 <ui:Button name="shop-button" text="Магазин" class="btn btn--accent" />
                 <ui:Button name="friends-button" text="Друзья" class="btn" />
+                <ui:Button name="market-button" text="Рынок" class="btn" />
                 <ui:Button name="tasks-button" text="Дела" class="btn" />
                 <ui:Button name="settings-button" text="Настройки" class="btn" />
                 <ui:Button name="badges-button" text="Уровни" class="btn btn--ghost" />
@@ -255,6 +259,24 @@
                 </ui:VisualElement>
 
                 <ui:Label name="friends-message" text="" class="window__message window__message--hint" />
+            </ui:VisualElement>
+        </ui:VisualElement>
+
+        <!-- ================= РЫНОК =================
+             Одно окно двумя секциями: свои запасы сверху, чужие лоты ниже. Цены назначает
+             сервер от каталога — окно их только показывает. -->
+        <ui:VisualElement name="market-overlay" class="overlay" style="display: none;">
+            <ui:VisualElement name="market-window" class="window friends-window">
+                <ui:VisualElement class="window__header">
+                    <ui:Label text="РЫНОК" class="window__title" />
+                    <ui:Button name="market-close" text="×" class="btn btn--icon" />
+                </ui:VisualElement>
+
+                <ui:ScrollView class="window__body">
+                    <ui:VisualElement name="market-list" />
+                </ui:ScrollView>
+
+                <ui:Label name="market-message" text="" class="window__message window__message--hint" />
             </ui:VisualElement>
         </ui:VisualElement>
 

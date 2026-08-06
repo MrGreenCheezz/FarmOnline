@@ -47,6 +47,8 @@ namespace Farm.UI
         private VisualElement _screen;
         private Label _goldValue;
         private Label _clockValue;
+        private Label _waterValue;
+        private Label _levelValue;
         private DayNightCycle _clock;
         private Label _storageSummary;
         private Label _farmerState;
@@ -118,6 +120,8 @@ namespace Farm.UI
             _root = root;
             _goldValue = root.Q<Label>("gold-value");
             _clockValue = root.Q<Label>("clock-value");
+            _waterValue = root.Q<Label>("water-value");
+            _levelValue = root.Q<Label>("level-value");
             _storageSummary = root.Q<Label>("storage-summary");
             _farmerState = root.Q<Label>("farmer-state");
             _farmerThought = root.Q<Label>("farmer-thought");
@@ -197,6 +201,11 @@ namespace Farm.UI
             // загрузилась. Подписка, а не одна отрисовка в OnEnable.
             FarmLevels.Changed += OnFarmLevelChanged;
 
+            FarmWater.Changed += OnCareChanged;
+            FarmFertilizer.Changed += OnCareChanged;
+            FarmExperience.Changed += OnXpChanged;
+            FarmExperience.LevelUp += OnLevelUp;
+
             Bind();
             Refresh();
         }
@@ -213,6 +222,10 @@ namespace Farm.UI
             GatherFocus.Changed -= OnGatherChanged;
             NetStatus.Changed -= OnNetStatusChanged;
             FarmLevels.Changed -= OnFarmLevelChanged;
+            FarmWater.Changed -= OnCareChanged;
+            FarmFertilizer.Changed -= OnCareChanged;
+            FarmExperience.Changed -= OnXpChanged;
+            FarmExperience.LevelUp -= OnLevelUp;
 
             _storage = null;
             _wallet = null;
@@ -329,6 +342,8 @@ namespace Farm.UI
             Bind();
             RefreshGold();
             RefreshClock();
+            RefreshWater();
+            RefreshLevel();
             RefreshStorageSummary();
             RefreshFarmer();
             RefreshFarm();
@@ -348,6 +363,59 @@ namespace Farm.UI
             var clock = DayNightCycle.Instance;
             _clockValue.text = clock != null ? "День " + clock.Day + "   " + clock.ClockText : "—";
         }
+
+        /// <summary>
+        /// Сколько вёдер в колодце. Показание, а не кнопка: полив делается жестом по грядке,
+        /// а здесь игрок видит, на сколько грядок его хватит.
+        /// <para>
+        /// Без колодца счётчик уходит совсем — пустая «0/0» читалась бы как поломка, тогда как
+        /// на деле игроку просто нечего было построить.
+        /// </para>
+        /// </summary>
+        private void RefreshWater()
+        {
+            if (_waterValue == null) return;
+
+            int capacity = FarmWater.Capacity;
+            bool show = capacity > 0;
+
+            _waterValue.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
+            if (!show) return;
+
+            string text = "Вода " + FarmWater.Charges + "/" + capacity;
+
+            // Подкормка приписывается к той же строке, а не заводит свою: она бывает не всегда,
+            // и пустая ячейка «Подкормка 0» в топбаре читалась бы как недоделка. Топбар и без
+            // того несёт восемь кнопок.
+            int fertilizer = FarmFertilizer.Charges;
+            if (fertilizer > 0) text += "   Подкормка " + fertilizer;
+
+            _waterValue.text = text;
+        }
+
+        /// <summary>
+        /// Уровень игрока с остатком до следующего. Дробь, а не полоса: в топбаре полосе
+        /// не хватит места быть читаемой, а «120/250» отвечает на тот же вопрос точнее.
+        /// </summary>
+        private void RefreshLevel()
+        {
+            if (_levelValue == null) return;
+
+            _levelValue.text = FarmExperience.Level >= FarmExperience.MaxLevel
+                ? "Ур. " + FarmExperience.Level
+                : "Ур. " + FarmExperience.Level + " · " + FarmExperience.IntoLevel + "/" + FarmExperience.LevelCost;
+        }
+
+        /// <summary>Уровень взят — топбар вздрагивает, чтобы момент не прошёл незамеченным.</summary>
+        private void OnLevelUp(int level)
+        {
+            RefreshLevel();
+            Punch(_levelValue, 0.5f);
+        }
+
+        private void OnCareChanged() => RefreshWater();
+
+        private void OnXpChanged() => RefreshLevel();
 
         // ---- навыки ----
 

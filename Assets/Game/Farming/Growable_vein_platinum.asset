@@ -19,10 +19,10 @@ MonoBehaviour:
   _stages:
   - _name: "\u0420\u0430\u0441\u0442\u0451\u0442"
     _duration: 10800
-    _visual: {fileID: 5027417899829189703, guid: 48b833f370a6fbe46b27d0a9f827ea1e, type: 3}
+    _visual: {fileID: 8165137157957320252, guid: 4a411b8eba4168642bff5c0836787804, type: 3}
   - _name: "\u0413\u043E\u0442\u043E\u0432\u043E"
     _duration: 0
-    _visual: {fileID: 5027417899829189703, guid: 48b833f370a6fbe46b27d0a9f827ea1e, type: 3}
+    _visual: {fileID: 8165137157957320252, guid: 4a411b8eba4168642bff5c0836787804, type: 3}
   _yieldResource: {fileID: 11400000, guid: 9cfdd1e396c0d6648b3f4718217e133c, type: 2}
   _baseYield: 1
   _yieldPerLevel: 2

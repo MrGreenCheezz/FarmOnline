@@ -1,5 +1,5 @@
 {
-    "generatedAtUtc": "2026-08-05T13:28:17.1964951Z",
+    "generatedAtUtc": "2026-08-06T07:18:30.5723167Z",
     "resources": [
         {
             "id": "adamant",
@@ -50,6 +50,11 @@
             "id": "down",
             "tier": 4,
             "sellPrice": 66
+        },
+        {
+            "id": "dragonite",
+            "tier": 11,
+            "sellPrice": 88859
         },
         {
             "id": "ebony",
@@ -132,9 +137,24 @@
             "sellPrice": 24
         },
         {
+            "id": "moonstone",
+            "tier": 10,
+            "sellPrice": 31735
+        },
+        {
+            "id": "moonwood",
+            "tier": 9,
+            "sellPrice": 11334
+        },
+        {
             "id": "oak",
             "tier": 2,
             "sellPrice": 8
+        },
+        {
+            "id": "orichalcum",
+            "tier": 9,
+            "sellPrice": 11334
         },
         {
             "id": "plank",
@@ -162,9 +182,24 @@
             "sellPrice": 4048
         },
         {
+            "id": "starheart",
+            "tier": 12,
+            "sellPrice": 248805
+        },
+        {
             "id": "starmetal",
             "tier": 8,
             "sellPrice": 4048
+        },
+        {
+            "id": "stormwood",
+            "tier": 11,
+            "sellPrice": 88859
+        },
+        {
+            "id": "sunwood",
+            "tier": 10,
+            "sellPrice": 31735
         },
         {
             "id": "wheat",
@@ -175,6 +210,11 @@
             "id": "wood",
             "tier": 1,
             "sellPrice": 3
+        },
+        {
+            "id": "worldtree",
+            "tier": 12,
+            "sellPrice": 248805
         },
         {
             "id": "yew",
@@ -303,6 +343,13 @@
             "baseYield": 1
         },
         {
+            "id": "tree_moonwood",
+            "resourceId": "moonwood",
+            "tier": 9,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
             "id": "tree_oak",
             "resourceId": "oak",
             "tier": 2,
@@ -317,10 +364,31 @@
             "baseYield": 1
         },
         {
+            "id": "tree_stormwood",
+            "resourceId": "stormwood",
+            "tier": 11,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
+            "id": "tree_sunwood",
+            "resourceId": "sunwood",
+            "tier": 10,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
             "id": "tree_wood",
             "resourceId": "wood",
             "tier": 1,
             "growSeconds": 300.0,
+            "baseYield": 1
+        },
+        {
+            "id": "tree_worldtree",
+            "resourceId": "worldtree",
+            "tier": 12,
+            "growSeconds": 43200.0,
             "baseYield": 1
         },
         {
@@ -345,6 +413,13 @@
             "baseYield": 1
         },
         {
+            "id": "vein_dragonite",
+            "resourceId": "dragonite",
+            "tier": 11,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
             "id": "vein_gold",
             "resourceId": "gold",
             "tier": 4,
@@ -366,6 +441,20 @@
             "baseYield": 1
         },
         {
+            "id": "vein_moonstone",
+            "resourceId": "moonstone",
+            "tier": 10,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
+            "id": "vein_orichalcum",
+            "resourceId": "orichalcum",
+            "tier": 9,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
             "id": "vein_platinum",
             "resourceId": "platinum",
             "tier": 5,
@@ -377,6 +466,13 @@
             "resourceId": "silver",
             "tier": 3,
             "growSeconds": 2400.0,
+            "baseYield": 1
+        },
+        {
+            "id": "vein_starheart",
+            "resourceId": "starheart",
+            "tier": 12,
+            "growSeconds": 43200.0,
             "baseYield": 1
         },
         {

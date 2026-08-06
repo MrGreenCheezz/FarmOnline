@@ -73,6 +73,56 @@ namespace Farm.Farming
                  "превращается в силуэт, и смотреть на неё нечем.")]
         [SerializeField] private Color _ambientNightColor = new Color(0.20f, 0.24f, 0.34f);
 
+        [Header("Туман")]
+        // Даль обязана линять вместе с небом. Дневной голубой туман в полночь — это светлая
+        // полоса вдоль края мира под чёрным небом: ночь есть, а горизонта у неё нет.
+        [Tooltip("Туман в полдень.")]
+        [SerializeField] private Color _fogDayColor = new Color(0.58f, 0.71f, 0.72f);
+
+        [Tooltip("Туман на низком солнце. Тёплый: свет идёт вдоль земли и красит воздух, " +
+                 "а закат, обрывающийся голубой дымкой, — первое, что выдаёт подделку.")]
+        [SerializeField] private Color _fogDuskColor = new Color(0.64f, 0.47f, 0.40f);
+
+        [Tooltip("Туман ночью. Темнее ночного ambient — даль обязана тонуть раньше фермы, " +
+                 "иначе взгляд уходит от освещённых грядок к светлому краю мира.")]
+        [SerializeField] private Color _fogNightColor = new Color(0.12f, 0.16f, 0.26f);
+
+        [Header("Небо")]
+        [Tooltip("Оттенок неба в полдень.")]
+        [SerializeField] private Color _skyDayTint = new Color(0.46f, 0.64f, 0.86f);
+
+        [Tooltip("Оттенок неба на рассвете и закате.")]
+        [SerializeField] private Color _skyDuskTint = new Color(0.86f, 0.47f, 0.34f);
+
+        [Tooltip("Оттенок неба ночью.")]
+        [SerializeField] private Color _skyNightTint = new Color(0.08f, 0.11f, 0.22f);
+
+        [Tooltip("Низ неба днём — то, что видно ниже горизонта при наклоне камеры.")]
+        [SerializeField] private Color _skyGroundDayColor = new Color(0.56f, 0.66f, 0.66f);
+
+        [Tooltip("Низ неба ночью.")]
+        [SerializeField] private Color _skyGroundNightColor = new Color(0.05f, 0.06f, 0.09f);
+
+        [SerializeField, Min(0f)] private float _skyExposureDay = 1.25f;
+
+        [Tooltip("Ночное небо не гасится в ноль: чёрный купол над освещённой фермой читается " +
+                 "как дыра, а не как ночь.")]
+        [SerializeField, Min(0f)] private float _skyExposureNight = 0.35f;
+
+        [Tooltip("Толщина атмосферы в полдень.")]
+        [SerializeField, Range(0f, 5f)] private float _skyThicknessDay = 0.62f;
+
+        [Tooltip("Толщина на низком солнце. Больше дневной: длинный путь луча сквозь воздух — " +
+                 "это и есть причина, по которой закат красный.")]
+        [SerializeField, Range(0f, 5f)] private float _skyThicknessDusk = 1.35f;
+
+        [Tooltip("Размер солнечного диска днём.")]
+        [SerializeField, Range(0f, 1f)] private float _sunSizeDay = 0.045f;
+
+        [Tooltip("Размер диска ночью. Светило не уходит под горизонт (см. SkyRotation), поэтому " +
+                 "ночью его диск виден — и обязан выглядеть луной, а не забытым солнцем.")]
+        [SerializeField, Range(0f, 1f)] private float _sunSizeNight = 0.016f;
+
         [Header("Тени")]
         [Tooltip("Плотность тени в полдень.")]
         [SerializeField, Range(0f, 1f)] private float _shadowStrengthDay = 0.62f;
@@ -96,13 +146,25 @@ namespace Farm.Farming
                  "проваливается в черноту ровно в самое красивое время суток.")]
         [SerializeField, Range(3f, 25f)] private float _minElevation = 9f;
 
+        private static readonly int SkyTintId = Shader.PropertyToID("_SkyTint");
+        private static readonly int SkyGroundId = Shader.PropertyToID("_GroundColor");
+        private static readonly int SkyExposureId = Shader.PropertyToID("_Exposure");
+        private static readonly int SkyThicknessId = Shader.PropertyToID("_AtmosphereThickness");
+        private static readonly int SunSizeId = Shader.PropertyToID("_SunSize");
+
         private float _time01;
         private int _day = 1;
         private bool _wasNight;
         private float _originalAmbient = 1f;
         private AmbientMode _originalMode = AmbientMode.Skybox;
         private Color _originalAmbientColor = Color.grey;
+        private Color _originalFogColor = Color.grey;
         private bool _captured;
+
+        // Небо красится в копии. Обе сцены ссылаются на один и тот же Skybox.mat, а компонент
+        // живёт и в редакторе: без копии закат уехал бы прямо в ассет — и остался бы там.
+        private Material _skyOriginal;
+        private Material _skyInstance;
 
         public static DayNightCycle Instance { get; private set; }
 
@@ -148,8 +210,18 @@ namespace Farm.Farming
                 _originalAmbient = RenderSettings.ambientIntensity;
                 _originalMode = RenderSettings.ambientMode;
                 _originalAmbientColor = RenderSettings.ambientLight;
+                _originalFogColor = RenderSettings.fogColor;
                 _captured = true;
             }
+
+            AcquireSkybox();
+
+#if UNITY_EDITOR
+            // Сцену сохраняют с нашим небом в RenderSettings — а наше небо не ассет, и ссылка
+            // на него запишется пустой. Отказ был бы тихим: небо просто пропало бы у всех.
+            UnityEditor.SceneManagement.EditorSceneManager.sceneSaving += BeforeSceneSaved;
+            UnityEditor.SceneManagement.EditorSceneManager.sceneSaved += AfterSceneSaved;
+#endif
 
             _time01 = Mathf.Repeat(_startTime, 1f);
             _wasNight = IsNight;
@@ -160,6 +232,13 @@ namespace Farm.Farming
         {
             if (Instance == this) Instance = null;
 
+#if UNITY_EDITOR
+            UnityEditor.SceneManagement.EditorSceneManager.sceneSaving -= BeforeSceneSaved;
+            UnityEditor.SceneManagement.EditorSceneManager.sceneSaved -= AfterSceneSaved;
+#endif
+
+            ReleaseSkybox();
+
             // Возвращаем сцене её собственное освещение, иначе выключенный компонент
             // оставит редактор в вечных сумерках.
             if (!_captured) return;
@@ -167,7 +246,62 @@ namespace Farm.Farming
             RenderSettings.ambientIntensity = _originalAmbient;
             RenderSettings.ambientMode = _originalMode;
             RenderSettings.ambientLight = _originalAmbientColor;
+            RenderSettings.fogColor = _originalFogColor;
         }
+
+        /// <summary>Забрать небо сцены под свою копию. Оригинал остаётся нетронутым ассетом.</summary>
+        private void AcquireSkybox()
+        {
+            if (_skyInstance != null) return;
+
+            var current = RenderSettings.skybox;
+            if (current == null) return;
+
+            _skyOriginal = current;
+            _skyInstance = new Material(current)
+            {
+                name = current.name + " (сутки)",
+                // Копия не должна пережить компонент и не должна попасть в сцену как объект.
+                hideFlags = HideFlags.HideAndDontSave
+            };
+
+            RenderSettings.skybox = _skyInstance;
+        }
+
+        private void ReleaseSkybox()
+        {
+            if (_skyInstance == null) return;
+
+            if (RenderSettings.skybox == _skyInstance) RenderSettings.skybox = _skyOriginal;
+
+            if (Application.isPlaying) Destroy(_skyInstance);
+            else DestroyImmediate(_skyInstance);
+
+            _skyInstance = null;
+            _skyOriginal = null;
+        }
+
+#if UNITY_EDITOR
+        /// <summary>На время записи сцена видит своё собственное освещение, а не наше текущее.</summary>
+        private void BeforeSceneSaved(UnityEngine.SceneManagement.Scene scene, string path)
+        {
+            if (_skyInstance != null && RenderSettings.skybox == _skyInstance)
+                RenderSettings.skybox = _skyOriginal;
+
+            if (!_captured) return;
+
+            RenderSettings.ambientMode = _originalMode;
+            RenderSettings.ambientIntensity = _originalAmbient;
+            RenderSettings.ambientLight = _originalAmbientColor;
+            RenderSettings.fogColor = _originalFogColor;
+        }
+
+        private void AfterSceneSaved(UnityEngine.SceneManagement.Scene scene)
+        {
+            if (_skyInstance != null) RenderSettings.skybox = _skyInstance;
+            Apply();
+        }
+#endif
 
         private void Update()
         {
@@ -244,6 +378,36 @@ namespace Farm.Farming
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientIntensity = 1f;
             RenderSettings.ambientLight = Color.Lerp(_ambientNightColor, _ambientDayColor, daylight);
+
+            ApplySky(height, daylight);
+        }
+
+        /// <summary>
+        /// Небо и туман по тому же светилу, что и свет. Держатся здесь, а не отдельным компонентом,
+        /// ровно потому, что разъехаться им нельзя: голубая дымка вдоль горизонта под красным
+        /// закатным светом выглядит не как ошибка настройки, а как поломка рендера.
+        /// </summary>
+        private void ApplySky(float height, float daylight)
+        {
+            // Насколько светило у горизонта: 1 ровно на восходе и закате, 0 в полдень и полночь.
+            // Отдельная величина, потому что daylight их не различает — на рассвете и закате он
+            // один и тот же, а закат — это не «полдня», это своя краска.
+            float horizon = 1f - Mathf.Clamp01(Mathf.Abs(height) / 0.32f);
+
+            Color fog = Color.Lerp(_fogNightColor, _fogDayColor, daylight);
+            RenderSettings.fogColor = Color.Lerp(fog, _fogDuskColor, horizon * 0.85f);
+
+            if (_skyInstance == null) return;
+
+            Color tint = Color.Lerp(_skyNightTint, _skyDayTint, daylight);
+            _skyInstance.SetColor(SkyTintId, Color.Lerp(tint, _skyDuskTint, horizon * 0.8f));
+            _skyInstance.SetColor(SkyGroundId, Color.Lerp(_skyGroundNightColor, _skyGroundDayColor, daylight));
+            _skyInstance.SetFloat(SkyExposureId, Mathf.Lerp(_skyExposureNight, _skyExposureDay, daylight));
+            _skyInstance.SetFloat(SkyThicknessId, Mathf.Lerp(_skyThicknessDay, _skyThicknessDusk, horizon));
+
+            // Диск сжимается к ночи вместе с высотой светила: та же дуга, что днём несёт солнце,
+            // ночью несёт луну — и отличить их можно только размером и яркостью неба вокруг.
+            _skyInstance.SetFloat(SunSizeId, Mathf.Lerp(_sunSizeNight, _sunSizeDay, Mathf.Clamp01(height * 2f + 0.5f)));
         }
 
         /// <summary>

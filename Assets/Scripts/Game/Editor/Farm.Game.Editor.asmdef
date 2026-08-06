@@ -4,7 +4,8 @@
     "references": [
         "Farm.Farming",
         "Farm.Characters",
-        "Farm.Game"
+        "Farm.Game",
+        "Farm.Juice"
     ],
     "includePlatforms": [
         "Editor"

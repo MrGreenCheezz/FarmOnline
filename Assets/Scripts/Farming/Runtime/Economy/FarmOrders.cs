@@ -83,7 +83,10 @@ namespace Farm.Farming
     public static class FarmOrders
     {
         /// <summary>Сколько заказов висит на доске одновременно.</summary>
-        public const int SlotCount = 3;
+        // Слоты растут с уровнем игрока: больше заказов — больше и подкормки, и золота,
+        // так что это ровно та награда за уровень, которая кормит следующий уровень.
+        public static int SlotCount =>
+            3 + (FarmExperience.Level >= 6 ? 1 : 0) + (FarmExperience.Level >= 12 ? 1 : 0);
 
         /// <summary>
         /// Сколько живёт одно окно заказов. Шесть часов — чтобы доска обновлялась к каждому
@@ -173,6 +176,11 @@ namespace Farm.Farming
 
             var wallet = Wallet.Instance;
             if (wallet != null) wallet.Add(order.Gold);
+
+            // Подкормка платится за дело, а не за место: вода идёт из колодца сама по себе,
+            // а это — награда тому, кто собрал заказ и донёс его до горожан.
+            FarmFertilizer.Grant(FarmFertilizer.PerOrder);
+            FarmExperience.Add(FarmExperience.PerOrder);
 
             Filled.Add(order.Id);
             FarmAchievements.NoteOrderFilled();

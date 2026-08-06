@@ -123,7 +123,7 @@ namespace Farm.Interaction
         private void GuestPress(Vector2 screen)
         {
             _pressScreen = screen;
-            _guestPlot = FindRipePlot(screen);
+            _guestPlot = FindGuestPlot(screen);
         }
 
         private void GuestRelease(Vector2 screen)
@@ -131,9 +131,17 @@ namespace Farm.Interaction
             var plot = _guestPlot;
             _guestPlot = null;
 
-            if (plot == null || !plot.IsReady) return;
+            if (plot == null) return;
             if ((screen - _pressScreen).sqrMagnitude > TapSlopSqr()) return;
 
+            // Тот же язык жестов, что и дома: тап по спелой — собрать, по растущей — полить.
+            // Гостю не приходится учить вторую грамматику ради визита.
+            if (plot.IsReady) GuestHelp(plot);
+            else if (plot.CanWater) GuestCare(plot);
+        }
+
+        private void GuestHelp(Growable plot)
+        {
             if (!GuestMode.CanHelp)
             {
                 // Лимит кончился, а игрок кликает — молчать нельзя, UI слушает это событие.
@@ -164,8 +172,28 @@ namespace Farm.Interaction
                 result.Amount));
         }
 
-        /// <summary>Ближайшая спелая грядка под курсором — единственная цель гостя.</summary>
-        private Growable FindRipePlot(Vector2 screen)
+        private void GuestCare(Growable plot)
+        {
+            if (!GuestMode.CanCare)
+            {
+                GuestMode.RefuseHelp();
+                Sfx.Play(b => b.UiClose);
+                return;
+            }
+
+            // Поливаем локальную копию, минуя колодец: вода хозяина не тратится — гостевая
+            // сцена вообще черновик, настоящий эффект случится у хозяина при проигрывании
+            // события. Локальный полив нужен, чтобы гость видел сделанное и не поливал дважды.
+            if (!plot.TryWater(FarmWater.CycleFraction)) return;
+
+            Effects.Play(l => l.Plant, plot.transform.position + Vector3.up * _plotAimHeight);
+            Sfx.Play(b => b.Plant);
+
+            GuestMode.ReportCare(new CareReport(plot.Uid, plot.CycleId));
+        }
+
+        /// <summary>Ближайшая грядка, с которой гостю есть что делать: спелая или растущая неполитая.</summary>
+        private Growable FindGuestPlot(Vector2 screen)
         {
             float scale = Screen.height > 0 ? Screen.height / 1080f : 1f;
             float radius = _pickRadiusPixels * Mathf.Max(0.5f, scale);
@@ -176,7 +204,7 @@ namespace Farm.Interaction
             for (int i = 0; i < plots.Count; i++)
             {
                 var g = plots[i];
-                if (g == null || !g.IsReady) continue;
+                if (g == null || (!g.IsReady && !g.CanWater)) continue;
                 if (!TryScreenDistance(g.transform.position, _plotAimHeight, screen, out float sqr)) continue;
                 if (sqr >= bestSqr) continue;
 
@@ -308,9 +336,12 @@ namespace Farm.Interaction
             var target = FindMergeTarget(screen, growable);
 
             // Курсор почти не сдвинулся — это был клик, а не перенос. Клик по спелой грядке —
-            // сбор: главный жест онлайн-фермы, посадил-подождал-собрал. Клик по постройке
-            // открывает её панель; по остальному — просто снимает выделение. Отдельная кнопка
-            // «осмотреть» не нужна, а правая кнопка мыши не переживёт переезда на тач.
+            // сбор: главный жест онлайн-фермы, посадил-подождал-собрал. По растущей — полив:
+            // фазы Ready и Growing взаимоисключающие, поэтому один жест никогда не значит
+            // двух вещей сразу, и решать, что имел в виду игрок, не приходится. Клик по
+            // постройке открывает её панель; по остальному — просто снимает выделение.
+            // Отдельная кнопка «осмотреть» не нужна, а правая кнопка мыши не переживёт
+            // переезда на тач.
             if ((screen - _pressScreen).sqrMagnitude <= TapSlopSqr())
             {
                 if (growable != null && growable.IsReady)
@@ -329,6 +360,17 @@ namespace Farm.Interaction
                         // Собранное исчезнет — возвращать на землю нечего и некому.
                         if (vanishes) return;
                     }
+                }
+                else if (growable != null && growable.CanWater)
+                {
+                    Care(FarmWater.Pour(growable), dragged.position);
+                }
+                else if (growable != null && growable.CanFertilize && FarmFertilizer.Charges > 0)
+                {
+                    // Подкормка предлагается только когда она есть. Иначе каждый второй тап по
+                    // политой грядке ругался бы «нет подкормки» — а это не отказ в действии,
+                    // это отсутствие действия, и говорить о нём должен счётчик в HUD, не грядка.
+                    Care(FarmFertilizer.Apply(growable), dragged.position);
                 }
                 else
                 {
@@ -467,6 +509,25 @@ namespace Farm.Interaction
             // Панель считает Y сверху вниз, экран — снизу вверх.
             Vector2 panelPoint = RuntimePanelUtils.ScreenToPanel(panel, new Vector2(screen.x, Screen.height - screen.y));
             return panel.Pick(panelPoint) != null;
+        }
+
+        // ---- уход ----
+
+        /// <summary>
+        /// Отклик на уход за грядкой. Он одинаков и для полива, и для подкормки: что именно
+        /// случилось, скажет надпись над грядкой, а руке важно лишь, приняли жест или нет.
+        /// </summary>
+        private void Care(bool done, Vector3 at)
+        {
+            if (done)
+            {
+                Effects.Play(l => l.Plant, at + Vector3.up * _plotAimHeight);
+                Sfx.Play(b => b.Plant);
+            }
+            else
+            {
+                Sfx.Play(b => b.UiClose);
+            }
         }
 
         // ---- подсветка ----

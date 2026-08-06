@@ -82,6 +82,11 @@ namespace Farm.UI
             mark.AddToClassList("merge-mark");
             mark.pickingMode = PickingMode.Ignore;
             mark.style.display = DisplayStyle.None;
+
+            // Центрирование раскладкой, а не вычитанием resolvedStyle: метка появляется
+            // в момент, когда её размер ещё не измерен, и первый кадр она стоит не над грядкой.
+            mark.style.translate = new Translate(Length.Percent(-50f), Length.Percent(-50f));
+
             _layer.Add(mark);
             return mark;
         }
@@ -162,8 +167,8 @@ namespace Farm.UI
             float pulse = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 3.4f);
 
             mark.style.display = DisplayStyle.Flex;
-            mark.style.left = point.x - mark.resolvedStyle.width * 0.5f;
-            mark.style.top = point.y - mark.resolvedStyle.height * 0.5f;
+            mark.style.left = point.x;
+            mark.style.top = point.y;
             mark.style.opacity = 0.35f + 0.65f * pulse;
             mark.style.scale = new StyleScale(new Scale(Vector2.one * (1f + 0.12f * pulse)));
         }

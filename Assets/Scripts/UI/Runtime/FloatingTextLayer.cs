@@ -42,8 +42,18 @@ namespace Farm.UI
         private readonly Stack<Label> _pool = new Stack<Label>();
         private Shop _shop;
 
+        /// <summary>
+        /// Слой сцены. Открыт наружу, потому что не всё, что стоит сказать над грядкой,
+        /// приходит событием фермы: отказ («нет воды») события не порождает — его порождает
+        /// как раз его отсутствие, — а сказать о нём обязательно, иначе жест игрока молча
+        /// проваливается в никуда.
+        /// </summary>
+        public static FloatingTextLayer Instance { get; private set; }
+
         private void OnEnable()
         {
+            Instance = this;
+
             var root = GetComponent<UIDocument>()?.rootVisualElement;
             _layer = root?.Q<VisualElement>("floating-text");
             if (_camera == null) _camera = Camera.main;
@@ -52,6 +62,10 @@ namespace Farm.UI
             FarmingEvents.Harvested += OnHarvested;
             FarmingEvents.Merged += OnMerged;
             FarmingEvents.Withered += OnWithered;
+            FarmWater.Poured += OnPoured;
+            FarmWater.Refused += OnCareRefused;
+            FarmFertilizer.Applied += OnFertilized;
+            FarmFertilizer.Refused += OnCareRefused;
 
             _shop = Shop.Instance != null ? Shop.Instance : FindFirstObjectByType<Shop>();
             if (_shop != null) _shop.Sold += OnSold;
@@ -59,14 +73,54 @@ namespace Farm.UI
 
         private void OnDisable()
         {
+            if (Instance == this) Instance = null;
+
             FarmingEvents.Harvested -= OnHarvested;
             FarmingEvents.Merged -= OnMerged;
             FarmingEvents.Withered -= OnWithered;
+            FarmWater.Poured -= OnPoured;
+            FarmWater.Refused -= OnCareRefused;
+            FarmFertilizer.Applied -= OnFertilized;
+            FarmFertilizer.Refused -= OnCareRefused;
             if (_shop != null) _shop.Sold -= OnSold;
             _shop = null;
         }
 
         // ---- события ----
+
+        /// <summary>
+        /// Полито. Говорим не «+12%», а сколько времени это отняло у ожидания: доля цикла
+        /// ничего не значит человеку, который смотрит на грядку и прикидывает, успеет ли
+        /// до вечера.
+        /// </summary>
+        private void OnPoured(Growable plot)
+        {
+            if (plot == null) return;
+
+            double saved = plot.Definition != null
+                ? plot.Definition.TotalGrowTime * FarmWater.CycleFraction
+                : 0.0;
+
+            string text = saved >= 60.0
+                ? "−" + Mathf.RoundToInt((float)(saved / 60.0)) + " мин"
+                : "полито";
+
+            Show(text, plot.transform.position + Vector3.up * 0.9f, "float--harvest");
+        }
+
+        /// <summary>
+        /// Подкормлено. Говорим прибавкой к урожаю, а не словом «подкормлено»: игрок тратит
+        /// дефицитный запас и обязан увидеть, что именно купил.
+        /// </summary>
+        private void OnFertilized(Growable plot)
+        {
+            if (plot == null) return;
+            Show("урожай ×" + FarmFertilizer.YieldMultiplier,
+                 plot.transform.position + Vector3.up * 0.9f, "float--gold");
+        }
+
+        private void OnCareRefused(string reason, Vector3 at) =>
+            Show(reason, at + Vector3.up * 0.9f, "float--bad");
 
         private void OnHarvested(Growable g, HarvestResult result)
         {
@@ -123,6 +177,12 @@ namespace Farm.UI
             var label = new Label();
             label.AddToClassList("float");
             label.pickingMode = PickingMode.Ignore;
+
+            // Центрируем раскладкой, а не вычитанием resolvedStyle: размер надписи известен
+            // только со следующего кадра, и первый кадр каждой новой строки уезжал вправо
+            // на полширины — ровно тот рывок, с которого текст начинает лететь.
+            label.style.translate = new Translate(Length.Percent(-50f), Length.Percent(-100f));
+
             _layer.Add(label);
             return label;
         }
@@ -146,8 +206,8 @@ namespace Farm.UI
                 if (_camera.WorldToViewportPoint(world).z <= 0f) { item.Label.style.opacity = 0f; continue; }
 
                 Vector2 point = RuntimePanelUtils.CameraTransformWorldToPanel(panel, world, _camera);
-                item.Label.style.left = point.x - item.Label.resolvedStyle.width * 0.5f;
-                item.Label.style.top = point.y - item.Label.resolvedStyle.height;
+                item.Label.style.left = point.x;
+                item.Label.style.top = point.y;
 
                 // Держим полную непрозрачность первую половину жизни — иначе число не успевают прочесть.
                 item.Label.style.opacity = k < 0.5f ? 1f : 1f - (k - 0.5f) * 2f;

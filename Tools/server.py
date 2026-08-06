@@ -72,6 +72,7 @@ KNOWN_API_PATHS = frozenset({
     "/api/register", "/api/login", "/api/session", "/api/password", "/api/logout",
     "/api/friends/request", "/api/friends/accept", "/api/friends/remove",
     "/api/events/ack", "/api/daily",
+    "/api/market", "/api/market/list", "/api/market/buy",
 })
 
 #: Ежедневная награда. Сутки считаются по UTC-календарю, а не «24 часа с прошлого раза»:
@@ -153,6 +154,21 @@ CREATE TABLE IF NOT EXISTS events(
     consumed    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS events_inbox ON events(to_player, consumed);
+CREATE TABLE IF NOT EXISTS market_lots(
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    seller      INTEGER NOT NULL REFERENCES players(id),
+    resource    TEXT NOT NULL,
+    amount      INTEGER NOT NULL,
+    seller_gold INTEGER NOT NULL,
+    buyer_gold  INTEGER NOT NULL,
+    created_at  REAL NOT NULL
+);
+CREATE TABLE IF NOT EXISTS market_ledger(
+    player     INTEGER PRIMARY KEY REFERENCES players(id),
+    credit     INTEGER NOT NULL DEFAULT 0,
+    day        TEXT,
+    sold_today INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -162,6 +178,39 @@ CREATE INDEX IF NOT EXISTS events_inbox ON events(to_player, consumed);
 MAX_GOLD = 1_000_000_000
 MAX_PLOTS = 500
 MAX_LEVEL = 30
+
+# Вода и подкормка (FarmWater, FarmFertilizer в клиенте). Потолок воды — колодец
+# последнего уровня с запасом на будущие уровни; подкормка потолок держит сама.
+MAX_WATER_CHARGES = 60
+MAX_FERTILIZER_CHARGES = 12
+
+# Опыт растёт только сложением малых чисел; сто миллионов не набрать и за годы —
+# всё сверх читается как подделка, а не как рекорд.
+MAX_XP = 100_000_000
+
+# Growable.CareStreakMax в клиенте.
+MAX_CARE_STREAK = 9
+
+# Потолок одного подарка, штук. Щедрость — да, канал перекачки — нет: крупная передача
+# ценности должна быть видна (рынок), а не прятаться в поздравительной открытке.
+MAX_GIFT_AMOUNT = 100
+
+# --- Рынок. Цены фиксированы от каталога, а не свободны, и это главное решение:
+# --- свободная цена тащит за собой вилки, демпинг, арбитраж с лавкой и твинко-насосы,
+# --- а фиксированная держит лестницу каналов сбыта: лавка 1× мгновенно, заказ 1.75×
+# --- за конкретику, рынок 1.25× продавцу — но жди покупателя. Спред сгорает.
+MARKET_SELLER_FACTOR = 1.25   # долю каталожной цены получает продавец
+MARKET_BUYER_FACTOR = 1.50    # долю платит покупатель
+MARKET_MAX_LOTS = 6           # активных лотов на продавца
+MARKET_MAX_AMOUNT = 500       # штук в одном лоте
+MARKET_LOT_TTL = 48 * 3600.0  # через столько невыкупленный лот едет домой событием
+MARKET_DAILY_SELL_GOLD = 50_000  # потолок выручки продавца в календарные сутки — капельница вместо насоса
+
+# Во сколько раз уход может поднять доход фермы: подкормка удваивает урожай
+# (FarmFertilizer.YieldMultiplier), полив срезает часть ожидания. Учитывается
+# в потолке дохода отдельным множителем, чтобы общий запас ×3 остался тому,
+# для чего вводился, — аурам, рынку и подаркам, а не съедался уходом.
+CARE_INCOME_FACTOR = 2.4
 
 
 def _reject_const(name):
@@ -229,7 +278,11 @@ class Catalog:
                 level = 1
             level = max(1, min(MAX_LEVEL, level))
             rate += self.rates.get(plot.get("GrowableId", ""), 0.0) * (2 ** (level - 1))
-        return rate
+
+        # Уход поднимает потолок для всех грядок, а не только для отмеченных сейчас:
+        # флаги в снимке говорят о текущем цикле, а богатство копится за многие циклы —
+        # считать по ним значило бы помечать того, кто ухаживал вчера и собрал сегодня.
+        return rate * CARE_INCOME_FACTOR
 
 
 def is_int(value):
@@ -261,6 +314,36 @@ def validate_state(doc):
         level = plot.get("Level", 1)
         if not is_int(level) or level < 1 or level > MAX_LEVEL:
             return "bad_plots"
+
+        # Скорость грядки обязана быть единицей, и эту дверь надо держать закрытой.
+        # Ради неё уход (полив, подкормка) в клиенте сделан флагами: положи он свой
+        # множитель сюда — отличить честные 1.25 от 25 стало бы нечем уже навсегда.
+        speed = plot.get("OwnGrowthSpeed", 1.0)
+        if not isinstance(speed, (int, float)) or isinstance(speed, bool):
+            return "bad_plots"
+        if not (0.999 <= float(speed) <= 1.001):
+            return "bad_speed"
+
+        # Уход — только да/нет. Клиент шлёт bool; число здесь означает подделку.
+        for flag in ("Watered", "Fertilized"):
+            if flag in plot and not isinstance(plot.get(flag), bool):
+                return "bad_plots"
+
+        streak = plot.get("CareStreak", 0)
+        if not is_int(streak) or streak < 0 or streak > MAX_CARE_STREAK:
+            return "bad_plots"
+
+    water = doc.get("WaterCharges", 0)
+    if not is_int(water) or water < 0 or water > MAX_WATER_CHARGES:
+        return "bad_water"
+
+    fertilizer = doc.get("FertilizerCharges", 0)
+    if not is_int(fertilizer) or fertilizer < 0 or fertilizer > MAX_FERTILIZER_CHARGES:
+        return "bad_water"
+
+    xp = doc.get("TotalXp", 0)
+    if not is_int(xp) or xp < 0 or xp > MAX_XP:
+        return "bad_xp"
 
     return None
 
@@ -662,6 +745,100 @@ class Db:
                 "UPDATE events SET consumed = 1 WHERE to_player = ? AND id IN (%s)" % marks,
                 [me] + list(ids))
 
+    # --- рынок ---
+
+    def market_sweep(self, now):
+        """Вернуть продавцам просроченные лоты. Зовётся перед любым чтением рынка:
+        отдельного планировщика у сервера нет, и «раз в 48 часов» здесь означает
+        «при первом взгляде на рынок после истечения»."""
+        with self._lock:
+            rows = self._conn.execute(
+                "SELECT id, seller, resource, amount FROM market_lots WHERE created_at < ?",
+                (now - MARKET_LOT_TTL,)).fetchall()
+            for row in rows:
+                payload = json.dumps({"ResourceId": row["resource"], "Amount": row["amount"]})
+                self._conn.execute(
+                    "INSERT INTO events(to_player, from_player, type, payload, created_at)"
+                    " VALUES (?, ?, 'market_returned', ?, ?)",
+                    (row["seller"], row["seller"], payload, now))
+                self._conn.execute("DELETE FROM market_lots WHERE id = ?", (row["id"],))
+            return len(rows)
+
+    def market_lots_list(self, limit=100):
+        with self._lock:
+            return self._conn.execute(
+                "SELECT l.id, l.seller, p.name AS seller_name, l.resource, l.amount,"
+                " l.buyer_gold FROM market_lots l JOIN players p ON p.id = l.seller"
+                " ORDER BY l.id DESC LIMIT ?", (limit,)).fetchall()
+
+    def market_seller_lots(self, seller):
+        with self._lock:
+            return self._conn.execute(
+                "SELECT COUNT(*) AS n FROM market_lots WHERE seller = ?", (seller,)).fetchone()["n"]
+
+    def market_add_lot(self, seller, resource, amount, seller_gold, buyer_gold, now):
+        with self._lock:
+            cur = self._conn.execute(
+                "INSERT INTO market_lots(seller, resource, amount, seller_gold, buyer_gold, created_at)"
+                " VALUES (?, ?, ?, ?, ?, ?)", (seller, resource, amount, seller_gold, buyer_gold, now))
+            return cur.lastrowid
+
+    def market_buy(self, buyer, lot_id, now):
+        """Атомарная покупка: проверка, удаление лота, событие продавцу и его рыночный
+        кредит — под одним замком. Второй покупатель того же лота получает None,
+        и его клиент не тронет ни золота, ни склада."""
+        with self._lock:
+            lot = self._conn.execute(
+                "SELECT id, seller, resource, amount, seller_gold, buyer_gold"
+                " FROM market_lots WHERE id = ?", (lot_id,)).fetchone()
+            if lot is None:
+                return None
+
+            payload = json.dumps({"ResourceId": lot["resource"], "Amount": lot["amount"],
+                                  "Gold": lot["seller_gold"]})
+            self._conn.execute(
+                "INSERT INTO events(to_player, from_player, type, payload, created_at)"
+                " VALUES (?, ?, 'market_sold', ?, ?)", (lot["seller"], buyer, payload, now))
+            self._conn.execute("DELETE FROM market_lots WHERE id = ?", (lot_id,))
+
+            # Кредит к эвристике: сервер сам провёл сделку и знает сумму точно,
+            # поэтому allowance поднимается ровно на неё, а не множителем на глазок.
+            self._conn.execute(
+                "INSERT INTO market_ledger(player, credit) VALUES (?, ?)"
+                " ON CONFLICT(player) DO UPDATE SET credit = credit + ?",
+                (lot["seller"], lot["seller_gold"], lot["seller_gold"]))
+            return lot
+
+    def market_day_turnover(self, seller, day, add_gold):
+        """Выручка продавца за календарные сутки. add_gold резервирует сумму под новый лот
+        и возвращает итог; вызвавший сравнивает с потолком и, если перебор, откатывает."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT day, sold_today FROM market_ledger WHERE player = ?", (seller,)).fetchone()
+            sold = row["sold_today"] if row is not None and row["day"] == day else 0
+            sold += add_gold
+            self._conn.execute(
+                "INSERT INTO market_ledger(player, day, sold_today) VALUES (?, ?, ?)"
+                " ON CONFLICT(player) DO UPDATE SET day = ?, sold_today = ?",
+                (seller, day, sold, day, sold))
+            return sold
+
+    def market_day_rollback(self, seller, gold):
+        with self._lock:
+            self._conn.execute(
+                "UPDATE market_ledger SET sold_today = MAX(0, sold_today - ?) WHERE player = ?",
+                (gold, seller))
+
+    def market_take_credit(self, player):
+        """Забрать накопленный рыночный кредит (и обнулить): он одноразовый — до первого PUT."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT credit FROM market_ledger WHERE player = ?", (player,)).fetchone()
+            credit = row["credit"] if row is not None else 0
+            if credit:
+                self._conn.execute("UPDATE market_ledger SET credit = 0 WHERE player = ?", (player,))
+            return credit
+
 
 class ThreadedServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     """Каждое соединение — свой поток.
@@ -782,6 +959,8 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
                 return self._api_friends()
             if path == "/api/events":
                 return self._api_events_get()
+            if path == "/api/market":
+                return self._api_market_get()
         elif method == "POST":
             if path == "/api/register":
                 return self._api_register()
@@ -805,6 +984,10 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
                 return self._api_events_post()
             if path == "/api/events/ack":
                 return self._api_events_ack()
+            if path == "/api/market/list":
+                return self._api_market_list()
+            if path == "/api/market/buy":
+                return self._api_market_buy()
         elif method == "PUT":
             if path == "/api/farm":
                 return self._api_farm_put()
@@ -1003,6 +1186,11 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
                 if isinstance(prev_doc, dict):
                     dt = max(0.0, now - prev["saved_at"])
                     allowance = self.catalog.income_ceiling(prev_doc) * dt * 3.0 + 500.0
+
+                    # Рыночная выручка — точной суммой, а не запасом множителя: сервер сам
+                    # провёл эти сделки и знает их до монеты. Кредит одноразовый — до этого PUT.
+                    allowance += self.db.market_take_credit(player["id"])
+
                     gain = self.catalog.wealth(doc) - self.catalog.wealth(prev_doc)
                     if gain > allowance:
                         suspicion = (gain, allowance, dt)
@@ -1073,20 +1261,133 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
         to_player = data.get("toPlayerId")
         if not is_int(to_player):
             raise ApiError(400, "bad_request")
-        if data.get("type") not in ("gift", "help", "help_reward"):
+        if data.get("type") not in ("gift", "help", "help_reward", "care"):
             raise ApiError(400, "bad_type")
         payload = data.get("payload")
         if not isinstance(payload, str):
             raise ApiError(400, "bad_payload")
         if self.db.player_by_id(to_player) is None:
             raise ApiError(404, "no_such_player")
+
+        # help_reward — ТОЛЬКО самому себе: гость откладывает собственную награду,
+        # которую его ферма заберёт при следующем входе. Клиент верит этому событию
+        # кошельком (wallet.Add), значит от друга оно было бы каналом печати золота:
+        # два аккаунта в дружбе — и любые суммы едут «легально». Дверь закрыта здесь,
+        # а не эвристикой, потому что эвристика помечает, а не отказывает.
+        if data["type"] == "help_reward" and to_player != player["id"]:
+            raise ApiError(403, "self_only")
+
+        # Подарок обязан быть скромным и настоящим: существующий ресурс, штук по каталогу.
+        # Клиент зачисляет его на склад не глядя — значит смотреть обязан сервер.
+        if data["type"] == "gift":
+            try:
+                gift = json.loads(payload)
+            except ValueError:
+                raise ApiError(400, "bad_payload")
+            if not isinstance(gift, dict):
+                raise ApiError(400, "bad_payload")
+            amount = gift.get("Amount", 0)
+            if not is_int(amount) or amount < 1 or amount > MAX_GIFT_AMOUNT:
+                raise ApiError(400, "bad_gift")
+            resource = gift.get("ResourceId", "")
+            if self.catalog is not None and self.catalog.loaded and resource not in self.catalog.prices:
+                raise ApiError(400, "bad_gift")
+
         # События — только друзьям: подарок от незнакомца — это спам-канал.
-        # Себе — можно: так гость в гостях откладывает собственную награду за помощь
-        # (help_reward), которую его ферма заберёт при следующем входе домой.
         if to_player != player["id"] and self.db.friendship(player["id"], to_player) != "accepted":
             raise ApiError(403, "not_friends")
         self.db.add_event(to_player, player["id"], data["type"], payload, time.time())
         return {"ok": True, "serverNow": time.time()}
+
+    # --- рынок ---
+
+    def _market_price(self, resource):
+        """Каталожная цена ресурса. Без каталога рынка нет: торговать по неизвестным
+        ценам значило бы отдать вилку на откуп клиенту — ровно то, от чего ушли."""
+        if self.catalog is None or not self.catalog.loaded:
+            raise ApiError(503, "no_catalog")
+        price = self.catalog.prices.get(resource, 0)
+        if not isinstance(price, (int, float)) or price <= 0:
+            raise ApiError(400, "bad_resource")
+        return float(price)
+
+    def _snapshot_amount(self, player_id, resource):
+        """Сколько такого ресурса лежит в последнем снимке фермы игрока."""
+        row = self.db.get_farm(player_id)
+        if row is None:
+            return 0
+        try:
+            doc = json.loads(row["state"])
+        except (ValueError, TypeError):
+            return 0
+        for entry in (doc.get("Storage") or {}).get("Entries") or []:
+            if isinstance(entry, dict) and entry.get("ResourceId") == resource:
+                amount = entry.get("Amount", 0)
+                return int(amount) if isinstance(amount, (int, float)) else 0
+        return 0
+
+    def _api_market_get(self):
+        self._auth()
+        now = time.time()
+        self.db.market_sweep(now)
+        lots = [{"id": row["id"], "sellerId": row["seller"], "sellerName": row["seller_name"],
+                 "resourceId": row["resource"], "amount": row["amount"], "gold": row["buyer_gold"]}
+                for row in self.db.market_lots_list()]
+        return {"ok": True, "lots": lots, "serverNow": now}
+
+    def _api_market_list(self):
+        player = self._auth()
+        data = self._json_body()
+        now = time.time()
+
+        resource = data.get("resourceId")
+        amount = data.get("amount", 0)
+        if not isinstance(resource, str) or not resource:
+            raise ApiError(400, "bad_resource")
+        if not is_int(amount) or amount < 1 or amount > MARKET_MAX_AMOUNT:
+            raise ApiError(400, "bad_amount")
+
+        price = self._market_price(resource)
+        seller_gold = max(1, int(amount * price * MARKET_SELLER_FACTOR))
+        buyer_gold = max(seller_gold + 1, int(amount * price * MARKET_BUYER_FACTOR))
+
+        if self.db.market_seller_lots(player["id"]) >= MARKET_MAX_LOTS:
+            raise ApiError(409, "too_many_lots")
+
+        # Сверка с последним снимком — главный замок рынка: лот, которого не видно
+        # на складе продавца, не существует. Клиент обязан сохраниться перед листингом.
+        if self._snapshot_amount(player["id"], resource) < amount:
+            raise ApiError(409, "not_in_snapshot")
+
+        # Суточный потолок выручки: превращает любой насос в капельницу. Резервируем
+        # на листинге, а не на продаже, — качать нельзя даже впрок.
+        day = time.strftime("%Y-%m-%d", time.gmtime(now))
+        if self.db.market_day_turnover(player["id"], day, seller_gold) > MARKET_DAILY_SELL_GOLD:
+            self.db.market_day_rollback(player["id"], seller_gold)
+            raise ApiError(429, "daily_limit")
+
+        lot_id = self.db.market_add_lot(player["id"], resource, amount, seller_gold, buyer_gold, now)
+        return {"ok": True, "lotId": lot_id, "sellerGold": seller_gold,
+                "buyerGold": buyer_gold, "serverNow": now}
+
+    def _api_market_buy(self):
+        player = self._auth()
+        data = self._json_body()
+        lot_id = data.get("lotId")
+        if not is_int(lot_id):
+            raise ApiError(400, "bad_request")
+
+        now = time.time()
+        self.db.market_sweep(now)
+
+        lot = self.db.market_buy(player["id"], lot_id, now)
+        if lot is None:
+            # Лот успели купить или он уехал домой по сроку. Покупатель ещё ничего
+            # не списывал (клиент трогает золото только после ok) — честный отказ.
+            raise ApiError(409, "lot_sold")
+
+        return {"ok": True, "resourceId": lot["resource"], "amount": lot["amount"],
+                "gold": lot["buyer_gold"], "serverNow": now}
 
     def _api_events_get(self):
         player = self._auth()
