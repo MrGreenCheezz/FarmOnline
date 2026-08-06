@@ -46,6 +46,9 @@ namespace Farm.UI
         /// <summary>Вкладки жителей над панелью фермера. Null, пока житель один.</summary>
         private VisualElement _residentTabs;
 
+        /// <summary>Ведомость жалования: сколько нанято и почём сутки. Живёт под вкладками.</summary>
+        private Label _wageSummary;
+
         /// <summary>Игрок выбрал вкладку сам — авто-переключение на жителя №1 больше не трогает выбор.</summary>
         private bool _followChosen;
 
@@ -465,6 +468,7 @@ namespace Farm.UI
             if (panel == null) return;
 
             if (_residentTabs != null) { _residentTabs.RemoveFromHierarchy(); _residentTabs = null; }
+            if (_wageSummary != null) { _wageSummary.RemoveFromHierarchy(); _wageSummary = null; }
 
             // Житель №1 — первым: порядок вкладок это порядок состава, а не гонка
             // регистраций (порядок OnEnable Unity не обещает).
@@ -499,6 +503,15 @@ namespace Farm.UI
 
             panel.Insert(1, _residentTabs);   // сразу под заголовком, выше состояния
 
+            // Ведомость: одна строка вместо окна — при трёх жителях игроку нужна сумма,
+            // а не бухгалтерия. Пер-жителя наём остаётся строкой выбранной вкладки.
+            _wageSummary = new Label();
+            _wageSummary.AddToClassList("row");
+            _wageSummary.AddToClassList("row--muted");
+            _wageSummary.pickingMode = PickingMode.Ignore;   // строится после прохода MakeReadout
+            panel.Insert(2, _wageSummary);
+            RefreshWageSummary();
+
             // Заголовок панели говорит правду: над вкладками двоих «ФЕРМЕР» — враньё.
             var title = panel.Q<Label>(className: "panel__title");
             if (title != null) title.text = "ЖИТЕЛИ";
@@ -524,6 +537,29 @@ namespace Farm.UI
 
             foreach (var child in _residentTabs.Children())
                 child.EnableInClassList("resident-tab--on", ReferenceEquals(child.userData, _farmer));
+        }
+
+        /// <summary>
+        /// Ведомость одной строкой: сколько работников на жаловании и почём сутки.
+        /// Сумма — по нанятым, а не по всем: ненанятый живёт бытом и не стоит ничего.
+        /// </summary>
+        private void RefreshWageSummary()
+        {
+            if (_wageSummary == null) return;
+
+            int total = 0, hired = 0, wage = 0;
+            foreach (var resident in FarmerRegistry.All)
+            {
+                if (resident == null) continue;
+                total++;
+                if (!resident.IsHired) continue;
+                hired++;
+                wage += resident.RoleWagePerDay;
+            }
+
+            _wageSummary.text = hired > 0
+                ? "на жаловании " + hired + " из " + total + " · " + wage + " зол./сутки"
+                : "никто не нанят — все живут бытом";
         }
 
         private void BuildSkillRows()
@@ -875,6 +911,8 @@ namespace Farm.UI
             if (_hireButton != null)
                 _hireButton.text = (_farmer.IsHired ? "Продлить на сутки — " : "Нанять на сутки — ")
                                    + _farmer.RoleWagePerDay + " зол.";
+
+            RefreshWageSummary();
         }
 
         private void OnHireClicked()

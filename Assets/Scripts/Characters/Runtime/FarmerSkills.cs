@@ -36,12 +36,6 @@ namespace Farm.Characters
     [AddComponentMenu("Farm/Farmer Skills")]
     public sealed class FarmerSkills : MonoBehaviour
     {
-        /// <summary>Смекалка, с которой он начинает сам продавать излишки.</summary>
-        public const int SellingLevel = 2;
-
-        /// <summary>Смекалка, с которой он сам докупает грядки на вырученное.</summary>
-        public const int RestockLevel = 4;
-
         /// <summary>Спина, с которой он берёт тележку.</summary>
         public const int CartLevel = 3;
 
@@ -185,8 +179,22 @@ namespace Farm.Characters
         }
 
         public bool HasCart => LevelOf(FarmerSkill.Back) >= CartLevel;
-        public bool CanSell => LevelOf(FarmerSkill.Wits) >= SellingLevel;
-        public bool CanRestock => LevelOf(FarmerSkill.Wits) >= RestockLevel;
+
+        // Ворота Смекалки выброшены (этап 2 колонии, решение из концепта): продажа и
+        // закупка требовали Смекалки, а Смекалка росла только от продажи и закупки —
+        // замок, запиравший сам себя; единственным входом были замыслы, и одна
+        // ненайденная кухня выключала половину поведения. Свойства оставлены, чтобы
+        // места вызова читались как прежде: торговлю стерегут буферы Keep* и резерв
+        // золота, а не навык.
+        public bool CanSell => true;
+        public bool CanRestock => true;
+
+        /// <summary>
+        /// Насколько быстрее он управляется у прилавка. Живая награда Смекалки взамен
+        /// выброшенных ворот: цены трогать нельзя — их знает сервер по каталогу, и
+        /// клиентская надбавка разошлась бы с потолком дохода.
+        /// </summary>
+        public float TradeSpeed => 1f + (LevelOf(FarmerSkill.Wits) - 1) * 0.08f;
 
         /// <summary>
         /// Множитель скорости партий, пока мастеровой стоит у станка. Четверть — за сами
@@ -224,9 +232,7 @@ namespace Farm.Characters
                 case FarmerSkill.Back:
                     return next == CartLevel ? "берёт тележку: +6 к переноске" : "+2 к переноске";
                 case FarmerSkill.Wits:
-                    if (next == SellingLevel) return "начнёт сам продавать излишки";
-                    if (next == RestockLevel) return "начнёт сам докупать грядки";
-                    return "ближе к новому умению";
+                    return "у прилавка на 8% быстрее";
                 case FarmerSkill.Crafting:
                     return "партии у станка быстрее на 14%";
                 default:

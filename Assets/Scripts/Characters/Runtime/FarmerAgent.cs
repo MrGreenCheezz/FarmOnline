@@ -1975,7 +1975,9 @@ namespace Farm.Characters
         {
             _mover.Stop();
             if (_market != null) Face(_market.transform.position);
-            _timer = _sellDuration;
+
+            // Смекалка ускоряет саму сделку — её награда после выброса ворот.
+            _timer = _sellDuration / (_skills != null ? _skills.TradeSpeed : 1f);
             SetState(FarmerState.AtMarket);
         }
 
