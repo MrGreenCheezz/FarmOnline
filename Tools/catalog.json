@@ -1,5 +1,5 @@
 {
-    "generatedAtUtc": "2026-08-06T07:18:30.5723167Z",
+    "generatedAtUtc": "2026-08-06T12:07:55.7718169Z",
     "resources": [
         {
             "id": "adamant",
@@ -488,6 +488,44 @@
             "tier": 1,
             "growSeconds": 300.0,
             "baseYield": 3
+        }
+    ],
+    "workshops": [
+        {
+            "buildingId": "sawmill",
+            "inputId": "wood",
+            "inputAmount": 2,
+            "outputId": "plank",
+            "outputAmount": 1,
+            "seconds": 6.0,
+            "maxOutput": 3.75
+        },
+        {
+            "buildingId": "sawmill",
+            "inputId": "oak",
+            "inputAmount": 2,
+            "outputId": "beam",
+            "outputAmount": 1,
+            "seconds": 9.899999618530274,
+            "maxOutput": 3.75
+        },
+        {
+            "buildingId": "smelter",
+            "inputId": "copper",
+            "inputAmount": 2,
+            "outputId": "ingot_copper",
+            "outputAmount": 1,
+            "seconds": 6.0,
+            "maxOutput": 3.75
+        },
+        {
+            "buildingId": "smelter",
+            "inputId": "iron",
+            "inputAmount": 2,
+            "outputId": "ingot_iron",
+            "outputAmount": 1,
+            "seconds": 9.899999618530274,
+            "maxOutput": 3.75
         }
     ]
 }

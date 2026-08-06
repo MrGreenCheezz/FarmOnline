@@ -212,6 +212,10 @@ MARKET_DAILY_SELL_GOLD = 50_000  # потолок выручки продавц�
 # для чего вводился, — аурам, рынку и подаркам, а не съедался уходом.
 CARE_INCOME_FACTOR = 2.4
 
+#: Запас на мастерового у станка (этап 2 колонии): Ремесло последнего уровня ускоряет
+#: партии в 1.25 + 9×0.14 = 2.51 раза — берём 2.6, чтобы честный максимум не помечался.
+CRAFT_TEND_FACTOR = 2.6
+
 
 def _reject_const(name):
     """NaN и Infinity в снимке — всегда порча: JsonUtility их не пишет."""
@@ -231,6 +235,7 @@ class Catalog:
     def __init__(self, path):
         self.prices = {}   # resourceId -> цена продажи за единицу
         self.rates = {}    # growableId -> золото/сек с грядки 1-го уровня
+        self.craft = {}    # buildingId -> лучший прирост золота/сек мастерской (уже с потолком уровня)
         self.loaded = False
         self.generated = "?"
 
@@ -247,6 +252,23 @@ class Catalog:
             price = self.prices.get(row.get("resourceId", ""), 0)
             if grow > 0:
                 self.rates[row.get("id", "")] = price * row.get("baseYield", 1) / grow
+
+        # Маржа мастерских (этап 2 колонии): партия превращает дешёвое сырьё в дорогой
+        # выход, и прирост богатства за секунду — это маржа рецепта на скорости
+        # последнего уровня постройки. Мастеровой у станка умножается уже снаружи,
+        # общим запасом CRAFT_TEND_FACTOR в income_ceiling.
+        for row in data.get("workshops", []):
+            seconds = row.get("seconds") or 0
+            if seconds <= 0:
+                continue
+            gain = (self.prices.get(row.get("outputId", ""), 0) * row.get("outputAmount", 1)
+                    - self.prices.get(row.get("inputId", ""), 0) * row.get("inputAmount", 1))
+            if gain <= 0:
+                continue
+            rate = gain / seconds * max(1.0, row.get("maxOutput", 1.0))
+            building = row.get("buildingId", "")
+            if rate > self.craft.get(building, 0.0):
+                self.craft[building] = rate
 
         self.generated = data.get("generatedAtUtc", "?")
         self.loaded = True
@@ -278,6 +300,15 @@ class Catalog:
                 level = 1
             level = max(1, min(MAX_LEVEL, level))
             rate += self.rates.get(plot.get("GrowableId", ""), 0.0) * (2 ** (level - 1))
+
+        # Мастерские фермы: маржа лучшего рецепта на потолочной скорости постройки,
+        # с запасом на мастерового у станка (Ремесло 10 даёт ×2.51 — берём 2.6).
+        # Считаем по составу построек, а не по флагу «работает сейчас»: богатство
+        # копится за многие партии, как и у грядок с уходом строкой выше.
+        for building in doc.get("Buildings") or []:
+            if not isinstance(building, dict):
+                continue
+            rate += self.craft.get(building.get("BuildingId", ""), 0.0) * CRAFT_TEND_FACTOR
 
         # Уход поднимает потолок для всех грядок, а не только для отмеченных сейчас:
         # флаги в снимке говорят о текущем цикле, а богатство копится за многие циклы —

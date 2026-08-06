@@ -37,11 +37,26 @@ namespace Farm.Game.EditorTools
         }
 
         [Serializable]
+        private sealed class WorkshopRow
+        {
+            public string buildingId;
+            public string inputId;
+            public int inputAmount;
+            public string outputId;
+            public int outputAmount;
+            public double seconds;
+
+            /// <summary>Скорость мастерской на последнем уровне — потолок для эвристики.</summary>
+            public float maxOutput;
+        }
+
+        [Serializable]
         private sealed class Catalog
         {
             public string generatedAtUtc;
             public ResourceRow[] resources;
             public GrowableRow[] growables;
+            public WorkshopRow[] workshops;
         }
 
         [MenuItem("Farm/Онлайн/Экспортировать каталог для сервера")]
@@ -70,18 +85,52 @@ namespace Farm.Game.EditorTools
                 });
             }
 
+            // Рецепты мастерских: по ним сервер поднимает потолок дохода фермы со станками.
+            // Без этого ускоренный мастеровым оборот сыпал бы ложными suspicious (этап 2).
+            var workshops = new List<WorkshopRow>();
+            foreach (var guid in AssetDatabase.FindAssets("t:BuildingDefinition"))
+            {
+                var def = AssetDatabase.LoadAssetAtPath<BuildingDefinition>(AssetDatabase.GUIDToAssetPath(guid));
+                if (def == null || def.Recipes == null || def.Recipes.Count == 0) continue;
+
+                float maxOutput = 1f;
+                for (int level = 1; level <= 32; level++)
+                {
+                    float output = def.OutputAt(level);
+                    if (output <= 0f) break;
+                    if (output > maxOutput) maxOutput = output;
+                }
+
+                foreach (var recipe in def.Recipes)
+                {
+                    if (recipe == null || !recipe.IsValid) continue;
+                    workshops.Add(new WorkshopRow
+                    {
+                        buildingId = def.Id,
+                        inputId = recipe.Input.Id,
+                        inputAmount = recipe.InputAmount,
+                        outputId = recipe.Output.Id,
+                        outputAmount = recipe.OutputAmount,
+                        seconds = recipe.Seconds,
+                        maxOutput = maxOutput,
+                    });
+                }
+            }
+
             var catalog = new Catalog
             {
                 generatedAtUtc = DateTime.UtcNow.ToString("O"),
                 resources = resources.ToArray(),
                 growables = growables.ToArray(),
+                workshops = workshops.ToArray(),
             };
 
             string path = Path.Combine(Application.dataPath, "..", "Tools", "catalog.json");
             File.WriteAllText(path, JsonUtility.ToJson(catalog, true));
 
             Debug.Log("[Онлайн] Каталог экспортирован: " + resources.Count + " ресурсов, "
-                      + growables.Count + " растимых → " + Path.GetFullPath(path));
+                      + growables.Count + " растимых, " + workshops.Count + " рецептов → "
+                      + Path.GetFullPath(path));
         }
     }
 }
