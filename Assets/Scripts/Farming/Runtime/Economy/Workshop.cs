@@ -169,6 +169,63 @@ namespace Farm.Farming
             return best;
         }
 
+        // ---- сохранение ----
+
+        /// <summary>
+        /// Снимок недоделанной партии. Наработанные секунды, а не таймстамп, — как у грядок:
+        /// оффлайн-догон добавит вызывающий при чтении. False — мастерская простаивает.
+        /// </summary>
+        public bool CaptureRunning(out string inputId, out string outputId, out double elapsed)
+        {
+            inputId = null;
+            outputId = null;
+            elapsed = 0.0;
+
+            if (_running == null || _running.Input == null || _running.Output == null) return false;
+
+            inputId = _running.Input.Id;
+            outputId = _running.Output.Id;
+            elapsed = System.Math.Max(0.0, FarmingRuntime.Now - _startedAt);
+            return true;
+        }
+
+        /// <summary>
+        /// Вернуть партию из сохранения. Сырьё НЕ списывается — оно уже списано в момент
+        /// старта и в снимке склада его нет; списать второй раз значило бы брать двойную цену.
+        /// Перезревшая за отлучку партия дойдёт сама: планировщик разбудит немедленно.
+        /// </summary>
+        public void RestoreRunning(string inputId, string outputId, double elapsed)
+        {
+            var definition = Building != null ? Building.Definition : null;
+            var recipes = definition != null ? definition.Recipes : null;
+            if (recipes == null) return;
+
+            WorkshopRecipe found = null;
+            for (int i = 0; i < recipes.Count; i++)
+            {
+                var recipe = recipes[i];
+                if (recipe == null || recipe.Input == null || recipe.Output == null) continue;
+                if (recipe.Input.Id == inputId && recipe.Output.Id == outputId) { found = recipe; break; }
+            }
+
+            // Рецепт исчез из ассета — честно сказать и отпустить: сырьё этой партии
+            // потеряно вместе с рецептом, молча проглотить это нельзя.
+            if (found == null)
+            {
+                Debug.LogWarning("[Workshop] " + name + ": рецепт " + inputId + "→" + outputId +
+                                 " из сейва не найден — партия пропала", this);
+                return;
+            }
+
+            double now = FarmingRuntime.Now;
+            _running = found;
+            _startedAt = now - System.Math.Max(0.0, elapsed);
+            _readyAt = _startedAt + BatchSeconds(found);
+
+            Sleep(System.Math.Max(now, _readyAt));
+            Raise(WorkChanged, found);
+        }
+
         private void RefundRunning()
         {
             if (_running == null) return;

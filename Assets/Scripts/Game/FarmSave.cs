@@ -158,6 +158,7 @@ namespace Farm.Game
 
             CapturePlots(data);
             var buildingIndex = CaptureBuildings(data);
+            CaptureWorkshops(data, buildingIndex);
             CaptureImprovements(data);
             CaptureShop(data);
             CaptureFarmer(data, buildingIndex);
@@ -270,60 +271,96 @@ namespace Farm.Game
             data.ShopOwned = saved.ToArray();
         }
 
+        /// <summary>
+        /// Недоделанные партии мастерских. Сырьё этих партий уже списано со склада, и его
+        /// нет в снимке — поэтому партию нельзя ни забыть (сырьё испарится), ни списать
+        /// второй раз при чтении.
+        /// </summary>
+        private static void CaptureWorkshops(FarmSaveData data, Dictionary<Building, int> buildingIndex)
+        {
+            var shops = new List<WorkshopSave>();
+
+            foreach (var pair in buildingIndex)
+            {
+                var workshop = pair.Key != null ? pair.Key.GetComponent<Workshop>() : null;
+                if (workshop == null) continue;
+                if (!workshop.CaptureRunning(out string input, out string output, out double elapsed)) continue;
+
+                shops.Add(new WorkshopSave
+                {
+                    BuildingIndex = pair.Value,
+                    InputId = input,
+                    OutputId = output,
+                    ElapsedSeconds = elapsed
+                });
+            }
+
+            data.Workshops = shops.ToArray();
+        }
+
         private static void CaptureFarmer(FarmSaveData data, Dictionary<Building, int> buildingIndex)
         {
-            var farmer = FarmerRegistry.Primary;
-            if (farmer == null) return;
+            // Все жители, а не Primary: колония (этап 0, 06.08.2026). Пока житель один,
+            // массив длиной один — партия эпохи одного фермера остаётся собой.
+            var residents = new List<FarmerSave>();
 
-            // Снимок умеет делать конкретная реализация: интерфейсу он не нужен — контейнеров
-            // много, а сохраняется ими только тот, что лежит в сцене.
-            var pack = farmer.Inventory as Inventory;
-
-            var save = new FarmerSave
+            foreach (var farmer in FarmerRegistry.All)
             {
-                Position = farmer.transform.position,
-                Yaw = farmer.transform.eulerAngles.y,
-                Pack = pack != null ? pack.CaptureState() : new InventorySnapshot(),
-                HiredUntilUnix = farmer.HiredUntil
-            };
+                if (farmer == null) continue;
 
-            var needs = farmer.GetComponent<CharacterNeeds>();
-            if (needs != null)
-                needs.CaptureState(out save.Satiety01, out save.Hydration01, out save.Energy01);
+                // Снимок умеет делать конкретная реализация: интерфейсу он не нужен — контейнеров
+                // много, а сохраняется ими только тот, что лежит в сцене.
+                var pack = farmer.Inventory as Inventory;
 
-            var skills = farmer.Skills;
-            if (skills != null) skills.CaptureState(out save.SkillLevels, out save.SkillXp);
-
-            var traits = farmer.Traits;
-            if (traits != null) save.Traits = traits.CaptureState();
-
-            data.Farmer = save;
-
-            var built = new List<BuiltSave>();
-            foreach (var pair in farmer.CaptureBuilt())
-            {
-                if (pair.Key == null || pair.Value <= 0) continue;
-                built.Add(new BuiltSave { ImprovementId = pair.Key.Id, Count = pair.Value });
-            }
-            data.Built = built.ToArray();
-
-            var yards = new List<YardSave>();
-            foreach (var yard in farmer.CaptureBuiltYards())
-            {
-                if (yard.Key == null || !buildingIndex.TryGetValue(yard.Key, out int index)) continue;
-
-                foreach (var entry in yard.Value)
+                var save = new FarmerSave
                 {
-                    if (entry.Key == null || entry.Value <= 0) continue;
-                    yards.Add(new YardSave
-                    {
-                        BuildingIndex = index,
-                        ImprovementId = entry.Key.Id,
-                        Count = entry.Value
-                    });
+                    Name = farmer.name,
+                    Position = farmer.transform.position,
+                    Yaw = farmer.transform.eulerAngles.y,
+                    Pack = pack != null ? pack.CaptureState() : new InventorySnapshot(),
+                    HiredUntilUnix = farmer.HiredUntil
+                };
+
+                var needs = farmer.GetComponent<CharacterNeeds>();
+                if (needs != null)
+                    needs.CaptureState(out save.Satiety01, out save.Hydration01, out save.Energy01);
+
+                var skills = farmer.Skills;
+                if (skills != null) skills.CaptureState(out save.SkillLevels, out save.SkillXp);
+
+                var traits = farmer.Traits;
+                if (traits != null) save.Traits = traits.CaptureState();
+
+                var built = new List<BuiltSave>();
+                foreach (var pair in farmer.CaptureBuilt())
+                {
+                    if (pair.Key == null || pair.Value <= 0) continue;
+                    built.Add(new BuiltSave { ImprovementId = pair.Key.Id, Count = pair.Value });
                 }
+                save.Built = built.ToArray();
+
+                var yards = new List<YardSave>();
+                foreach (var yard in farmer.CaptureBuiltYards())
+                {
+                    if (yard.Key == null || !buildingIndex.TryGetValue(yard.Key, out int index)) continue;
+
+                    foreach (var entry in yard.Value)
+                    {
+                        if (entry.Key == null || entry.Value <= 0) continue;
+                        yards.Add(new YardSave
+                        {
+                            BuildingIndex = index,
+                            ImprovementId = entry.Key.Id,
+                            Count = entry.Value
+                        });
+                    }
+                }
+                save.Yards = yards.ToArray();
+
+                residents.Add(save);
             }
-            data.Yards = yards.ToArray();
+
+            data.Residents = residents.ToArray();
         }
 
         // ---- разложить ----
@@ -403,6 +440,21 @@ namespace Farm.Game
 
             var buildings = ApplyBuildings(data, registry);
             FarmBuffs.Refresh();   // ауры готовы — теперь грядкам есть что спросить
+
+            // Партии мастерских — сразу после построек: сырьё уже списано в снимке,
+            // и до восстановления мастерская считала бы себя праздной и начала бы
+            // новую партию, списав сырьё второй раз.
+            foreach (var shop in data.Workshops)
+            {
+                if (shop == null || shop.BuildingIndex < 0 || shop.BuildingIndex >= buildings.Count) continue;
+
+                var building = buildings[shop.BuildingIndex];
+                var workshop = building != null ? building.GetComponent<Workshop>() : null;
+
+                // Оффлайн-догон здесь: станок работал, пока игра была закрыта.
+                if (workshop != null)
+                    workshop.RestoreRunning(shop.InputId, shop.OutputId, shop.ElapsedSeconds + offlineSeconds);
+            }
 
             ApplyPlots(data, registry, offlineSeconds);
             ApplyImprovements(data, registry);
@@ -553,11 +605,43 @@ namespace Farm.Game
 
         private static void ApplyFarmer(FarmSaveData data, ContentRegistry registry, List<Building> buildings)
         {
-            var farmer = FarmerRegistry.Primary;
-            if (farmer == null || data.Farmer == null) return;
+            // Миграция эпохи одного фермера: старое поле читается как «житель №1» вместе
+            // с верхнеуровневыми замыслами и двориками — характер, посеянный от имени игрока,
+            // обязан пережить обновление.
+            var saves = data.Residents != null && data.Residents.Length > 0
+                ? data.Residents
+                : data.Farmer != null ? new[] { Legacy(data) } : System.Array.Empty<FarmerSave>();
 
+            var agents = new List<FarmerAgent>();
+            foreach (var agent in FarmerRegistry.All)
+                if (agent != null) agents.Add(agent);
+
+            for (int i = 0; i < saves.Length; i++)
+            {
+                var save = saves[i];
+                if (save == null) continue;
+
+                // Житель находится по имени; безымянный сейв или пропавший тёзка — по месту
+                // в списке. Терять снимок из-за переименования объекта сцены нельзя.
+                var farmer = agents.Find(a => a.name == save.Name) ?? (i < agents.Count ? agents[i] : null);
+                if (farmer == null) continue;
+
+                ApplyResident(farmer, save, registry, buildings);
+            }
+        }
+
+        /// <summary>Старый сейв как житель №1: его личное имущество лежало на уровне фермы.</summary>
+        private static FarmerSave Legacy(FarmSaveData data)
+        {
             var save = data.Farmer;
+            if (save.Built == null || save.Built.Length == 0) save.Built = data.Built;
+            if (save.Yards == null || save.Yards.Length == 0) save.Yards = data.Yards;
+            return save;
+        }
 
+        private static void ApplyResident(FarmerAgent farmer, FarmerSave save,
+                                          ContentRegistry registry, List<Building> buildings)
+        {
             var traits = farmer.Traits;
             if (traits != null) traits.RestoreState(save.Traits);
 
@@ -576,13 +660,13 @@ namespace Farm.Game
             // Часы найма — те же unix-часы, что растят грядки: наём честно тикает и без нас.
             farmer.RestoreHired(save.HiredUntilUnix);
 
-            foreach (var built in data.Built)
+            foreach (var built in save.Built)
             {
                 var definition = registry.Improvement(built.ImprovementId);
                 if (definition != null) farmer.RestoreBuilt(definition, built.Count);
             }
 
-            foreach (var yard in data.Yards)
+            foreach (var yard in save.Yards)
             {
                 if (yard.BuildingIndex < 0 || yard.BuildingIndex >= buildings.Count) continue;
 

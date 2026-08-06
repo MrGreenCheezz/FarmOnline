@@ -54,12 +54,19 @@ namespace Farm.Game
         {
             FarmingEvents.Harvested += OnSignificantAction;
             FarmingEvents.Merged += OnSignificantAction;
+
+            // Уход — такое же значимое действие, как сбор: он тратит дефицит (ведро,
+            // подкормку), и потерять его закрытой вкладкой обиднее, чем лишний PUT.
+            FarmWater.Poured += OnCared;
+            FarmFertilizer.Applied += OnCared;
         }
 
         private void OnDisable()
         {
             FarmingEvents.Harvested -= OnSignificantAction;
             FarmingEvents.Merged -= OnSignificantAction;
+            FarmWater.Poured -= OnCared;
+            FarmFertilizer.Applied -= OnCared;
         }
 
         private void OnDestroy()
@@ -98,15 +105,18 @@ namespace Farm.Game
                 }
             }
 
-            // Свежая партия — пересеять характер фермера от имени игрока: у каждого хозяина
-            // свой работник, а не общий на всех слепок от имени объекта сцены. Загруженная
-            // партия сюда не попадает: её характер уже данные и восстановлен из сейва.
+            // Свежая партия — пересеять характеры жителей от имени игрока: у каждого хозяина
+            // свои люди, а не общий на всех слепок от имени объекта сцены. Зерно — имя игрока
+            // плюс имя жителя: одно зерно на всех дало бы колонию клонов с одним характером.
+            // Загруженная партия сюда не попадает: её характеры уже данные из сейва.
             bool freshFarm = pending == null || pending.Data == null;
             if (!GuestMode.IsGuest && freshFarm && !string.IsNullOrEmpty(NetSession.PlayerName))
             {
-                var farmer = FarmerRegistry.Primary;
-                var traits = farmer != null ? farmer.Traits : null;
-                if (traits != null) traits.Reroll(NetSession.PlayerName);
+                foreach (var resident in FarmerRegistry.All)
+                {
+                    var traits = resident != null ? resident.Traits : null;
+                    if (traits != null) traits.Reroll(NetSession.PlayerName + "·" + resident.name);
+                }
             }
 
             Ready = true;
@@ -141,6 +151,7 @@ namespace Farm.Game
 
         private void OnSignificantAction(Growable plot, HarvestResult result) => RequestSoon();
         private void OnSignificantAction(Growable survivor, Growable absorbed) => RequestSoon();
+        private void OnCared(Growable plot) => RequestSoon();
 
         /// <summary>Попросить сохраниться скоро, но не сейчас: серия сборов подряд — один сейв.</summary>
         public void RequestSoon()

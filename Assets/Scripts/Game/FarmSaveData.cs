@@ -68,7 +68,21 @@ namespace Farm.Game
         public int Count;
     }
 
-    /// <summary>Общефермовый счёт построенного жителем — дом и любимое место.</summary>
+    /// <summary>
+    /// Партия мастерской, не доведённая до конца. Наработанные секунды, а не таймстамп, —
+    /// по той же причине, что у грядок: оффлайн-догон добавляется при чтении.
+    /// Рецепт называется парой «вход-выход»: собственного id у рецепта нет, а пара
+    /// уникальна внутри постройки.
+    /// </summary>
+    [Serializable]
+    public sealed class WorkshopSave
+    {
+        public int BuildingIndex = -1;
+        public string InputId;
+        public string OutputId;
+        public double ElapsedSeconds;
+    }
+
     [Serializable]
     public sealed class BuiltSave
     {
@@ -88,6 +102,13 @@ namespace Farm.Game
     [Serializable]
     public sealed class FarmerSave
     {
+        /// <summary>
+        /// Имя жителя — идентичность между сейвом и сценой. Пустое у сейвов эпохи одного
+        /// фермера: такой снимок читается как «житель №1», и его характер сохраняется —
+        /// характер посеян от имени игрока, терять его при обновлении нельзя.
+        /// </summary>
+        public string Name;
+
         public Vector3 Position;
         public float Yaw;
 
@@ -105,6 +126,15 @@ namespace Farm.Game
 
         /// <summary>До какого момента (unix-секунды серверных часов) фермер нанят. 0 — не нанят.</summary>
         public double HiredUntilUnix;
+
+        /// <summary>
+        /// Личные замыслы и дворики жителя. Личные по замыслу («у будущих жителей будут
+        /// свои», FarmerAgent), поэтому лежат в жителе, а не на ферме. Пустые у старых
+        /// сейвов — их верхнеуровневые Built/Yards читаются как имущество жителя №1.
+        /// </summary>
+        public BuiltSave[] Built = Array.Empty<BuiltSave>();
+
+        public YardSave[] Yards = Array.Empty<YardSave>();
     }
 
     /// <summary>
@@ -195,10 +225,29 @@ namespace Farm.Game
         public BuildingSave[] Buildings = Array.Empty<BuildingSave>();
         public ImprovementSave[] Improvements = Array.Empty<ImprovementSave>();
         public ShopOwnedSave[] ShopOwned = Array.Empty<ShopOwnedSave>();
+
+        /// <summary>Эпоха одного фермера: замыслы и дворики лежали на ферме. Читаются как
+        /// имущество жителя №1; новые сейвы пишут их внутри <see cref="Residents"/>.</summary>
         public BuiltSave[] Built = Array.Empty<BuiltSave>();
+
         public YardSave[] Yards = Array.Empty<YardSave>();
 
+        /// <summary>Эпоха одного фермера — читается как житель №1, когда <see cref="Residents"/> пуст.</summary>
         public FarmerSave Farmer;
+
+        /// <summary>
+        /// Жители колонии, по одному снимку на каждого. Массив, а не одно поле, — решение
+        /// владельца 06.08.2026 о колонии; при единственном жителе он длиной один, и партия
+        /// эпохи одного фермера остаётся собой после первой же записи.
+        /// </summary>
+        public FarmerSave[] Residents = Array.Empty<FarmerSave>();
+
+        /// <summary>
+        /// Недоделанные партии мастерских. С реальными часами без этого 8-часовая партия,
+        /// начатая перед выходом, молча откатывалась — сырьё возвращалось в склад, который
+        /// уже никуда не записывался.
+        /// </summary>
+        public WorkshopSave[] Workshops = Array.Empty<WorkshopSave>();
 
         /// <summary>Натоптанные клетки парами (x, y, x, y…).</summary>
         public int[] Footpaths = Array.Empty<int>();
