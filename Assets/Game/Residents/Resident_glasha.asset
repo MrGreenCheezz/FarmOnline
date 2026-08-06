@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Farm.Characters::Farm.Characters.ResidentDefinition
   _displayName: "\u0413\u043B\u0430\u0448\u0430"
   _role: 1
+  _arrivesAtFarmLevel: 2
   _wagePerDay: 100
   _tidyZeal: 1.4
   _projectZeal: 0.8

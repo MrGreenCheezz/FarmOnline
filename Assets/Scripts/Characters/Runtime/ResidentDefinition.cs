@@ -55,6 +55,10 @@ namespace Farm.Characters
                  "неоплаченная роль живёт бытом.")]
         [SerializeField] private ResidentRole _role = ResidentRole.None;
 
+        [Tooltip("Со ступени земли приезжает на ферму. Единица — живёт с самого начала.\n" +
+                 "Земля растёт — люди подтягиваются: у прибытия должна быть видимая причина.")]
+        [SerializeField, Min(1)] private int _arrivesAtFarmLevel = 1;
+
         [Tooltip("Жалование роли, золота за сутки серверных часов. 0 — по общему тарифу (150).")]
         [SerializeField, Min(0)] private int _wagePerDay;
 
@@ -71,6 +75,7 @@ namespace Farm.Characters
 
         public string DisplayName => _displayName;
         public ResidentRole Role => _role;
+        public int ArrivesAtFarmLevel => _arrivesAtFarmLevel;
         public int WagePerDay => _wagePerDay;
         public float TidyZeal => _tidyZeal;
         public float ProjectZeal => _projectZeal;

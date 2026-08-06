@@ -46,6 +46,7 @@ namespace Farm.Farming
         private double _tendUntil;
 
         private Transform _preview;      // растущая заглушка цели
+        private Material _scaffoldWood;  // материал лесов: свой инстанс, сносится с площадкой
         private int _handle = GrowthScheduler.InvalidHandle;
 
         public TargetKind Kind => _kind;
@@ -202,8 +203,58 @@ namespace Farm.Farming
                 Destroy(component);
             }
 
+            // Каркас блёклый: цветной в полный тон читался бы «готовой мини-постройкой»,
+            // а не стройкой. MaterialPropertyBlock — чужие материалы не трогаются.
+            var block = new MaterialPropertyBlock();
+            block.SetColor("_BaseColor", new Color(0.72f, 0.68f, 0.62f, 1f));
+            foreach (var renderer in preview.GetComponentsInChildren<Renderer>(true))
+                renderer.SetPropertyBlock(block);
+
             _preview = preview.transform;
+            BuildScaffold();
             ApplyPreviewScale();
+        }
+
+        /// <summary>
+        /// Леса из жердей — то, что делает площадку площадкой с первого взгляда. Из
+        /// примитивов и одного материала: контент не должен требовать новых ассетов.
+        /// </summary>
+        private void BuildScaffold()
+        {
+            float half = _kind == TargetKind.Building ? 1.35f : 0.75f;
+            const float Height = 1.5f;
+            const float PoleThickness = 0.09f;
+
+            _scaffoldWood = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+            _scaffoldWood.color = new Color(0.45f, 0.33f, 0.19f, 1f);
+            var wood = _scaffoldWood;
+
+            // Четыре угловых столба.
+            for (int i = 0; i < 4; i++)
+            {
+                float sx = (i & 1) == 0 ? -half : half;
+                float sz = (i & 2) == 0 ? -half : half;
+                MakeBeam(new Vector3(sx, Height * 0.5f, sz),
+                         new Vector3(PoleThickness, Height, PoleThickness), wood);
+            }
+
+            // Верхние перекладины по периметру.
+            MakeBeam(new Vector3(0f, Height, -half), new Vector3(half * 2f, PoleThickness, PoleThickness), wood);
+            MakeBeam(new Vector3(0f, Height, half), new Vector3(half * 2f, PoleThickness, PoleThickness), wood);
+            MakeBeam(new Vector3(-half, Height, 0f), new Vector3(PoleThickness, PoleThickness, half * 2f), wood);
+            MakeBeam(new Vector3(half, Height, 0f), new Vector3(PoleThickness, PoleThickness, half * 2f), wood);
+        }
+
+        private void MakeBeam(Vector3 localPosition, Vector3 size, Material wood)
+        {
+            var beam = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            beam.name = "леса";
+            Destroy(beam.GetComponent<Collider>());   // леса — картинка, кликов не ловят
+
+            beam.transform.SetParent(transform, false);
+            beam.transform.localPosition = localPosition;
+            beam.transform.localScale = size;
+            beam.GetComponent<MeshRenderer>().sharedMaterial = wood;
         }
 
         private void ApplyPreviewScale()
@@ -235,6 +286,12 @@ namespace Farm.Farming
             var scheduler = GrowthScheduler.Existing;
             if (scheduler != null) scheduler.Unregister(_handle);
             _handle = GrowthScheduler.InvalidHandle;
+        }
+
+        private void OnDestroy()
+        {
+            // Материал лесов создан кодом — Unity сам его не приберёт.
+            if (_scaffoldWood != null) Destroy(_scaffoldWood);
         }
     }
 }

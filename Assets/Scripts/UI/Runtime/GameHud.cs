@@ -49,6 +49,9 @@ namespace Farm.UI
         /// <summary>Ведомость жалования: сколько нанято и почём сутки. Живёт под вкладками.</summary>
         private Label _wageSummary;
 
+        /// <summary>Кто приедет следующим и на какой ступени — причина роста колонии видима.</summary>
+        private Label _arrivalNote;
+
         /// <summary>Игрок выбрал вкладку сам — авто-переключение на жителя №1 больше не трогает выбор.</summary>
         private bool _followChosen;
 
@@ -469,6 +472,7 @@ namespace Farm.UI
 
             if (_residentTabs != null) { _residentTabs.RemoveFromHierarchy(); _residentTabs = null; }
             if (_wageSummary != null) { _wageSummary.RemoveFromHierarchy(); _wageSummary = null; }
+            if (_arrivalNote != null) { _arrivalNote.RemoveFromHierarchy(); _arrivalNote = null; }
 
             // Житель №1 — первым: порядок вкладок это порядок состава, а не гонка
             // регистраций (порядок OnEnable Unity не обещает).
@@ -483,6 +487,10 @@ namespace Farm.UI
                 // Вкладок нет — и заголовок обязан вернуться к правде одного фермера.
                 var soloTitle = panel.Q<Label>(className: "panel__title");
                 if (soloTitle != null) soloTitle.text = "ФЕРМЕР";
+
+                // А вот причина будущего роста видна и новичку с одним жителем — ради
+                // неё колонию и растят.
+                BuildArrivalNote(panel, 1);
                 return;
             }
 
@@ -510,6 +518,7 @@ namespace Farm.UI
             _wageSummary.AddToClassList("row--muted");
             _wageSummary.pickingMode = PickingMode.Ignore;   // строится после прохода MakeReadout
             panel.Insert(2, _wageSummary);
+            BuildArrivalNote(panel, 3);
             RefreshWageSummary();
 
             // Заголовок панели говорит правду: над вкладками двоих «ФЕРМЕР» — враньё.
@@ -539,6 +548,25 @@ namespace Farm.UI
                 child.EnableInClassList("resident-tab--on", ReferenceEquals(child.userData, _farmer));
         }
 
+        private void BuildArrivalNote(VisualElement panel, int index)
+        {
+            _arrivalNote = new Label();
+            _arrivalNote.AddToClassList("row");
+            _arrivalNote.AddToClassList("row--muted");
+            _arrivalNote.pickingMode = PickingMode.Ignore;
+            panel.Insert(index, _arrivalNote);
+            RefreshArrivalNote();
+        }
+
+        private void RefreshArrivalNote()
+        {
+            if (_arrivalNote == null) return;
+
+            string note = ColonyRoster.NextArrivalNote;
+            _arrivalNote.style.display = string.IsNullOrEmpty(note) ? DisplayStyle.None : DisplayStyle.Flex;
+            if (!string.IsNullOrEmpty(note)) _arrivalNote.text = note;
+        }
+
         /// <summary>
         /// Ведомость одной строкой: сколько работников на жаловании и почём сутки.
         /// Сумма — по нанятым, а не по всем: ненанятый живёт бытом и не стоит ничего.
@@ -565,6 +593,8 @@ namespace Farm.UI
             _wageSummary.text = hired > 0
                 ? "на жаловании " + hired + " из " + total + " · " + wage + " зол./сутки"
                 : "никто не нанят — все живут бытом";
+
+            RefreshArrivalNote();
         }
 
         private void BuildSkillRows()

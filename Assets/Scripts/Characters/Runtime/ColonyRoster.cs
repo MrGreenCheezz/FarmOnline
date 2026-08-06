@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using Farm.Farming;
 
 namespace Farm.Characters
 {
@@ -34,8 +35,23 @@ namespace Farm.Characters
 
         [SerializeField] private Entry[] _entries = Array.Empty<Entry>();
 
+        /// <summary>Житель приехал в живой игре (не при загрузке) — интерфейсу есть что объявить.</summary>
+        public static event Action<FarmerAgent> Arrived;
+
+        /// <summary>
+        /// Строка о следующем прибытии — для панели жителей. Null, когда все уже дома.
+        /// Игрок обязан видеть, что́ приводит людей: рост без причины читается как случайность.
+        /// </summary>
+        public static string NextArrivalNote { get; private set; }
+
+        private static ColonyRoster _instance;
+
+        /// <summary>Известный ростеру уровень земли. Ноль — ещё не видел ни одного.</summary>
+        private int _seenLevel;
+
         private void Awake()
         {
+            _instance = this;
             FarmerAgent first = null;
 
             foreach (var entry in _entries)
@@ -55,6 +71,70 @@ namespace Farm.Characters
             // эпохи одного фермера. Порядку регистрации это доверять нельзя — он от
             // порядка OnEnable, которого Unity не обещает.
             if (first != null) FarmerRegistry.Designate(first);
+        }
+
+        private void OnEnable()
+        {
+            FarmLevels.Changed += OnFarmLevelChanged;
+            OnFarmLevelChanged(FarmLevels.Current);
+        }
+
+        private void OnDisable()
+        {
+            FarmLevels.Changed -= OnFarmLevelChanged;
+            if (_instance == this) { _instance = null; NextArrivalNote = null; Arrived = null; }
+        }
+
+        /// <summary>
+        /// Земля выросла (или партия загрузилась) — свериться, кто уже приехал. Приезд
+        /// объявляется только при живом росте: загрузка включает состав молча, партия
+        /// с этими людьми уже жила.
+        /// </summary>
+        private void OnFarmLevelChanged(int level)
+        {
+            bool live = _seenLevel > 0 && level > _seenLevel;
+
+            foreach (var entry in _entries)
+            {
+                if (entry == null || entry.Definition == null || entry.Agent == null) continue;
+
+                bool here = level >= entry.Definition.ArrivesAtFarmLevel;
+                var go = entry.Agent.gameObject;
+                if (go.activeSelf == here) continue;
+
+                go.SetActive(here);
+
+                if (here && live) Raise(entry.Agent);
+            }
+
+            _seenLevel = level;
+            RefreshArrivalNote(level);
+        }
+
+        private void RefreshArrivalNote(int level)
+        {
+            ResidentDefinition next = null;
+
+            foreach (var entry in _entries)
+            {
+                if (entry == null || entry.Definition == null) continue;
+                if (entry.Definition.ArrivesAtFarmLevel <= level) continue;
+
+                if (next == null || entry.Definition.ArrivesAtFarmLevel < next.ArrivesAtFarmLevel)
+                    next = entry.Definition;
+            }
+
+            NextArrivalNote = next != null
+                ? next.DisplayName + " приедет на " + next.ArrivesAtFarmLevel + "-й ступени земли"
+                : null;
+        }
+
+        private static void Raise(FarmerAgent arrived)
+        {
+            var handler = Arrived;
+            if (handler == null) return;
+            try { handler(arrived); }
+            catch (Exception e) { Debug.LogException(e, arrived); }
         }
     }
 }
