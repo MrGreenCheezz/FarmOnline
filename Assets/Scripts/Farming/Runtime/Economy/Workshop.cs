@@ -32,6 +32,13 @@ namespace Farm.Farming
         private double _startedAt;
         private double _readyAt;
 
+        // Мастеровой рядом (этап 2 колонии). Метка со сроком годности, как у застолбления
+        // уборки: житель продлевает её каждый тик у станка, брошенная протухает сама — у
+        // ухода полдюжины путей, и ловить каждый значило бы утекать. Кто именно стоит,
+        // станок не знает: сборка Farm.Farming не видит жителей, ей хватает множителя.
+        private float _tendSpeed = 1f;
+        private double _tendUntil;
+
         /// <summary>Партия вышла: рецепт и сколько единиц реально легло на склад.</summary>
         public event Action<Workshop, WorkshopRecipe, int> Produced;
 
@@ -61,6 +68,19 @@ namespace Farm.Farming
             float speed = Mathf.Max(0.01f, Building != null ? Building.Output : 1f);
             return Mathf.Max(0.1f, recipe.Seconds) / speed;
         }
+
+        /// <summary>
+        /// Отметить мастерового у станка: множитель скорости партий на ближайшие
+        /// <paramref name="holdSeconds"/>. Продлевается каждым тиком присутствия.
+        /// </summary>
+        public void SetTendSpeed(float factor, double holdSeconds = 2.0)
+        {
+            _tendSpeed = Mathf.Max(1f, factor);
+            _tendUntil = FarmingRuntime.Now + holdSeconds;
+        }
+
+        /// <summary>Текущий множитель мастерового. Единица, когда у станка никого.</summary>
+        public float TendSpeed => FarmingRuntime.Now < _tendUntil ? _tendSpeed : 1f;
 
         private void OnEnable()
         {
@@ -125,7 +145,11 @@ namespace Farm.Farming
 
             _running = recipe;
             _startedAt = now;
-            _readyAt = now + BatchSeconds(recipe);
+
+            // Буст мастерового фиксируется на старте партии и не пересчитывается в
+            // середине: часам реального времени нельзя врать задним числом, а партии
+            // короткие — пришедший к станку увидит эффект со следующей же.
+            _readyAt = now + BatchSeconds(recipe) / TendSpeed;
 
             Sleep(_readyAt);
             Raise(WorkChanged, recipe);

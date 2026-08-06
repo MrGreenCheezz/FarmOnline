@@ -25,7 +25,9 @@ namespace Farm.Characters
         /// <summary>Навести порядок: перенести грядку к своим.</summary>
         Tidy = 8,
         /// <summary>Построить задуманное: клумбу, скамейку, костёр у крыльца.</summary>
-        Improve = 9
+        Improve = 9,
+        /// <summary>Встать к станку и вести партии — работа мастерового (этап 2 колонии).</summary>
+        Craft = 10
     }
 
     /// <summary>Одно взвешенное намерение: что делать, насколько хочется и с чем именно.</summary>
@@ -210,6 +212,7 @@ namespace Farm.Characters
             Consider(ScoreHarvest(), ref best);
             Consider(ScoreAwait(), ref best);
             Consider(ScoreTrade(), ref best);
+            Consider(ScoreCraft(), ref best);
             Consider(ScoreTidy(), ref best);
             Consider(ScoreImprove(), ref best);
             Consider(ScoreRelax(), ref best);
@@ -222,8 +225,14 @@ namespace Farm.Characters
             if (candidate.Score > best.Score) best = candidate;
         }
 
-        /// <summary>Идёт ли сейчас перерыв. На это время сбор и ожидание закрыты наглухо.</summary>
+        /// <summary>Идёт ли сейчас перерыв. На это время сбор, станок и ожидание закрыты наглухо.</summary>
         private bool Resting => _restUntil > 0.0;
+
+        /// <summary>
+        /// Перерыв — наружу: агенту у станка нужен явный выход, потому что партии, в
+        /// отличие от грядки, не кончаются сами и «доведу до конца» там не наступает.
+        /// </summary>
+        internal bool IsResting => Resting;
 
         /// <summary>
         /// Распорядок: наработал <see cref="WorkBeforeRest"/> секунд — иди отдохни
@@ -271,8 +280,9 @@ namespace Farm.Characters
         }
 
         /// <summary>
-        /// Занят ли фермер прямо сейчас работой по сбору. Только это и копит часы до
-        /// перерыва: уборка, обустройство и безделье отдыхом не оплачиваются.
+        /// Занят ли фермер прямо сейчас работой. Только это и копит часы до перерыва:
+        /// уборка, обустройство и безделье отдыхом не оплачиваются. Станок — работа
+        /// наравне со сбором: жалование не отменяет распорядка.
         /// </summary>
         private bool AtWork()
         {
@@ -283,6 +293,8 @@ namespace Farm.Characters
                 case FarmerState.Awaiting:
                 case FarmerState.ReturningHome:
                 case FarmerState.Depositing:
+                case FarmerState.GoingToCraft:
+                case FarmerState.Crafting:
                     return true;
 
                 default:
@@ -853,6 +865,55 @@ namespace Farm.Characters
             if (needs != null) score += (1f - needs.Energy01) * 0.8f;
 
             return new FarmerDecision(FarmerIntent.Relax, score, thought, spot: spot);
+        }
+
+        /// <summary>
+        /// Работа мастерового: встать к станку и вести партии, пока они идут.
+        /// <para>
+        /// Только по найму — неоплаченная роль живёт бытом (демаркация ролей, CLAUDE.md):
+        /// это предохранитель от идл-автомата, а не жадность. И только к работающему
+        /// станку: стоять над пустым — поза, а не работа; станок сам начнёт партию при
+        /// сырье, и мастеровой придёт следом.
+        /// </para>
+        /// </summary>
+        private FarmerDecision ScoreCraft()
+        {
+            if (_agent.Role != ResidentRole.Craftsman || !_agent.IsHired) return FarmerDecision.None;
+
+            // Перерыв закрывает станок наравне со сбором: распорядок один на все работы.
+            if (Resting) return FarmerDecision.None;
+
+            // Ночь — сну, с грузом — сперва доставка: как у всякой работы.
+            if (Night || !_agent.Pack.IsEmpty) return FarmerDecision.None;
+
+            Building place = null;
+            float bestTravel = float.MaxValue;
+
+            var all = BuildingRegistry.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var building = all[i];
+                if (building == null) continue;
+
+                var workshop = building.GetComponent<Workshop>();
+                if (workshop == null || !workshop.IsWorking) continue;
+
+                float travel = Travel(building.transform.position);
+                if (travel >= bestTravel) continue;
+
+                bestTravel = travel;
+                place = building;
+            }
+
+            if (place == null) return FarmerDecision.None;
+
+            // База 4.3 сидит в полосе работы: выше надоевшего порядка (потолок 3.9) —
+            // жалование не тратят на перестановку грядок — и ниже потолка сбора (5.2)
+            // с полом еды (5.4): нужды перебивают станок, как и всякую работу.
+            float score = ScoreWork + 0.3f - bestTravel * 0.4f;
+            if (score <= 0f) return FarmerDecision.None;
+
+            return new FarmerDecision(FarmerIntent.Craft, score, "постругаем", place: place);
         }
 
         /// <summary>

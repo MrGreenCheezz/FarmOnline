@@ -848,22 +848,25 @@ namespace Farm.UI
             }
             else if (_farmerHire != null)
             {
+                // Строка говорит на языке роли: подсобник собирает, мастеровой ведёт станки.
+                bool craftsman = _farmer.Role == ResidentRole.Craftsman;
                 _farmerHire.text = _farmer.IsHired
                     ? "нанят ещё на " + FormatDuration(_farmer.HiredSecondsLeft)
-                      + " · собирает ступени 1–" + FarmerAgent.HelperMaxTier
-                    : "не нанят — урожай собирает хозяин";
+                      + (craftsman ? " · ведёт станки" : " · собирает ступени 1–" + FarmerAgent.HelperMaxTier)
+                    : craftsman ? "не нанят — станки без мастера"
+                                : "не нанят — урожай собирает хозяин";
             }
 
             if (_hireButton != null)
                 _hireButton.text = (_farmer.IsHired ? "Продлить на сутки — " : "Нанять на сутки — ")
-                                   + TierEconomy.FarmerWagePerDay + " зол.";
+                                   + _farmer.RoleWagePerDay + " зол.";
         }
 
         private void OnHireClicked()
         {
             if (_farmer == null) return;
 
-            if (_farmer.TryHire(86400.0, TierEconomy.FarmerWagePerDay))
+            if (_farmer.TryHire(86400.0, _farmer.RoleWagePerDay))
             {
                 Punch(_farmerHire, 0.25f);
                 Farm.Juice.Sfx.Play(b => b.UiOpen);
@@ -871,7 +874,7 @@ namespace Farm.UI
             else
             {
                 // Отказ обязан быть заметным: строка называет и причину, и цену.
-                _hireMessage = "не хватает золота — жалование " + TierEconomy.FarmerWagePerDay + " зол.";
+                _hireMessage = "не хватает золота — жалование " + _farmer.RoleWagePerDay + " зол.";
                 _hireMessageTimer = 2.5f;
                 Farm.Juice.Sfx.Play(b => b.UiClose);
             }
@@ -1083,6 +1086,8 @@ namespace Farm.UI
                 case FarmerState.Awaiting: return "ждёт урожай";
                 case FarmerState.GoingToTidy: return "идёт прибраться";
                 case FarmerState.Hauling: return "переставляет";
+                case FarmerState.GoingToCraft: return "идёт к станку";
+                case FarmerState.Crafting: return "у станка";
                 default: return state.ToString();
             }
         }

@@ -13,7 +13,9 @@ namespace Farm.Characters
         /// <summary>Спина. Носит больше за раз.</summary>
         Back = 2,
         /// <summary>Смекалка. Открывает самостоятельные дела — продажу, закупку.</summary>
-        Wits = 3
+        Wits = 3,
+        /// <summary>Ремесло. Партии мастерских идут быстрее, пока он у станка (этап 2 колонии).</summary>
+        Crafting = 4
     }
 
     /// <summary>
@@ -43,7 +45,9 @@ namespace Farm.Characters
         /// <summary>Спина, с которой он берёт тележку.</summary>
         public const int CartLevel = 3;
 
-        private const int SkillCount = 4;
+        // Пятый — Ремесло: старые сейвы с четырьмя навыками достраиваются стартовыми
+        // в RestoreState, поэтому рост числа безопасен.
+        private const int SkillCount = 5;
 
         [Header("Кривая роста")]
         [SerializeField, Min(1)] private int _maxLevel = 10;
@@ -184,6 +188,13 @@ namespace Farm.Characters
         public bool CanSell => LevelOf(FarmerSkill.Wits) >= SellingLevel;
         public bool CanRestock => LevelOf(FarmerSkill.Wits) >= RestockLevel;
 
+        /// <summary>
+        /// Множитель скорости партий, пока мастеровой стоит у станка. Четверть — за сами
+        /// руки у станка (иначе мастеровой первого уровня не виден вовсе), дальше — та же
+        /// лестница, что у сбора: +14% за уровень.
+        /// </summary>
+        public float CraftSpeed => 1.25f + (LevelOf(FarmerSkill.Crafting) - 1) * 0.14f;
+
         /// <summary>Русское имя навыка — для UI и логов.</summary>
         public static string NameOf(FarmerSkill skill)
         {
@@ -193,6 +204,7 @@ namespace Farm.Characters
                 case FarmerSkill.Legs: return "Ноги";
                 case FarmerSkill.Back: return "Спина";
                 case FarmerSkill.Wits: return "Смекалка";
+                case FarmerSkill.Crafting: return "Ремесло";
                 default: return skill.ToString();
             }
         }
@@ -215,6 +227,8 @@ namespace Farm.Characters
                     if (next == SellingLevel) return "начнёт сам продавать излишки";
                     if (next == RestockLevel) return "начнёт сам докупать грядки";
                     return "ближе к новому умению";
+                case FarmerSkill.Crafting:
+                    return "партии у станка быстрее на 14%";
                 default:
                     return "";
             }

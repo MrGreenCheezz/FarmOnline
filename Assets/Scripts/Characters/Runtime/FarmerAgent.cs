@@ -44,7 +44,11 @@ namespace Farm.Characters
         /// <summary>Идёт к месту, где задумал что-то построить.</summary>
         GoingToImprove = 17,
         /// <summary>Мастерит задуманное.</summary>
-        Improving = 18
+        Improving = 18,
+        /// <summary>Мастеровой идёт к станку (этап 2 колонии).</summary>
+        GoingToCraft = 19,
+        /// <summary>Стоит у станка и ведёт партии.</summary>
+        Crafting = 20
     }
 
     /// <summary>
@@ -455,7 +459,9 @@ namespace Farm.Characters
         internal Vector3 FavouriteSpot => _favouriteSpot;
         internal float SearchRadius => _searchRadius;
         internal bool SleepsAtNight => _sleepAtNight;
-        internal bool MayHarvest => _mayHarvest || IsHired;
+        // Наём подсобника включает сбор рутины; наём мастерового — станки, не сбор:
+        // демаркация ролей (CLAUDE.md), урожай остаётся хозяйским.
+        internal bool MayHarvest => _mayHarvest || (IsHired && Role == ResidentRole.None);
         internal bool OnlyOwnCategory => _filterByCategory;
         internal ResourceCategory Category => _category;
         internal int KeepFood => _keepFood;
@@ -511,6 +517,18 @@ namespace Farm.Characters
         /// <summary>Вернуть наём из сохранения.</summary>
         public void RestoreHired(double hiredUntil) => _hiredUntil = hiredUntil;
 
+        /// <summary>Роль жителя из определения. Меняет смысл найма, не сам механизм.</summary>
+        public ResidentRole Role => _role;
+
+        /// <summary>
+        /// Жалование этой роли за сутки. Ноль в определении читается как общий тариф —
+        /// чтобы подсобники не требовали числа в каждом ассете.
+        /// </summary>
+        public int RoleWagePerDay => _roleWage > 0 ? _roleWage : TierEconomy.FarmerWagePerDay;
+
+        private ResidentRole _role = ResidentRole.None;
+        private int _roleWage;
+
         /// <summary>Рвение к порядку из определения жителя. Читает мозг при оценке уборки.</summary>
         internal float TidyZeal => _tidyZeal;
 
@@ -530,6 +548,8 @@ namespace Farm.Characters
             if (bed != null) _bed = bed;
             if (home != null) _home = home;
 
+            _role = definition.Role;
+            _roleWage = definition.WagePerDay;
             _tidyZeal = Mathf.Clamp(definition.TidyZeal, 0.5f, 2f);
 
             // Тяга к обустройству делит срок дозревания желания: рьяный хочет строить
@@ -602,6 +622,11 @@ namespace Farm.Characters
             }
 
             Release();
+
+            // Снос посреди смены у станка минует SetState — отписка руками. Лишний
+            // вызов без подписки безвреден.
+            if (_craftShop != null) { _craftShop.Produced -= OnCraftProduced; _craftShop = null; }
+
             FarmerRegistry.Unregister(this);
         }
 
@@ -704,6 +729,8 @@ namespace Farm.Characters
                 case FarmerState.Sleeping: TickSleeping(); break;
                 case FarmerState.GoingToImprove: TickGoingToImprove(); break;
                 case FarmerState.Improving: TickImproving(); break;
+                case FarmerState.GoingToCraft: TickGoingToCraft(); break;
+                case FarmerState.Crafting: TickCrafting(); break;
             }
 
             TickLiveliness();
@@ -777,6 +804,7 @@ namespace Farm.Characters
 
                 case FarmerIntent.Refresh:
                 case FarmerIntent.Trade:
+                case FarmerIntent.Craft:
                     return ReferenceEquals(decision.Place, _current.Place);
 
                 case FarmerIntent.Relax:
@@ -856,6 +884,11 @@ namespace Farm.Characters
 
                 case FarmerIntent.Tidy:
                     if (decision.Plot != null) EnterGoingToTidy(decision.Plot, decision.Spot);
+                    else EnterIdle();
+                    break;
+
+                case FarmerIntent.Craft:
+                    if (decision.Place != null) EnterGoingToCraft(decision.Place);
                     else EnterIdle();
                     break;
 
@@ -1921,6 +1954,101 @@ namespace Farm.Characters
             SetState(FarmerState.AtMarket);
         }
 
+        // ---- мастеровой у станка (этап 2 колонии) ----
+
+        /// <summary>Станок, к которому идёт или у которого стоит мастеровой.</summary>
+        private Workshop _craftShop;
+
+        private void EnterGoingToCraft(Building place)
+        {
+            _craftShop = place != null ? place.GetComponent<Workshop>() : null;
+            if (_craftShop == null) { EnterIdle(); return; }
+
+            _mover.SetDestination(place.transform.position);
+            SetState(FarmerState.GoingToCraft);
+        }
+
+        private void TickGoingToCraft()
+        {
+            // Станок снесли или партии кончились вместе с сырьём — идти больше незачем.
+            if (_craftShop == null || !_craftShop.isActiveAndEnabled || !_craftShop.IsWorking)
+            {
+                _craftShop = null;
+                EnterIdle();
+                return;
+            }
+
+            if (_mover.HasArrived) { EnterCrafting(); return; }
+
+            // Дорога к станку бросается легко, как дорога к уборке: ноша ещё не взята.
+            if (Rethink(_switchMargin)) return;
+
+            _mover.SetDestination(_craftShop.transform.position);
+        }
+
+        private void EnterCrafting()
+        {
+            if (_craftShop == null) { EnterIdle(); return; }
+
+            _mover.Stop();
+            Face(_craftShop.transform.position);
+
+            // Опыт Ремесла — по готовым партиям: станок объявляет их всем желающим, а
+            // мастеровой слушает, только пока стоит рядом. Отписка — в SetState, через
+            // неё проходят все выходы из состояния без исключения.
+            _craftShop.Produced += OnCraftProduced;
+
+            SetState(FarmerState.Crafting);
+        }
+
+        private void TickCrafting()
+        {
+            // Порядок в выходах не косметика: сперва EnterIdle — его SetState отписывает
+            // от партий станка, пока ссылка жива, — и только потом обнуление ссылки.
+            if (_craftShop == null || !_craftShop.isActiveAndEnabled)
+            {
+                EnterIdle();
+                _craftShop = null;
+                return;
+            }
+
+            // Перерыв уводит от станка явно: партии бесконечны, и «доведу до конца», как
+            // у грядки, здесь не наступит никогда. Причина — вслух, по правилу перерыва.
+            if (_brain.IsResting)
+            {
+                SetThought("передохну");
+                EnterIdle();
+                _craftShop = null;
+                return;
+            }
+
+            // Сырьё кончилось — стоять над пустым станком нечего, пусть быт заберёт.
+            if (!_craftShop.IsWorking)
+            {
+                SetThought("стружка вышла — сырья бы");
+                EnterIdle();
+                _craftShop = null;
+                return;
+            }
+
+            // Метка скорости продлевается каждый тик и протухает сама, если мастеровой ушёл.
+            _craftShop.SetTendSpeed(_skills != null ? _skills.CraftSpeed : 1f);
+
+            if (_glanceHold <= 0f) TurnTowards(_craftShop.transform.position, _glanceTurnSpeed);
+
+            Rethink(_switchMargin);
+        }
+
+        /// <summary>Партия вышла при мастеровом — его Ремесло растёт от сделанной работы.</summary>
+        private void OnCraftProduced(Workshop shop, WorkshopRecipe recipe, int stored)
+        {
+            if (_state != FarmerState.Crafting || shop != _craftShop || recipe == null) return;
+
+            // Порядок величин как у сбора, но партии куда чаще — потому доли, не единицы.
+            if (_skills != null)
+                _skills.Grant(FarmerSkill.Crafting, 0.8f + recipe.OutputValue * 0.01f);
+        }
+
         /// <summary>
         /// Собраться и пойти спать домой.
         /// <para>
@@ -1975,6 +2103,12 @@ namespace Farm.Characters
         private void SetState(FarmerState state)
         {
             if (_state == state) return;
+
+            // Единственная дверь из состояния «у станка» — здесь и отписка от его партий:
+            // выходов из Crafting полдюжины, а SetState минуют только они все разом.
+            if (_state == FarmerState.Crafting && _craftShop != null)
+                _craftShop.Produced -= OnCraftProduced;
+
             _state = state;
 
             var handler = StateChanged;
