@@ -551,6 +551,11 @@ namespace Farm.UI
             foreach (var resident in FarmerRegistry.All)
             {
                 if (resident == null) continue;
+
+                // Сторож вне ведомости: он не нанимается, и «нанято 2 из 4» с вечной
+                // недостачей читалось бы как невыполнимая задача.
+                if (resident.Role == ResidentRole.Watchman) continue;
+
                 total++;
                 if (!resident.IsHired) continue;
                 hired++;
@@ -885,7 +890,7 @@ namespace Farm.UI
             else if (_farmerHire != null)
             {
                 // Строка говорит на языке роли: подсобник собирает, мастеровой ведёт
-                // станки, возчик расширяет доску заказов.
+                // станки, возчик расширяет доску заказов, сторож наёмным не бывает.
                 string hiredDoes, idleMeans;
                 switch (_farmer.Role)
                 {
@@ -896,6 +901,10 @@ namespace Farm.UI
                     case ResidentRole.Carter:
                         hiredDoes = " · доска заказов шире на один";
                         idleMeans = "не нанят — доска заказов обычная";
+                        break;
+                    case ResidentRole.Watchman:
+                        hiredDoes = "";
+                        idleMeans = "жалования не берёт — ночь его смена";
                         break;
                     default:
                         hiredDoes = " · собирает ступени 1–" + FarmerAgent.HelperMaxTier;
@@ -909,8 +918,14 @@ namespace Farm.UI
             }
 
             if (_hireButton != null)
-                _hireButton.text = (_farmer.IsHired ? "Продлить на сутки — " : "Нанять на сутки — ")
-                                   + _farmer.RoleWagePerDay + " зол.";
+            {
+                // Сторожа не нанимают вовсе — кнопка врала бы самим существованием.
+                bool hireable = _farmer.Role != ResidentRole.Watchman;
+                _hireButton.style.display = hireable ? DisplayStyle.Flex : DisplayStyle.None;
+                if (hireable)
+                    _hireButton.text = (_farmer.IsHired ? "Продлить на сутки — " : "Нанять на сутки — ")
+                                       + _farmer.RoleWagePerDay + " зол.";
+            }
 
             RefreshWageSummary();
         }

@@ -826,11 +826,36 @@ namespace Farm.Characters
 
             if (Night)
             {
-                // Ночь ему не принадлежит: работы нет, и посидеть у огня — самое осмысленное.
-                score += 1.1f;
-                spot = FindFireside(out bool found);
-                thought = found ? "посижу у огня" : "тихая ночь";
-                if (!found) spot = _agent.HomePosition;
+                if (_agent.Role == ResidentRole.Watchman)
+                {
+                    // Дозор сторожа: точка медленно ползёт по кругу — фермер догоняет её,
+                    // останавливается «подумать» и идёт дальше: выходит обход с остановками.
+                    // Никакого нового состояния: это Relax с маршрутом, случайности в
+                    // безделье — жизнь (правило 3), а полоса быта не покидается — та же
+                    // надбавка, что у огня.
+                    score += 1.1f;
+
+                    const double LegSeconds = 40.0;      // одна «нога» обхода
+                    const double FullRound = LegSeconds * 6.0;
+                    float angle = (float)(FarmingRuntime.Now % FullRound / FullRound) * Mathf.PI * 2f
+                                  + (_agent.name.GetHashCode() & 0xFF) * 0.02f;
+                    spot = FarmBounds.ClampToFarm(
+                        new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * 10f);
+
+                    int leg = (int)(FarmingRuntime.Now / LegSeconds) % 4;
+                    thought = leg == 0 ? "всё спокойно"
+                            : leg == 1 ? "обойду ещё разок"
+                            : leg == 2 ? "тихо на дворе"
+                            : "фонари горят ровно";
+                }
+                else
+                {
+                    // Ночь ему не принадлежит: работы нет, и посидеть у огня — самое осмысленное.
+                    score += 1.1f;
+                    spot = FindFireside(out bool found);
+                    thought = found ? "посижу у огня" : "тихая ночь";
+                    if (!found) spot = _agent.HomePosition;
+                }
             }
             else if (DayProgress > 0.85f)
             {

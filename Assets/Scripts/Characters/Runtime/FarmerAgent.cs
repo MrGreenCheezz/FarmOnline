@@ -556,6 +556,10 @@ namespace Farm.Characters
             _roleWage = definition.WagePerDay;
             _tidyZeal = Mathf.Clamp(definition.TidyZeal, 0.5f, 2f);
 
+            // Сторожу ночь — смена: распорядочный сон выключается, а дневной придёт сам
+            // через усталость — инверсия суток живёт на нуждах, а не на особом коде.
+            if (_role == ResidentRole.Watchman) _sleepAtNight = false;
+
             // Тяга к обустройству делит срок дозревания желания: рьяный хочет строить
             // раньше. Деление готовой настройки, а не своё поле в мозге, — мозг читает
             // ImprovementUrge01 как раньше, и полосы оценок разницы не видят.
