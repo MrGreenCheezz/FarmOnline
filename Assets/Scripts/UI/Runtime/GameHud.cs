@@ -848,13 +848,28 @@ namespace Farm.UI
             }
             else if (_farmerHire != null)
             {
-                // Строка говорит на языке роли: подсобник собирает, мастеровой ведёт станки.
-                bool craftsman = _farmer.Role == ResidentRole.Craftsman;
+                // Строка говорит на языке роли: подсобник собирает, мастеровой ведёт
+                // станки, возчик расширяет доску заказов.
+                string hiredDoes, idleMeans;
+                switch (_farmer.Role)
+                {
+                    case ResidentRole.Craftsman:
+                        hiredDoes = " · ведёт станки";
+                        idleMeans = "не нанят — станки без мастера";
+                        break;
+                    case ResidentRole.Carter:
+                        hiredDoes = " · доска заказов шире на один";
+                        idleMeans = "не нанят — доска заказов обычная";
+                        break;
+                    default:
+                        hiredDoes = " · собирает ступени 1–" + FarmerAgent.HelperMaxTier;
+                        idleMeans = "не нанят — урожай собирает хозяин";
+                        break;
+                }
+
                 _farmerHire.text = _farmer.IsHired
-                    ? "нанят ещё на " + FormatDuration(_farmer.HiredSecondsLeft)
-                      + (craftsman ? " · ведёт станки" : " · собирает ступени 1–" + FarmerAgent.HelperMaxTier)
-                    : craftsman ? "не нанят — станки без мастера"
-                                : "не нанят — урожай собирает хозяин";
+                    ? "нанят ещё на " + FormatDuration(_farmer.HiredSecondsLeft) + hiredDoes
+                    : idleMeans;
             }
 
             if (_hireButton != null)
@@ -1088,6 +1103,8 @@ namespace Farm.UI
                 case FarmerState.Hauling: return "переставляет";
                 case FarmerState.GoingToCraft: return "идёт к станку";
                 case FarmerState.Crafting: return "у станка";
+                case FarmerState.GoingToLoad: return "идёт за коробом";
+                case FarmerState.DeliveringOrder: return "везёт заказ";
                 default: return state.ToString();
             }
         }

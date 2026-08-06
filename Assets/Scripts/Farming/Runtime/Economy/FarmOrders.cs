@@ -83,10 +83,28 @@ namespace Farm.Farming
     public static class FarmOrders
     {
         /// <summary>Сколько заказов висит на доске одновременно.</summary>
-        // Слоты растут с уровнем игрока: больше заказов — больше и подкормки, и золота,
+        // Слоты растут с уровнем игрока: больше заказов — больше и подкормки, и опыта,
         // так что это ровно та награда за уровень, которая кормит следующий уровень.
+        // Нанятый возчик держит ещё один: его ценность — пропускная способность заказов
+        // (демаркация ролей, CLAUDE.md), а не золото из воздуха.
         public static int SlotCount =>
-            3 + (FarmExperience.Level >= 6 ? 1 : 0) + (FarmExperience.Level >= 12 ? 1 : 0);
+            3 + (FarmExperience.Level >= 6 ? 1 : 0) + (FarmExperience.Level >= 12 ? 1 : 0)
+              + (CarrierActive ? 1 : 0);
+
+        /// <summary>
+        /// Метка нанятого возчика — по образцу метки мастерового у станка: продлевается
+        /// каждый тик его агента и протухает сама, когда наём кончился или возчик пропал.
+        /// Сборка заказов жителей не знает, ей хватает факта «возчик в деле».
+        /// </summary>
+        private static double _carrierUntil;
+
+        public static void StampCarrier(double holdSeconds = 3.0) =>
+            _carrierUntil = FarmingRuntime.Now + holdSeconds;
+
+        public static bool CarrierActive => FarmingRuntime.Now < _carrierUntil;
+
+        /// <summary>Заказ сдан и оплачен. Слушает возчик: повод отвезти короб к рынку.</summary>
+        public static event Action<FarmOrder> FilledOrder;
 
         /// <summary>
         /// Сколько живёт одно окно заказов. Шесть часов — чтобы доска обновлялась к каждому
@@ -184,6 +202,15 @@ namespace Farm.Farming
 
             Filled.Add(order.Id);
             FarmAchievements.NoteOrderFilled();
+
+            // Исключение слушателя не должно ломать сдачу — награда уже выдана.
+            var filled = FilledOrder;
+            if (filled != null)
+            {
+                try { filled(order); }
+                catch (Exception e) { Debug.LogException(e); }
+            }
+
             Raise();
             return true;
         }
@@ -287,6 +314,8 @@ namespace Farm.Farming
         {
             Filled.Clear();
             Changed = null;
+            FilledOrder = null;
+            _carrierUntil = 0.0;
         }
     }
 }

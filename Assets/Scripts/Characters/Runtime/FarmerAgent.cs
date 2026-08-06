@@ -48,7 +48,11 @@ namespace Farm.Characters
         /// <summary>Мастеровой идёт к станку (этап 2 колонии).</summary>
         GoingToCraft = 19,
         /// <summary>Стоит у станка и ведёт партии.</summary>
-        Crafting = 20
+        Crafting = 20,
+        /// <summary>Возчик идёт к дому взять короб сданного заказа.</summary>
+        GoingToLoad = 21,
+        /// <summary>Возчик везёт короб заказа к рынку.</summary>
+        DeliveringOrder = 22
     }
 
     /// <summary>
@@ -609,7 +613,17 @@ namespace Farm.Characters
             DragFocus.Changed += OnDragChanged;
         }
 
-        private void OnEnable() => FarmerRegistry.Register(this);
+        private void OnEnable()
+        {
+            FarmerRegistry.Register(this);
+
+            // Подписка безусловная, роль проверяет сам хендлер: Awake и OnEnable Unity
+            // зовёт ПАРАМИ ПО ОБЪЕКТАМ, и OnEnable жителя может пройти раньше Awake
+            // ростера — роль в этот миг ещё не назначена (замер 06.08.2026: Тимофей
+            // включился первым и не подписался). Лишний вызов на жителя при сдаче —
+            // копейки, потерянная подписка — молчаливо мёртвый возчик.
+            FarmOrders.FilledOrder += OnOrderFilled;
+        }
 
         private void OnDisable()
         {
@@ -626,6 +640,7 @@ namespace Farm.Characters
             // Снос посреди смены у станка минует SetState — отписка руками. Лишний
             // вызов без подписки безвреден.
             if (_craftShop != null) { _craftShop.Produced -= OnCraftProduced; _craftShop = null; }
+            FarmOrders.FilledOrder -= OnOrderFilled;
 
             FarmerRegistry.Unregister(this);
         }
@@ -708,6 +723,10 @@ namespace Farm.Characters
             TrackEffort();
             TickEmotes();
 
+            // Нанятый возчик держит слот доски заказов меткой со сроком годности:
+            // кончился наём или пропал возчик — метка протухла, слот ушёл сам.
+            if (_role == ResidentRole.Carter && IsHired) FarmOrders.StampCarrier();
+
             switch (_state)
             {
                 case FarmerState.Idle: TickIdle(); break;
@@ -731,6 +750,8 @@ namespace Farm.Characters
                 case FarmerState.Improving: TickImproving(); break;
                 case FarmerState.GoingToCraft: TickGoingToCraft(); break;
                 case FarmerState.Crafting: TickCrafting(); break;
+                case FarmerState.GoingToLoad: TickGoingToLoad(); break;
+                case FarmerState.DeliveringOrder: TickDeliveringOrder(); break;
             }
 
             TickLiveliness();
@@ -890,6 +911,10 @@ namespace Farm.Characters
                 case FarmerIntent.Craft:
                     if (decision.Place != null) EnterGoingToCraft(decision.Place);
                     else EnterIdle();
+                    break;
+
+                case FarmerIntent.CarryOrder:
+                    EnterGoingToLoad();
                     break;
 
                 default:
@@ -2047,6 +2072,88 @@ namespace Farm.Characters
             // Порядок величин как у сбора, но партии куда чаще — потому доли, не единицы.
             if (_skills != null)
                 _skills.Grant(FarmerSkill.Crafting, 0.8f + recipe.OutputValue * 0.01f);
+        }
+
+        // ---- возчик (этап 2 колонии) ----
+
+        /// <summary>
+        /// Сколько сданных заказов ждут ходки с коробом. Театр труда: слот доски даёт сама
+        /// метка найма, а ходка — шум вокруг решения игрока, никогда вместо него.
+        /// Потолок в три: доска сдана залпом — возчик не обязан отрабатывать каждый клик.
+        /// </summary>
+        private int _pendingDeliveries;
+
+        /// <summary>Публичный не ради UI, а ради проверяемости: очередь ходок читают тесты.</summary>
+        public int PendingDeliveries => _pendingDeliveries;
+
+        /// <summary>Рынок, к которому едет короб. Память дороги — как станок у мастерового.</summary>
+        private Building _orderMarket;
+
+        private void OnOrderFilled(FarmOrder order)
+        {
+            // Роль здесь, а не на подписке: см. комментарий в OnEnable про порядок Awake.
+            if (_role != ResidentRole.Carter || !IsHired) return;
+            if (_pendingDeliveries < 3) _pendingDeliveries++;
+        }
+
+        private void EnterGoingToLoad()
+        {
+            _mover.SetDestination(_homePosition);
+            SetState(FarmerState.GoingToLoad);
+        }
+
+        private void TickGoingToLoad()
+        {
+            // Дорога за коробом бросается легко: ноши ещё нет.
+            if (Rethink(_switchMargin)) return;
+
+            if (!_mover.HasArrived)
+            {
+                _mover.SetDestination(_homePosition);
+                return;
+            }
+
+            // Короб взят — теперь к рынку. Рынок мог пропасть, пока шли: ходка сгорает,
+            // а слот доски цел — он держится наймом, не театром.
+            _orderMarket = null;
+            foreach (var building in BuildingRegistry.All)
+                if (building != null && building.Service == BuildingService.Market)
+                { _orderMarket = building; break; }
+
+            if (_orderMarket == null)
+            {
+                _pendingDeliveries = 0;
+                EnterIdle();
+                return;
+            }
+
+            SetThought("повезу заказ горожанам");
+            _mover.SetDestination(_orderMarket.transform.position);
+            SetState(FarmerState.DeliveringOrder);
+        }
+
+        private void TickDeliveringOrder()
+        {
+            if (_orderMarket == null)
+            {
+                _pendingDeliveries = Mathf.Max(0, _pendingDeliveries - 1);
+                EnterIdle();
+                return;
+            }
+
+            if (!_mover.HasArrived)
+            {
+                _mover.SetDestination(_orderMarket.transform.position);
+                return;
+            }
+
+            // Довёз. Спина помнит короб — тем же зерном, что доставка урожая.
+            _pendingDeliveries = Mathf.Max(0, _pendingDeliveries - 1);
+            if (_skills != null) _skills.Grant(FarmerSkill.Back, 2f);
+
+            SetThought("сдал в лучшем виде");
+            _orderMarket = null;
+            EnterIdle();
         }
 
         /// <summary>

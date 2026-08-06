@@ -27,7 +27,9 @@ namespace Farm.Characters
         /// <summary>Построить задуманное: клумбу, скамейку, костёр у крыльца.</summary>
         Improve = 9,
         /// <summary>Встать к станку и вести партии — работа мастерового (этап 2 колонии).</summary>
-        Craft = 10
+        Craft = 10,
+        /// <summary>Отвезти короб сданного заказа к рынку — театр возчика (этап 2 колонии).</summary>
+        CarryOrder = 11
     }
 
     /// <summary>Одно взвешенное намерение: что делать, насколько хочется и с чем именно.</summary>
@@ -213,6 +215,7 @@ namespace Farm.Characters
             Consider(ScoreAwait(), ref best);
             Consider(ScoreTrade(), ref best);
             Consider(ScoreCraft(), ref best);
+            Consider(ScoreCarryOrder(), ref best);
             Consider(ScoreTidy(), ref best);
             Consider(ScoreImprove(), ref best);
             Consider(ScoreRelax(), ref best);
@@ -295,6 +298,8 @@ namespace Farm.Characters
                 case FarmerState.Depositing:
                 case FarmerState.GoingToCraft:
                 case FarmerState.Crafting:
+                case FarmerState.GoingToLoad:
+                case FarmerState.DeliveringOrder:
                     return true;
 
                 default:
@@ -914,6 +919,30 @@ namespace Farm.Characters
             if (score <= 0f) return FarmerDecision.None;
 
             return new FarmerDecision(FarmerIntent.Craft, score, "постругаем", place: place);
+        }
+
+        /// <summary>
+        /// Ходка возчика: свезти короб сданного заказа к рынку. Чистый театр труда — слот
+        /// доски держит сама метка найма, а ходка лишь показывает, за что платится
+        /// жалование. Шум вокруг решения игрока (сдачи), никогда вместо него.
+        /// </summary>
+        private FarmerDecision ScoreCarryOrder()
+        {
+            if (_agent.Role != ResidentRole.Carter || !_agent.IsHired) return FarmerDecision.None;
+            if (_agent.PendingDeliveries <= 0) return FarmerDecision.None;
+
+            // Распорядок и нужды — как у всякой работы.
+            if (Resting || Night || !_agent.Pack.IsEmpty) return FarmerDecision.None;
+
+            // Без рынка короб везти некуда — театр молчит, слот доски живёт наймом.
+            bool hasMarket = false;
+            var all = BuildingRegistry.All;
+            for (int i = 0; i < all.Count; i++)
+                if (all[i] != null && all[i].Service == BuildingService.Market) { hasMarket = true; break; }
+            if (!hasMarket) return FarmerDecision.None;
+
+            // 4.4 в полосе работы: выше быта и порядка, ниже потолка сбора (5.2) и еды (5.4).
+            return new FarmerDecision(FarmerIntent.CarryOrder, ScoreWork + 0.4f, "заказ собран — свезу");
         }
 
         /// <summary>

@@ -14,7 +14,10 @@ namespace Farm.Characters
         None = 0,
 
         /// <summary>Мастеровой: наём ставит его к станкам — партии идут быстрее.</summary>
-        Craftsman = 1
+        Craftsman = 1,
+
+        /// <summary>Возчик: пока нанят, доска заказов шире на один слот; сданное возит к рынку.</summary>
+        Carter = 2
     }
 
     /// <summary>
