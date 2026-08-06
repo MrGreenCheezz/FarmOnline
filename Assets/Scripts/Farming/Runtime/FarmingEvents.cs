@@ -26,6 +26,9 @@ namespace Farm.Farming
         /// <summary>Опустело — собрано без отрастания или очищено вручную.</summary>
         public static event Action<Growable> Cleared;
 
+        /// <summary>Стройплощадка достроилась в настоящую вещь (театр труда, этап 3).</summary>
+        public static event Action<Transform> Constructed;
+
         /// <summary>
         /// Две грядки слились. Первый аргумент — выживший (уровень уже поднят),
         /// второй — уничтожаемый: читай из него нужное прямо сейчас.
@@ -35,6 +38,14 @@ namespace Farm.Farming
         internal static void RaisePlanted(Growable g) => Safe(Planted, g, nameof(Planted));
         internal static void RaiseReady(Growable g) => Safe(Ready, g, nameof(Ready));
         internal static void RaiseCleared(Growable g) => Safe(Cleared, g, nameof(Cleared));
+
+        internal static void RaiseConstructed(Transform built)
+        {
+            var handler = Constructed;
+            if (handler == null || built == null) return;
+            try { handler(built); }
+            catch (Exception e) { Debug.LogException(e, built); }
+        }
 
         internal static void RaiseStageAdvanced(Growable g, int stage)
         {
@@ -80,6 +91,7 @@ namespace Farm.Farming
             Ready = null;
             Harvested = null;
             Cleared = null;
+            Constructed = null;
             Merged = null;
         }
     }

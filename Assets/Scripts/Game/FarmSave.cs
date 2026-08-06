@@ -159,6 +159,7 @@ namespace Farm.Game
             CapturePlots(data);
             var buildingIndex = CaptureBuildings(data);
             CaptureWorkshops(data, buildingIndex);
+            CaptureConstructions(data);
             CaptureImprovements(data);
             CaptureShop(data);
             CaptureFarmer(data, buildingIndex);
@@ -315,6 +316,29 @@ namespace Farm.Game
                 if (farmer != null && farmer != primary) ordered.Add(farmer);
 
             return ordered;
+        }
+
+        /// <summary>Недостроенные площадки: оплачены при покупке — терять нельзя.</summary>
+        private static void CaptureConstructions(FarmSaveData data)
+        {
+            var sites = new List<ConstructionSave>(ConstructionSite.All.Count);
+
+            foreach (var site in ConstructionSite.All)
+            {
+                if (site == null) continue;
+
+                site.CaptureState(out int kind, out string targetId, out double remaining);
+                sites.Add(new ConstructionSave
+                {
+                    Kind = kind,
+                    TargetId = targetId,
+                    RemainingSeconds = remaining,
+                    Position = site.transform.position,
+                    Yaw = site.transform.eulerAngles.y
+                });
+            }
+
+            data.Constructions = sites.ToArray();
         }
 
         private static void CaptureFarmer(FarmSaveData data, Dictionary<Building, int> buildingIndex)
@@ -487,6 +511,7 @@ namespace Farm.Game
 
             ApplyPlots(data, registry, offlineSeconds);
             ApplyImprovements(data, registry);
+            ApplyConstructions(data, offlineSeconds);
             ApplyShop(data, registry);
             ApplyFarmer(data, registry, buildings);
 
@@ -600,6 +625,11 @@ namespace Farm.Game
             foreach (var movable in movables)
                 if (movable != null && movable.name.StartsWith("Improvement_", StringComparison.Ordinal))
                     UnityEngine.Object.Destroy(movable.gameObject);
+
+            // Площадки — как всё расставленное: снести и вернуть из сейва.
+            var sites = new List<ConstructionSite>(ConstructionSite.All);
+            foreach (var site in sites)
+                if (site != null) UnityEngine.Object.Destroy(site.gameObject);
         }
 
         private static List<Building> ApplyBuildings(FarmSaveData data, ContentRegistry registry)
@@ -693,6 +723,35 @@ namespace Farm.Game
                 // в клумбу. Дублирует проверку по MovableRegistry, но стоит дёшево и
                 // страхует на случай, если замысел останется без Movable.
                 if (shop != null) shop.RegisterPlaced(built.transform);
+            }
+        }
+
+        /// <summary>
+        /// Вернуть площадки. Оффлайн-догон вычитается здесь: закрытая игра строит базовой
+        /// скоростью (строителя рядом нет), а достроившееся за отлучку встаёт готовым
+        /// первым же будильником планировщика.
+        /// </summary>
+        private static void ApplyConstructions(FarmSaveData data, double offlineSeconds)
+        {
+            var shop = Shop.Instance;
+
+            foreach (var save in data.Constructions)
+            {
+                if (save == null || string.IsNullOrEmpty(save.TargetId)) continue;
+
+                var site = new GameObject().AddComponent<ConstructionSite>();
+                site.transform.SetPositionAndRotation(
+                    save.Position, Quaternion.Euler(0f, save.Yaw, 0f));
+
+                double baseSeconds = save.Kind == (int)ConstructionSite.TargetKind.Building
+                    ? ConstructionSite.BuildingSeconds
+                    : ConstructionSite.PropSeconds;
+
+                site.Begin((ConstructionSite.TargetKind)save.Kind, save.TargetId,
+                           System.Math.Max(0.0, save.RemainingSeconds - offlineSeconds), baseSeconds);
+
+                site.gameObject.AddComponent<Movable>();
+                if (shop != null) shop.RegisterPlaced(site.transform);
             }
         }
 

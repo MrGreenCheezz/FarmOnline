@@ -52,7 +52,11 @@ namespace Farm.Characters
         /// <summary>Возчик идёт к дому взять короб сданного заказа.</summary>
         GoingToLoad = 21,
         /// <summary>Возчик везёт короб заказа к рынку.</summary>
-        DeliveringOrder = 22
+        DeliveringOrder = 22,
+        /// <summary>Строитель идёт к стройплощадке (этап 3 колонии).</summary>
+        GoingToBuild = 23,
+        /// <summary>Стоит у площадки и строит.</summary>
+        Constructing = 24
     }
 
     /// <summary>
@@ -756,6 +760,8 @@ namespace Farm.Characters
                 case FarmerState.Crafting: TickCrafting(); break;
                 case FarmerState.GoingToLoad: TickGoingToLoad(); break;
                 case FarmerState.DeliveringOrder: TickDeliveringOrder(); break;
+                case FarmerState.GoingToBuild: TickGoingToBuild(); break;
+                case FarmerState.Constructing: TickConstructing(); break;
             }
 
             TickLiveliness();
@@ -919,6 +925,11 @@ namespace Farm.Characters
 
                 case FarmerIntent.CarryOrder:
                     EnterGoingToLoad();
+                    break;
+
+                case FarmerIntent.Build:
+                    if (decision.Site != null) EnterGoingToBuild(decision.Site);
+                    else EnterIdle();
                     break;
 
                 default:
@@ -2160,6 +2171,90 @@ namespace Farm.Characters
             SetThought("сдал в лучшем виде");
             _orderMarket = null;
             EnterIdle();
+        }
+
+        // ---- строитель (этап 3 колонии) ----
+
+        /// <summary>Площадка, к которой идёт или у которой стоит строитель.</summary>
+        private ConstructionSite _buildSite;
+
+        /// <summary>Сколько секунд оставалось площадке на прошлом тике: по исчезновению
+        /// с малым остатком строитель понимает «достроил», а не «снесли».</summary>
+        private double _lastSiteRemaining = double.MaxValue;
+
+        private void EnterGoingToBuild(ConstructionSite site)
+        {
+            _buildSite = site;
+            _lastSiteRemaining = double.MaxValue;
+            _mover.SetDestination(site.transform.position);
+            SetState(FarmerState.GoingToBuild);
+        }
+
+        private void TickGoingToBuild()
+        {
+            if (_buildSite == null)
+            {
+                EnterIdle();
+                return;
+            }
+
+            if (_mover.HasArrived)
+            {
+                _mover.Stop();
+                Face(_buildSite.transform.position);
+                SetThought("сруб к срубу");
+                SetState(FarmerState.Constructing);
+                return;
+            }
+
+            // Дорога бросается легко: молоток ещё не поднят.
+            if (Rethink(_switchMargin)) return;
+
+            _mover.SetDestination(_buildSite.transform.position);
+        }
+
+        private void TickConstructing()
+        {
+            if (_buildSite == null)
+            {
+                // Площадка исчезла. Малый остаток на прошлом тике — достроил: опыт по
+                // готовому делу, как у мастерового по партии. Иначе её снесли или унесли.
+                if (_lastSiteRemaining < 15.0)
+                {
+                    if (_skills != null) _skills.Grant(FarmerSkill.Crafting, 5f);
+                    SetThought("стоит — любо-дорого");
+                }
+
+                EnterIdle();
+                return;
+            }
+
+            // Перерыв уводит явно: стройка не «доводится» — она долгая, а без строителя
+            // всё равно достроится сама. Причина — вслух, по правилу перерыва.
+            if (_brain.IsResting)
+            {
+                SetThought("передохну");
+                EnterIdle();
+                _buildSite = null;
+                return;
+            }
+
+            // Игрок утащил площадку — догонять смешно, пусть мозг решит заново.
+            if (!_mover.HasArrived &&
+                Vector3.Distance(transform.position, _buildSite.transform.position) > 2.5f)
+            {
+                EnterIdle();
+                _buildSite = null;
+                return;
+            }
+
+            // Строитель у площадки: вдвое от ремесленной руки — он и есть её смысл.
+            _buildSite.SetTendSpeed(_skills != null ? _skills.CraftSpeed * 2f : 2f);
+            _lastSiteRemaining = _buildSite.RemainingSeconds;
+
+            if (_glanceHold <= 0f) TurnTowards(_buildSite.transform.position, _glanceTurnSpeed);
+
+            Rethink(_switchMargin);
         }
 
         /// <summary>

@@ -205,18 +205,19 @@ namespace Farm.Farming
                 {
                     if (item.Prefab == null) return false;
 
-                    var instance = Instantiate(item.Prefab, position, Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f));
+                    // Театр труда (этап 3): вещь не падает с неба, а строится минуты.
+                    // Имя Improvement_<id> получит уже готовая — площадку сейв ведёт
+                    // отдельным массивом, и как «готовое» её ловить нельзя.
+                    var site = new GameObject().AddComponent<ConstructionSite>();
+                    site.transform.SetPositionAndRotation(
+                        position, Quaternion.Euler(0f, UnityEngine.Random.Range(0f, 360f), 0f));
+                    site.Begin(ConstructionSite.TargetKind.Prop, item.Id,
+                               ConstructionSite.PropSeconds, ConstructionSite.PropSeconds);
 
-                    // Декор с замыслом-первоисточником получает имя Improvement_<id> — под ним
-                    // его находит и сохранение (CaptureImprovements ловит ровно этот префикс),
-                    // и восстановление. Проп без замысла остаётся сессионным — об этом
-                    // предупреждает OnValidate самого товара.
-                    instance.name = item.Improvement != null ? "Improvement_" + item.Improvement.Id : item.Id;
+                    // Стройку, как и вещь, игрок вправе переставить.
+                    site.gameObject.AddComponent<Movable>();
 
-                    // Всё купленное игрок должен иметь возможность переставить.
-                    if (instance.GetComponent<Movable>() == null) instance.AddComponent<Movable>();
-
-                    _placed.Add(instance.transform);
+                    _placed.Add(site.transform);
                     return true;
                 }
 
@@ -225,22 +226,16 @@ namespace Farm.Farming
                     var definition = item.Building;
                     if (definition == null || definition.Prefab == null) return false;
 
-                    // Постройки ставятся без случайного поворота: у них есть перёд, и фермер
-                    // подходит к ним — криво развёрнутая кухня читается как ошибка.
-                    var instance = Instantiate(definition.Prefab, position, Quaternion.identity);
-                    instance.name = "Building_" + definition.Id;
+                    // Постройки — те же минуты стройки, но без случайного поворота: у них
+                    // есть перёд, и криво развёрнутая кухня читается как ошибка.
+                    var site = new GameObject().AddComponent<ConstructionSite>();
+                    site.transform.SetPositionAndRotation(position, Quaternion.identity);
+                    site.Begin(ConstructionSite.TargetKind.Building, definition.Id,
+                               ConstructionSite.BuildingSeconds, ConstructionSite.BuildingSeconds);
 
-                    var building = instance.GetComponent<Building>();
-                    if (building == null) building = instance.AddComponent<Building>();
-                    building.Configure(definition, 1);
+                    site.gameObject.AddComponent<Movable>();
 
-                    // Мастерская — отдельный компонент: уровень и цикл производства живут врозь.
-                    if (definition.Service == BuildingService.Workshop && instance.GetComponent<Workshop>() == null)
-                        instance.AddComponent<Workshop>();
-
-                    if (instance.GetComponent<Movable>() == null) instance.AddComponent<Movable>();
-
-                    _placed.Add(instance.transform);
+                    _placed.Add(site.transform);
                     return true;
                 }
             }

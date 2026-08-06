@@ -61,6 +61,7 @@ namespace Farm.UI
 
             FarmingEvents.Harvested += OnHarvested;
             FarmingEvents.Merged += OnMerged;
+            FarmingEvents.Constructed += OnConstructed;
             FarmWater.Poured += OnPoured;
             FarmWater.Refused += OnCareRefused;
             FarmFertilizer.Applied += OnFertilized;
@@ -76,6 +77,7 @@ namespace Farm.UI
 
             FarmingEvents.Harvested -= OnHarvested;
             FarmingEvents.Merged -= OnMerged;
+            FarmingEvents.Constructed -= OnConstructed;
             FarmWater.Poured -= OnPoured;
             FarmWater.Refused -= OnCareRefused;
             FarmFertilizer.Applied -= OnFertilized;
@@ -131,6 +133,12 @@ namespace Farm.UI
         {
             if (survivor == null) return;
             Show("Уровень " + survivor.Level + "!", survivor.transform.position + Vector3.up * 0.9f, "float--merge");
+        }
+
+        private void OnConstructed(Transform built)
+        {
+            if (built == null) return;
+            Show("построено", built.position + Vector3.up * 0.8f, "float--merge");
         }
 
         private void OnSold(Shop shop, ResourceDefinition resource, int amount, int gold)

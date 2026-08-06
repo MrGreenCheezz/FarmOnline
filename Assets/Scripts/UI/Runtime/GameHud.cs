@@ -906,6 +906,10 @@ namespace Farm.UI
                         hiredDoes = "";
                         idleMeans = "жалования не берёт — ночь его смена";
                         break;
+                    case ResidentRole.Builder:
+                        hiredDoes = " · достраивает покупки";
+                        idleMeans = "не нанят — стройки идут сами, медленно";
+                        break;
                     default:
                         hiredDoes = " · собирает ступени 1–" + FarmerAgent.HelperMaxTier;
                         idleMeans = "не нанят — урожай собирает хозяин";
@@ -1158,6 +1162,8 @@ namespace Farm.UI
                 case FarmerState.Crafting: return "у станка";
                 case FarmerState.GoingToLoad: return "идёт за коробом";
                 case FarmerState.DeliveringOrder: return "везёт заказ";
+                case FarmerState.GoingToBuild: return "идёт на стройку";
+                case FarmerState.Constructing: return "строит";
                 default: return state.ToString();
             }
         }

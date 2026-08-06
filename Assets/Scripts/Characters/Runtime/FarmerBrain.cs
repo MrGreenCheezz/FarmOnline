@@ -29,7 +29,9 @@ namespace Farm.Characters
         /// <summary>Встать к станку и вести партии — работа мастерового (этап 2 колонии).</summary>
         Craft = 10,
         /// <summary>Отвезти короб сданного заказа к рынку — театр возчика (этап 2 колонии).</summary>
-        CarryOrder = 11
+        CarryOrder = 11,
+        /// <summary>Встать к стройплощадке и строить — работа строителя (этап 3 колонии).</summary>
+        Build = 12
     }
 
     /// <summary>Одно взвешенное намерение: что делать, насколько хочется и с чем именно.</summary>
@@ -52,12 +54,15 @@ namespace Farm.Characters
         /// <summary>Замысел для <see cref="FarmerIntent.Improve"/>.</summary>
         public readonly ImprovementDefinition Improvement;
 
+        /// <summary>Стройплощадка для <see cref="FarmerIntent.Build"/>.</summary>
+        public readonly ConstructionSite Site;
+
         /// <summary>Одна строка от первого лица — её показывает пузырь над головой.</summary>
         public readonly string Thought;
 
         public FarmerDecision(FarmerIntent intent, float score, string thought,
                               Growable plot = null, Building place = null, Vector3 spot = default,
-                              ImprovementDefinition improvement = null)
+                              ImprovementDefinition improvement = null, ConstructionSite site = null)
         {
             Intent = intent;
             Score = score;
@@ -66,6 +71,7 @@ namespace Farm.Characters
             Place = place;
             Spot = spot;
             Improvement = improvement;
+            Site = site;
         }
 
         public static readonly FarmerDecision None = new FarmerDecision(FarmerIntent.Idle, 0f, null);
@@ -216,6 +222,7 @@ namespace Farm.Characters
             Consider(ScoreTrade(), ref best);
             Consider(ScoreCraft(), ref best);
             Consider(ScoreCarryOrder(), ref best);
+            Consider(ScoreBuild(), ref best);
             Consider(ScoreTidy(), ref best);
             Consider(ScoreImprove(), ref best);
             Consider(ScoreRelax(), ref best);
@@ -300,6 +307,8 @@ namespace Farm.Characters
                 case FarmerState.Crafting:
                 case FarmerState.GoingToLoad:
                 case FarmerState.DeliveringOrder:
+                case FarmerState.GoingToBuild:
+                case FarmerState.Constructing:
                     return true;
 
                 default:
@@ -944,6 +953,43 @@ namespace Farm.Characters
             if (score <= 0f) return FarmerDecision.None;
 
             return new FarmerDecision(FarmerIntent.Craft, score, "постругаем", place: place);
+        }
+
+        /// <summary>
+        /// Работа строителя: встать к стройплощадке. Стройка идёт и без него — он лишь
+        /// ускоряет её и даёт что смотреть, тем же приёмом, что мастеровой у станка.
+        /// Только по найму: неоплаченная роль живёт бытом.
+        /// </summary>
+        private FarmerDecision ScoreBuild()
+        {
+            if (_agent.Role != ResidentRole.Builder || !_agent.IsHired) return FarmerDecision.None;
+
+            // Распорядок один на все работы: перерыв, ночь и груз закрывают стройку.
+            if (Resting || Night || !_agent.Pack.IsEmpty) return FarmerDecision.None;
+
+            ConstructionSite best = null;
+            float bestTravel = float.MaxValue;
+
+            var all = ConstructionSite.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var site = all[i];
+                if (site == null) continue;
+
+                float travel = Travel(site.transform.position);
+                if (travel >= bestTravel) continue;
+
+                bestTravel = travel;
+                best = site;
+            }
+
+            if (best == null) return FarmerDecision.None;
+
+            // Та же полоса, что у станка: 4.3 — выше быта, ниже потолка сбора и еды.
+            float score = ScoreWork + 0.3f - bestTravel * 0.4f;
+            if (score <= 0f) return FarmerDecision.None;
+
+            return new FarmerDecision(FarmerIntent.Build, score, "пойду достраивать", site: best);
         }
 
         /// <summary>

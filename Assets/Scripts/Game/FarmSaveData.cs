@@ -83,6 +83,21 @@ namespace Farm.Game
         public double ElapsedSeconds;
     }
 
+    /// <summary>
+    /// Недостроенная площадка (театр труда, этап 3). Оставшиеся секунды при скорости 1:
+    /// оффлайн-догон вычитается при чтении — закрытая игра строит базовой скоростью,
+    /// строителя-то рядом нет.
+    /// </summary>
+    [Serializable]
+    public sealed class ConstructionSave
+    {
+        public int Kind;
+        public string TargetId;
+        public double RemainingSeconds;
+        public Vector3 Position;
+        public float Yaw;
+    }
+
     [Serializable]
     public sealed class BuiltSave
     {
@@ -248,6 +263,9 @@ namespace Farm.Game
         /// уже никуда не записывался.
         /// </summary>
         public WorkshopSave[] Workshops = Array.Empty<WorkshopSave>();
+
+        /// <summary>Недостроенные площадки — оплачены при покупке, потерять их нельзя.</summary>
+        public ConstructionSave[] Constructions = Array.Empty<ConstructionSave>();
 
         /// <summary>Натоптанные клетки парами (x, y, x, y…).</summary>
         public int[] Footpaths = Array.Empty<int>();

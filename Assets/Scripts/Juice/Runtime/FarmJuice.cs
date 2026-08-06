@@ -59,6 +59,7 @@ namespace Farm.Juice
             FarmingEvents.Ready += OnReady;
             FarmingEvents.Harvested += OnHarvested;
             FarmingEvents.Merged += OnMerged;
+            FarmingEvents.Constructed += OnConstructed;
             BuildingRegistry.Upgraded += OnBuildingUpgraded;
 
             EnsureCameraBreath();
@@ -80,6 +81,7 @@ namespace Farm.Juice
             FarmingEvents.Ready -= OnReady;
             FarmingEvents.Harvested -= OnHarvested;
             FarmingEvents.Merged -= OnMerged;
+            FarmingEvents.Constructed -= OnConstructed;
             BuildingRegistry.Upgraded -= OnBuildingUpgraded;
 
             if (_shop != null)
@@ -161,6 +163,16 @@ namespace Farm.Juice
 
             Tween.PopIn(built.transform, 0.45f);
             Effects.Play(l => l.Place, built.transform.position);
+            Sfx.Play(b => b.Plant);
+        }
+
+        /// <summary>Стройплощадка достроилась — тот же голос «на ферме прибыло».</summary>
+        private void OnConstructed(Transform built)
+        {
+            if (built == null) return;
+
+            Tween.PopIn(built, 0.45f);
+            Effects.Play(l => l.Place, built.position);
             Sfx.Play(b => b.Plant);
         }
 
