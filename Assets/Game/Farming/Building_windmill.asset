@@ -32,7 +32,7 @@ MonoBehaviour:
         Amount: 8
     Efficiency: 0.35
     Output: 0.2
-    Note: "+20% \u043A \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 \u0440\u043E\u0441\u0442\u0430
+    Note: ""+20% \u043A \u0441\u043A\u043E\u0440\u043E\u0441\u0442\u0438 \u0440\u043E\u0441\u0442\u0430 \u00B7 \u043C\u0435\u043B\u0435\u0442: \u043F\u0448\u0435\u043D\u0438\u0446\u0430 \u2192 \u043C\u0443\u043A\u0430"
       \xB7 \u0440\u0430\u0434\u0438\u0443\u0441 7 \u043C"
   - Cost:
       Gold: 1610
@@ -80,7 +80,16 @@ MonoBehaviour:
       \xB7 \u0440\u0430\u0434\u0438\u0443\u0441 11 \u043C"
   _serviceDuration: 1
   _baseRestore: 1
-  _recipes: []
+  _recipes:
+  - Inputs:
+    - Resource: {fileID: 11400000, guid: 104b5960eb50096459f5ca59ef0ab91b, type: 2}
+      Amount: 2
+    Output: {fileID: 11400000, guid: 0ae0f511b0a64dadbd7ff62ca5d88403, type: 2}
+    OutputAmount: 1
+    Seconds: 6
+    UnlockLevel: 1
+    _legacyInput: {fileID: 0}
+    _legacyInputAmount: 0
   _boost: 1
   _auraRadius: 7
   _auraRadiusPerLevel: 1

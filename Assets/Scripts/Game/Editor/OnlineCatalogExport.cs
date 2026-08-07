@@ -36,18 +36,38 @@ namespace Farm.Game.EditorTools
             public int baseYield;
         }
 
+        /// <summary>Одна строка сырья рецепта в каталоге.</summary>
+        [Serializable]
+        private sealed class WorkshopInputRow
+        {
+            public string id;
+            public int amount;
+        }
+
         [Serializable]
         private sealed class WorkshopRow
         {
             public string buildingId;
+
+            /// <summary>Всё сырьё партии. Составной рецепт — несколько строк.</summary>
+            public WorkshopInputRow[] inputs;
+
+            // Первая строка отдельными полями — ради серверов на старом коде: они читают
+            // одиночный вход и без списка посчитали бы маржу по нулевой цене сырья, то есть
+            // завысили бы потолок дохода. Новый сервер предпочитает inputs, старый — эти два.
             public string inputId;
             public int inputAmount;
+
             public string outputId;
             public int outputAmount;
             public double seconds;
 
             /// <summary>Скорость мастерской на последнем уровне — потолок для эвристики.</summary>
             public float maxOutput;
+
+            /// <summary>С какого уровня постройки рецепт открыт: сервер кредитует потолок
+            /// дохода только открытыми рецептами, а не лучшим на любом уровне.</summary>
+            public int unlockLevel;
         }
 
         [Serializable]
@@ -104,15 +124,27 @@ namespace Farm.Game.EditorTools
                 foreach (var recipe in def.Recipes)
                 {
                     if (recipe == null || !recipe.IsValid) continue;
+
+                    int lines = recipe.InputCount;
+                    var inputs = new WorkshopInputRow[lines];
+                    for (int line = 0; line < lines; line++)
+                        inputs[line] = new WorkshopInputRow
+                        {
+                            id = recipe.InputResourceAt(line).Id,
+                            amount = recipe.InputAmountAt(line),
+                        };
+
                     workshops.Add(new WorkshopRow
                     {
                         buildingId = def.Id,
-                        inputId = recipe.Input.Id,
-                        inputAmount = recipe.InputAmount,
+                        inputs = inputs,
+                        inputId = inputs[0].id,
+                        inputAmount = inputs[0].amount,
                         outputId = recipe.Output.Id,
                         outputAmount = recipe.OutputAmount,
                         seconds = recipe.Seconds,
                         maxOutput = maxOutput,
+                        unlockLevel = recipe.UnlockLevel,
                     });
                 }
             }

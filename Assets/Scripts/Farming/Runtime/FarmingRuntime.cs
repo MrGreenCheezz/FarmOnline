@@ -133,18 +133,24 @@ namespace Farm.Farming
         /// нужно из сборок, которые про сохранение ничего не знают.
         /// </para>
         /// </summary>
-        public static bool Restoring { get; private set; }
+        public static bool Restoring => _restoreDepth > 0;
+
+        // Глубина, а не флаг: SaveRunner.Start держит своё окно вокруг FarmLevels.RestoreState
+        // (уровень ставится до Apply), а Apply внутри открывает и закрывает своё. С флагом
+        // вложенный EndRestore схлопывал бы внешнее окно, и приезд жителей с вехами
+        // «объявлялся» бы на каждой загрузке.
+        private static int _restoreDepth;
 
         /// <summary>Партия разложена и достоверна — можно оформлять.</summary>
         public static event Action Restored;
 
         /// <summary>Открыть и закрыть окно восстановления. Зовёт только сохранение.</summary>
-        public static void BeginRestore() => Restoring = true;
+        public static void BeginRestore() => _restoreDepth++;
 
         public static void EndRestore()
         {
-            if (!Restoring) return;
-            Restoring = false;
+            if (_restoreDepth == 0) return;
+            if (--_restoreDepth > 0) return;
 
             var handler = Restored;
             if (handler == null) return;
@@ -166,7 +172,7 @@ namespace Farm.Farming
             _sink = null;
             _ground = null;
             LogHarvests = true;
-            Restoring = false;
+            _restoreDepth = 0;
             Restored = null;
         }
     }

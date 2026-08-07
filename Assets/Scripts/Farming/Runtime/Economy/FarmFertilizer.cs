@@ -47,14 +47,19 @@ namespace Farm.Farming
 
         public static int Charges => _charges;
 
-        /// <summary>Выдать подкормку — за сданный заказ или подарком друга.</summary>
-        public static void Grant(int amount)
+        /// <summary>
+        /// Выдать подкормку (единственный вход — сданный заказ). Возвращает, сколько реально
+        /// легло: при полном запасе награда упирается в потолок, и вызывающий обязан сказать
+        /// об этом игроку — молча сгоревшая награда читается как обсчёт.
+        /// </summary>
+        public static int Grant(int amount)
         {
-            if (amount <= 0) return;
+            if (amount <= 0) return 0;
 
             int before = _charges;
             _charges = Mathf.Min(Capacity, _charges + amount);
             if (_charges != before) Raise(Changed);
+            return _charges - before;
         }
 
         /// <summary>
@@ -69,7 +74,12 @@ namespace Farm.Farming
 
             if (!plot.CanFertilize)
             {
-                Refuse(plot.Fertilized ? "уже подкормлено" : "подкармливать нечего", at);
+                // Категорию — вслух, как у ведра и корма: инструмент живёт в руке, и промах
+                // по скотине стал обычным делом. Молчаливое «подкармливать нечего» про
+                // растущую корову игрок читает как поломку.
+                Refuse(plot.Category != ResourceCategory.Crop
+                        ? "удобрение — для растений"
+                        : plot.Fertilized ? "уже подкормлено" : "подкармливать нечего", at);
                 return false;
             }
 

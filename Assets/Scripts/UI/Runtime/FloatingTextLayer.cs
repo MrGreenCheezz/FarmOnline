@@ -61,12 +61,17 @@ namespace Farm.UI
 
             FarmingEvents.Harvested += OnHarvested;
             FarmingEvents.Merged += OnMerged;
+            FarmingEvents.TierAscended += OnTierAscended;
+            FarmingEvents.MergeRefused += OnMergeRefused;
             FarmingEvents.Constructed += OnConstructed;
             Farm.Characters.ColonyRoster.Arrived += OnResidentArrived;
             FarmWater.Poured += OnPoured;
             FarmWater.Refused += OnCareRefused;
             FarmFertilizer.Applied += OnFertilized;
             FarmFertilizer.Refused += OnCareRefused;
+            FarmFeed.Fed += OnFed;
+            FarmFeed.Refused += OnCareRefused;
+            FarmingEvents.Notice += OnNotice;
 
             _shop = Shop.Instance != null ? Shop.Instance : FindFirstObjectByType<Shop>();
             if (_shop != null) _shop.Sold += OnSold;
@@ -78,12 +83,17 @@ namespace Farm.UI
 
             FarmingEvents.Harvested -= OnHarvested;
             FarmingEvents.Merged -= OnMerged;
+            FarmingEvents.TierAscended -= OnTierAscended;
+            FarmingEvents.MergeRefused -= OnMergeRefused;
             FarmingEvents.Constructed -= OnConstructed;
             Farm.Characters.ColonyRoster.Arrived -= OnResidentArrived;
             FarmWater.Poured -= OnPoured;
             FarmWater.Refused -= OnCareRefused;
             FarmFertilizer.Applied -= OnFertilized;
             FarmFertilizer.Refused -= OnCareRefused;
+            FarmFeed.Fed -= OnFed;
+            FarmFeed.Refused -= OnCareRefused;
+            FarmingEvents.Notice -= OnNotice;
             if (_shop != null) _shop.Sold -= OnSold;
             _shop = null;
         }
@@ -124,6 +134,17 @@ namespace Farm.UI
         private void OnCareRefused(string reason, Vector3 at) =>
             Show(reason, at + Vector3.up * 0.9f, "float--bad");
 
+        /// <summary>Накормлено — говорим прибавкой к урожаю, как и о подкормке.</summary>
+        private void OnFed(Growable plot)
+        {
+            if (plot == null) return;
+            Show("урожай ×" + FarmFeed.YieldMultiplier,
+                 plot.transform.position + Vector3.up * 0.9f, "float--gold");
+        }
+
+        /// <summary>Ткнули рукой в растущее — грядка отвечает сроком, а не молчанием.</summary>
+        private void OnNotice(string text, Vector3 at) => Show(text, at, "float--harvest");
+
         private void OnHarvested(Growable g, HarvestResult result)
         {
             if (g == null) return;
@@ -136,6 +157,16 @@ namespace Farm.UI
             if (survivor == null) return;
             Show("Уровень " + survivor.Level + "!", survivor.transform.position + Vector3.up * 0.9f, "float--merge");
         }
+
+        private void OnTierAscended(Growable survivor, GrowableDefinition from)
+        {
+            if (survivor == null || survivor.Definition == null) return;
+            Show("Новая ступень: " + survivor.Definition.DisplayName + "!",
+                 survivor.transform.position + Vector3.up * 1.1f, "float--merge");
+        }
+
+        private void OnMergeRefused(string reason, Vector3 at) =>
+            Show(reason, at + Vector3.up * 0.9f, "float--bad");
 
         private void OnConstructed(Transform built)
         {

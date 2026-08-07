@@ -34,18 +34,24 @@ namespace Farm.Farming
         /// <summary>Уровень слияния грядки в момент сбора — количество его уже учитывает.</summary>
         public readonly int Level;
 
-        public HarvestResult(Growable source, ResourceDefinition resource, int amount, int level)
+        /// <summary>Сорт снятого: что выросло на ухоженной земле, то и лучше.</summary>
+        public readonly ResourceGrade Grade;
+
+        public HarvestResult(Growable source, ResourceDefinition resource, int amount, int level,
+                             ResourceGrade grade = ResourceGrade.Common)
         {
             Source = source;
             Resource = resource;
             Amount = amount;
             Level = level;
+            Grade = grade;
         }
 
         public override string ToString()
         {
             string id = Resource != null ? Resource.Id : "<none>";
-            return Amount + "x " + id + " (lvl " + Level + ")";
+            string mark = Grade == ResourceGrade.Common ? "" : " " + ResourceGrades.Mark(Grade);
+            return Amount + "x " + id + " (lvl " + Level + ")" + mark;
         }
     }
 }

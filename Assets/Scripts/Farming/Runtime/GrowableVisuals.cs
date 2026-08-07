@@ -23,6 +23,9 @@ namespace Farm.Farming
         private GameObject[] _instances;
         private int _visibleStage = -1;
 
+        /// <summary>Под какое определение построен кэш стадий; см. проверку в Show.</summary>
+        private GrowableDefinition _builtFor;
+
         private void Awake()
         {
             _growable = GetComponent<Growable>();
@@ -54,10 +57,19 @@ namespace Farm.Farming
         /// <summary>Показать стадию <paramref name="stage"/>; отрицательное значение — спрятать всё.</summary>
         private void Show(int stage)
         {
-            if (_visibleStage == stage) return;
-
             var definition = _growable.Definition;
             if (definition == null) return;
+
+            // Смена определения — переход ступени слиянием: грядка переродилась в другой вид,
+            // и кэш мешей старой культуры обязан умереть, даже если номер стадии совпал.
+            // Без этого пшеница-двадцатка после «Новая ступень: Тыква!» часами стояла бы
+            // пшеницей: у большинства культур стадий поровну и длина кэша не выдаёт подмену.
+            if (definition != _builtFor)
+            {
+                DestroyInstances();
+                _builtFor = definition;
+            }
+            else if (_visibleStage == stage) return;
 
             if (_cacheStages)
             {

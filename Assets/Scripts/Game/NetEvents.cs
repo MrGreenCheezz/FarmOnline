@@ -177,10 +177,15 @@ namespace Farm.Game
             var storage = FarmingRuntime.Sink as Inventory;
             if (storage == null) return;
 
-            int taken = storage.TryRemove(resource, amount);
+            // Дарится только обычный сорт — как и на рынке: получатель зачисляет подарок
+            // по идентификатору ресурса, сорта в payload нет, и отборное доехало бы к другу
+            // обычным. Молча потерять надбавку за уход хуже, чем честно отказать.
+            int taken = storage.TryRemove(resource, amount, ResourceGrade.Common);
             if (taken <= 0)
             {
-                NetStatus.Set("на складе нет: " + resource.DisplayName);
+                NetStatus.Set(storage.GetAmount(resource) > 0
+                    ? "дарить можно обычный сорт — отборное довезёт только твоя лавка"
+                    : "на складе нет: " + resource.DisplayName);
                 return;
             }
 
@@ -190,6 +195,7 @@ namespace Farm.Game
             if (sent.Transport && sent.Value != null && sent.Value.ok)
             {
                 NetStatus.Set("подарок для " + friendName + " отправлен: " + taken + " × " + resource.DisplayName);
+                FarmProgress.NoteGiftSent();
                 SaveRunner.SaveIfPossible("после подарка");
             }
             else
@@ -197,7 +203,28 @@ namespace Farm.Game
                 // Сеть съела подарок — вернуть на склад, а не сделать вид, что так и было.
                 storage.Add(resource, taken);
                 if (sent.Transport)
-                    NetStatus.Fail("подарок", sent.Value != null ? sent.Value.error : "непонятный ответ");
+                {
+                    // Новые серверные замки подарков (этап 5) — человеческим языком,
+                    // а не кодом: отказ обязан быть понятен, не только заметен.
+                    string code = sent.Value != null ? sent.Value.error : null;
+                    switch (code)
+                    {
+                        case "not_in_snapshot":
+                            NetStatus.Set("сервер ещё не видел этого на складе — подожди пару секунд после сбора");
+                            break;
+                        case "gift_daily_limit":
+                            NetStatus.Set("щедрость на сегодня исчерпана — потолок ценности подарков в сутки");
+                            break;
+                        case "bad_gift":
+                            // Сервер отвечает bad_gift и на перебор штук (MAX_GIFT_AMOUNT,
+                            // зеркалит server.py), и на ресурс вне каталога — текст шире.
+                            NetStatus.Set("такой подарок не пройдёт — слишком много за раз или рынок его не знает");
+                            break;
+                        default:
+                            NetStatus.Fail("подарок", code ?? "непонятный ответ");
+                            break;
+                    }
+                }
             }
         }
 
@@ -213,6 +240,21 @@ namespace Farm.Game
             try
             {
                 var summary = new List<string>();
+
+                // Разово — о слиянии 2.0: у слитых грядок урожай стал линейным (был ×2 за
+                // уровень), и молча уменьшившийся «+N» при сборе читался бы как поломка.
+                // Только партиям, жившим до правила: новичку «пересчитано» — обрывок чужого
+                // changelog, его учит MergeHint. Ключ помечается в ShowSummary после
+                // фактического показа — сгоревшая до показа строка не вернулась бы никогда.
+                // Оффлайн-игрок (PlayInbox требует входа) увидит её при первом онлайн-входе:
+                // ключ до тех пор не тратится.
+                bool livedBeforeMerge2 = FarmProgress.TotalHarvested + FarmProgress.TotalMerges > 0;
+                if (livedBeforeMerge2 && PlayerPrefs.GetInt(MergeNoticeKey, 0) == 0)
+                {
+                    _markMergeNotice = true;
+                    summary.Add("слияние пересчитано: уровни складываются (потолок 20), урожай " +
+                                "линеен уровню, а две двадцатки перерождаются в новую ступень");
+                }
 
                 // Ежедневная награда — в ту же сводку «пока тебя не было»: игрок открывает игру
                 // и одним окном узнаёт всё, что случилось без него. Отдельное поздравление поверх
@@ -280,15 +322,28 @@ namespace Farm.Game
                 var wallet = Wallet.Instance;
                 if (wallet != null && res.Value.gold > 0) wallet.Add(res.Value.gold);
 
-                summary.Add(res.Value.streak > 1
-                    ? "ежедневная награда: +" + res.Value.gold + " зол. (" + res.Value.streak + " дня подряд)"
-                    : "ежедневная награда: +" + res.Value.gold + " зол.");
+                // «Завтра +N» — чтобы серия существовала для игрока, а не только в базе:
+                // без этой строки о лестнице ежедневки не знал никто, и рвать её было
+                // не жалко. Числа зеркалят server.py (DAILY_BASE_GOLD 120 + 60/день,
+                // потолок серии 7) — поменяешь там, поменяй и здесь.
+                const int step = 60, maxStreak = 7;
+                int streak = Mathf.Max(1, res.Value.streak);
+                string tomorrow = streak < maxStreak
+                    ? "завтра +" + (res.Value.gold + step) + " зол."
+                    : "потолок серии";
+
+                summary.Add(streak > 1
+                    ? "ежедневная награда: +" + res.Value.gold + " зол. (день " + streak + " подряд · " + tomorrow + ")"
+                    : "ежедневная награда: +" + res.Value.gold + " зол. (заходи завтра — будет +" + (res.Value.gold + step) + ")");
             }
             catch (Exception e)
             {
                 Debug.LogException(e);
             }
         }
+
+        private const string MergeNoticeKey = "Farm.Merge2Notice";
+        private static bool _markMergeNotice;
 
         private static void ShowSummary(List<string> summary)
         {
@@ -299,6 +354,15 @@ namespace Farm.Game
 
             try { handler(summary); }
             catch (Exception e) { Debug.LogException(e); }
+
+            // Разовая строка о слиянии 2.0 считается показанной только здесь — когда сводка
+            // реально дошла до окна. Save сразу: WebGL без него теряет PlayerPrefs с вкладкой.
+            if (_markMergeNotice)
+            {
+                _markMergeNotice = false;
+                PlayerPrefs.SetInt(MergeNoticeKey, 1);
+                PlayerPrefs.Save();
+            }
         }
 
         private static void Apply(EventEntry ev, List<string> summary)
@@ -317,7 +381,10 @@ namespace Farm.Game
                         return;
                     }
 
-                    FarmingRuntime.Sink.Add(resource, gift.Amount);
+                    // С переливом, как market_returned: отвергнуть собственность из-за
+                    // потолка склада нельзя — раньше излишек молча исчезал, а сводка
+                    // врала полным числом.
+                    NetMarket.AddWithOverflow(resource, gift.Amount);
                     summary.Add(ev.fromName + " прислал(а) " + gift.Amount + " × " + resource.DisplayName);
                     return;
                 }

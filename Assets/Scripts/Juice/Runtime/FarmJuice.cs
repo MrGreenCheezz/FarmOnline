@@ -59,6 +59,7 @@ namespace Farm.Juice
             FarmingEvents.Ready += OnReady;
             FarmingEvents.Harvested += OnHarvested;
             FarmingEvents.Merged += OnMerged;
+            FarmingEvents.TierAscended += OnTierAscended;
             FarmingEvents.Constructed += OnConstructed;
             BuildingRegistry.Upgraded += OnBuildingUpgraded;
 
@@ -81,6 +82,7 @@ namespace Farm.Juice
             FarmingEvents.Ready -= OnReady;
             FarmingEvents.Harvested -= OnHarvested;
             FarmingEvents.Merged -= OnMerged;
+            FarmingEvents.TierAscended -= OnTierAscended;
             FarmingEvents.Constructed -= OnConstructed;
             BuildingRegistry.Upgraded -= OnBuildingUpgraded;
 
@@ -274,6 +276,17 @@ namespace Farm.Juice
                          1f + survivor.Level * 0.12f);
 
             PlayMergeSound(survivor.Level);
+        }
+
+        private void OnTierAscended(Growable survivor, GrowableDefinition from)
+        {
+            if (survivor == null) return;
+
+            // Сильнее любого слияния: за этим жестом сорок вложенных грядок,
+            // и салют обязан отличаться от рядового «Уровень N!».
+            Tween.Punch(survivor.transform, _mergePunch * 1.5f, 0.6f);
+            Effects.Play(l => l.MergeBurst, survivor.transform.position + Vector3.up * 0.4f, 3.5f);
+            PlayMergeSound(7); // верх шкалы тона: выше рядовое слияние не звучит
         }
 
         /// <summary>Выше уровень — выше тон: прогресс слышен и без чтения плашки.</summary>

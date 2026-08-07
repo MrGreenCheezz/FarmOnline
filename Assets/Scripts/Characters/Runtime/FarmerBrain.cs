@@ -541,6 +541,11 @@ namespace Farm.Characters
         /// </summary>
         private FarmerDecision ScoreTrade()
         {
+            // В гостях торговли нет: Shop.TrySell чужой склад не продаст (этап 4), и без
+            // этой строки фермер хозяина ходил бы к рынку весь визит — «пошёл, бипнул
+            // отказом, ушёл» по кругу. Симметрично MayHarvest.
+            if (GuestMode.IsGuest) return FarmerDecision.None;
+
             var skills = _agent.Skills;
             if (skills == null || !skills.CanSell) return FarmerDecision.None;
             if (Shop.Instance == null) return FarmerDecision.None;
@@ -702,13 +707,13 @@ namespace Farm.Characters
                     {
                         var building = all[b];
                         if (building == null || building.Definition != kind) continue;
-                        if (_agent.BuiltCount(project, building) >= project.MaxCount) continue;
+                        if (FarmerAgent.BuiltCount(project, building) >= project.MaxCount) continue;
                         Offer(project, building);
                     }
                 }
                 else
                 {
-                    if (_agent.BuiltCount(project) >= project.MaxCount) continue;
+                    if (FarmerAgent.BuiltCount(project) >= project.MaxCount) continue;
                     Offer(project, null);
                 }
             }
@@ -891,8 +896,18 @@ namespace Farm.Characters
             {
                 // Стоять посреди спелого поля без объяснения — читаться сломанным.
                 // Названная причина превращает то же безделье в уговор с хозяином.
+                // Роли говорят своё дело: их наём сбор НЕ откроет (MayHarvest требует
+                // Role == None), и «без найма не трону» из их уст было бы обещанием,
+                // за которое игрок заплатил бы жалование впустую.
                 spot = _agent.FavouriteSpot;
-                thought = "урожай хозяйский — без найма не трону";
+                thought = _agent.Role switch
+                {
+                    ResidentRole.Craftsman => "урожай хозяйский — моё дело станок",
+                    ResidentRole.Carter => "урожай хозяйский — моё дело заказы",
+                    ResidentRole.Watchman => "урожай хозяйский — моё дело дозор",
+                    ResidentRole.Builder => "урожай хозяйский — моё дело стройка",
+                    _ => "урожай хозяйский — без найма не трону",
+                };
             }
             else
             {
@@ -1017,7 +1032,7 @@ namespace Farm.Characters
         }
 
         /// <summary>
-        /// Навести порядок: поднести грядку к её паре.
+        /// Навести порядок: снести отбившуюся грядку в двор её вида (<see cref="TidyGroups"/>).
         /// <para>
         /// Это про характер, а не про пользу: у фермера есть вкус, и ферма, разложенная его
         /// руками, выглядит обжитой, а не насыпанной случайно. В покое оценка сидит в полосе
@@ -1025,7 +1040,7 @@ namespace Farm.Characters
         /// ожидания и всё ещё ниже сбора.
         /// </para>
         /// <para>
-        /// Он сводит одинаковые уровни вплотную, но сам их не сливает: слияние остаётся ходом
+        /// Он сводит одинаковые вплотную, но сам их не сливает: слияние остаётся ходом
         /// игрока. Он подносит — ты решаешь.
         /// </para>
         /// </summary>
@@ -1087,75 +1102,72 @@ namespace Farm.Characters
         }
 
         /// <summary>
-        /// С какого расстояния пара считается стоящей врозь. Одно число на два вопроса —
-        /// «есть ли бардак» и «что нести»: разъехавшись, они дали бы вечно копящееся
-        /// раздражение при отсутствии работы для него.
-        /// </summary>
-        private float MessDistance => _agent.TidySpacing * 2.5f;
-
-        /// <summary>
-        /// Есть ли на ферме пара одинаковых, стоящая врозь. В отличие от
+        /// Есть ли на ферме одинокая грядка вне двора своего вида. В отличие от
         /// <see cref="FindTidyJob"/> не спрашивает, можно ли нести прямо сейчас: спелость,
-        /// рука игрока и занятое место рядом — это «не сейчас», а не «прибрано».
+        /// рука игрока и занятое место во дворе — это «не сейчас», а не «прибрано».
+        /// <para>
+        /// Оба вопроса — «есть ли бардак» и «что нести» — меряются одним и тем же
+        /// <see cref="TidyGroups.IsAstray"/>: разъехавшись, они дали бы вечно копящееся
+        /// раздражение при отсутствии работы для него.
+        /// </para>
         /// </summary>
         private bool HasMess()
         {
+            TidyGroups.Refresh();
+
+            float step = _agent.TidySpacing;
             var all = GrowableRegistry.All;
-            float apart = MessDistance;
 
             for (int i = 0; i < all.Count; i++)
-            {
-                var a = all[i];
-                if (a == null || a.Phase == GrowthPhase.Empty) continue;
-
-                for (int j = i + 1; j < all.Count; j++)
-                {
-                    var b = all[j];
-                    if (b == null || !b.CanMergeWith(a)) continue;
-
-                    if (Vector3.Distance(a.transform.position, b.transform.position) > apart)
-                        return true;
-                }
-            }
+                if (TidyGroups.IsAstray(all[i], step)) return true;
 
             return false;
         }
 
         /// <summary>
         /// Найти грядку, которую стоит перенести, и куда именно.
-        /// Возвращает false, когда всё и так на своих местах.
+        /// Возвращает false, когда всё и так по своим дворам.
+        /// <para>
+        /// Цель — <b>место</b>, а не пара. Раньше выбиралась самая разъехавшаяся двойка
+        /// одинаковых, и на трёх грядках это давало маятник: поднёс А к Б — самой дальней
+        /// парой стали А и В, и та же А ехала обратно. Двор вида выбран заранее и один
+        /// на ферму, поэтому каждая ходка приближает грядку к нему, и вернуть её наружу
+        /// не может уже никакая перестановка.
+        /// </para>
         /// </summary>
         private bool FindTidyJob(out Growable move, out Vector3 spot)
         {
             move = null;
             spot = default;
 
+            TidyGroups.Refresh();
+
+            float step = _agent.TidySpacing;
             var all = GrowableRegistry.All;
-            float bestGain = MessDistance;   // ниже этого возиться не стоит
+            float bestScore = float.NegativeInfinity;
 
             for (int i = 0; i < all.Count; i++)
             {
                 var candidate = all[i];
+                if (!TidyGroups.IsAstray(candidate, step)) continue;
                 if (!CanTidy(candidate)) continue;
 
-                for (int j = 0; j < all.Count; j++)
-                {
-                    var mate = all[j];
-                    if (mate == null || mate == candidate) continue;
+                var anchor = TidyGroups.AnchorFor(candidate.Definition);
+                if (anchor == null) continue;
 
-                    // Пара — это то, что слилось бы: тот же вид и тот же уровень.
-                    if (!mate.CanMergeWith(candidate)) continue;
+                // Насколько она не на месте, минус половина дороги до неё: ближний бардак
+                // убирается охотнее дальнего, но забредшая через всю ферму грядка перевесит
+                // и дорогу. Обе величины в метрах — потому и складываются напрямую.
+                float astray = Vector3.Distance(
+                    candidate.transform.position, anchor.transform.position);
+                float score = astray - Vector3.Distance(_agent.Pos, candidate.transform.position) * 0.5f;
+                if (score <= bestScore) continue;
 
-                    float distance = Vector3.Distance(
-                        candidate.transform.position, mate.transform.position);
-                    if (distance <= bestGain) continue;
+                if (!FindSpotInGrove(anchor, candidate, step, out Vector3 place)) continue;
 
-                    if (!FindFreeSpotBeside(mate, candidate, out Vector3 place)) continue;
-
-                    bestGain = distance;
-                    move = candidate;
-                    spot = place;
-                }
+                bestScore = score;
+                move = candidate;
+                spot = place;
             }
 
             return move != null;
@@ -1177,25 +1189,52 @@ namespace Farm.Characters
         }
 
         /// <summary>
-        /// Свободное место рядом с <paramref name="mate"/>. Перебираем восемь направлений и берём
-        /// первое, где никто не стоит: поставить грядку в другую — значит спрятать одну в другой.
+        /// Свободное место во дворе: кольцами от якоря наружу, веером от той стороны, откуда
+        /// несут, — куча прирастает навстречу жителю, и дорога выходит короче.
+        /// <para>
+        /// Дальше <see cref="TidyGroups.HomeRadius"/> не ставим никогда: поставленное снаружи
+        /// двора тут же снова читалось бы беспорядком, и та же грядка пошла бы на второй круг.
+        /// Поэтому «место не нашлось» честнее натянутого места — двор полон, работы нет.
+        /// </para>
         /// </summary>
-        private bool FindFreeSpotBeside(Growable mate, Growable moving, out Vector3 spot)
+        private bool FindSpotInGrove(Growable anchor, Growable moving, float step, out Vector3 spot)
         {
-            float spacing = _agent.TidySpacing;
-            Vector3 center = mate.transform.position;
+            Vector3 center = anchor.transform.position;
+            float limit = TidyGroups.HomeRadius(anchor.Definition, step);
 
-            for (int step = 0; step < 8; step++)
+            // Первый угол — в сторону несомой грядки: остальные разбираются веером от него.
+            Vector3 from = moving.transform.position - center;
+            from.y = 0f;
+            float bias = from.sqrMagnitude > 0.0001f ? Mathf.Atan2(from.z, from.x) : 0f;
+
+            for (int ring = 1; ring <= 5; ring++)
             {
-                float angle = step / 8f * Mathf.PI * 2f;
-                var candidate = center + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * spacing;
-                candidate.y = center.y;
-                candidate = FarmBounds.ClampToFarm(candidate);
+                float radius = step * ring;
+                if (radius > limit) break;
 
-                if (!IsSpotFree(candidate, spacing * 0.75f, moving, mate)) continue;
+                int slots = 6 * ring;                 // чем шире кольцо, тем больше на нём мест
+                float sector = Mathf.PI * 2f / slots;
 
-                spot = candidate;
-                return true;
+                for (int s = 0; s < slots; s++)
+                {
+                    // Веер: 0, −1, +1, −2, +2… Смещение по кольцу — чтобы места соседних
+                    // колец не выстраивались лучами и куча выглядела грядками, а не сеткой.
+                    int half = (s + 1) / 2;
+                    float angle = bias + (s % 2 == 0 ? half : -half) * sector + ring * 0.35f;
+
+                    var candidate = center + new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
+                    candidate.y = center.y;
+
+                    // Точка за краем фермы пропускается, а не подтягивается внутрь: зажатая
+                    // легла бы на забор, поверх соседей, мимо всех проверок свободного места.
+                    var clamped = FarmBounds.ClampToFarm(candidate);
+                    if ((clamped - candidate).sqrMagnitude > 0.01f) continue;
+
+                    if (!IsSpotFree(candidate, step * 0.75f, moving, null)) continue;
+
+                    spot = candidate;
+                    return true;
+                }
             }
 
             spot = default;
@@ -1405,6 +1444,10 @@ namespace Farm.Characters
         /// </summary>
         public ShopItemDefinition PickRestock()
         {
+            // Запрет игрока — раньше навыка и денег: это его золото, и вопрос «можно ли
+            // тратить» решается до вопроса «на что хватает».
+            if (!_agent.MayRestock) return null;
+
             var skills = _agent.Skills;
             if (skills == null || !skills.CanRestock) return null;
 

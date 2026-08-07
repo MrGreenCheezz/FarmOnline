@@ -146,8 +146,15 @@ namespace Farm.Game
 
                     if (entry.Amount > some)
                     {
-                        int all = entry.Amount;
-                        row.Add(ActionButton("Всё ×" + all, "btn btn--ghost", () => NetMarket.Sell(resource, all)));
+                        // Кламп потолком сервера: «Всё ×4752» стабильно получало бы
+                        // машинное bad_amount — кнопка не должна предлагать невозможное.
+                        // И называться «Всё» она вправе, только когда продаёт всё.
+                        int all = Mathf.Min(entry.Amount, NetMarket.MaxLotAmount);
+                        if (all > some)
+                        {
+                            string caption = all < entry.Amount ? "×" + all + " (потолок лота)" : "Всё ×" + all;
+                            row.Add(ActionButton(caption, "btn btn--ghost", () => NetMarket.Sell(resource, all)));
+                        }
                     }
 
                     _list.Add(row);
@@ -172,10 +179,17 @@ namespace Farm.Game
                 var row = Row(lot.amount + " × " + name,
                               mine ? "твой лот — ждёт покупателя" : "продаёт " + lot.sellerName);
 
+                var captured = lot;
                 if (!mine)
                 {
-                    var captured = lot;
                     row.Add(ActionButton(lot.gold + " зол.", "btn btn--accent", () => NetMarket.Buy(captured)));
+                }
+                else
+                {
+                    // Документированная отмена (ONLINE.md): выкупить свой лот, ценой спреда.
+                    // Раньше выход был описан в доке и не нажимался нигде.
+                    row.Add(ActionButton("Выкупить — " + lot.gold + " зол.", "btn btn--ghost",
+                                         () => NetMarket.Buy(captured)));
                 }
 
                 _list.Add(row);

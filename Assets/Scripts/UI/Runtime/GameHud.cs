@@ -65,15 +65,13 @@ namespace Farm.UI
         private Label _storageSummary;
         private Label _farmerState;
         private Label _farmerThought;
-        private Label _satietyLabel;
-        private Label _hydrationLabel;
-        private Label _energyLabel;
         private Label _carryLabel;
         private Label _plotsReady;
         private Label _plotsNext;
         private Label _netStatus;
         private Label _farmerHire;
         private Button _hireButton;
+        private Button _restockButton;
         private Label _skillNext;
 
         /// <summary>Пока идёт — в строке найма висит отказ, и Refresh её не затирает.</summary>
@@ -88,16 +86,12 @@ namespace Farm.UI
         private float _farmMessageTimer;
         private string _farmMessage;
 
-        private VisualElement _satietyFill;
-        private VisualElement _hydrationFill;
-        private VisualElement _energyFill;
         private VisualElement _carryFill;
         private VisualElement _skillList;
         private VisualElement _contextMenu;
         private VisualElement _contextItems;
         private Label _contextTitle;
 
-        private CharacterNeeds _needs;
         private IInventory _storage;
         private Wallet _wallet;
         private float _timer;
@@ -105,6 +99,7 @@ namespace Farm.UI
         /// <summary>Пара ссылок на живые элементы одной строки навыка.</summary>
         private struct SkillRow
         {
+            public VisualElement Row;
             public Label Level;
             public VisualElement Fill;
         }
@@ -137,9 +132,6 @@ namespace Farm.UI
             _storageSummary = root.Q<Label>("storage-summary");
             _farmerState = root.Q<Label>("farmer-state");
             _farmerThought = root.Q<Label>("farmer-thought");
-            _satietyLabel = root.Q<Label>("satiety-label");
-            _hydrationLabel = root.Q<Label>("hydration-label");
-            _energyLabel = root.Q<Label>("energy-label");
             _carryLabel = root.Q<Label>("carry-label");
             _plotsReady = root.Q<Label>("plots-ready");
             _plotsNext = root.Q<Label>("plots-next");
@@ -147,14 +139,14 @@ namespace Farm.UI
             _farmerHire = root.Q<Label>("farmer-hire");
             _hireButton = root.Q<Button>("hire-button");
             if (_hireButton != null) _hireButton.clicked += OnHireClicked;
+
+            _restockButton = root.Q<Button>("restock-button");
+            if (_restockButton != null) _restockButton.clicked += OnRestockClicked;
             _farmLevel = root.Q<Label>("farm-level");
             _farmLevelNote = root.Q<Label>("farm-level-note");
             _farmExpand = root.Q<Button>("farm-expand");
             if (_farmExpand != null) _farmExpand.clicked += OnExpandClicked;
             _skillNext = root.Q<Label>("skill-next");
-            _satietyFill = root.Q<VisualElement>("satiety-fill");
-            _hydrationFill = root.Q<VisualElement>("hydration-fill");
-            _energyFill = root.Q<VisualElement>("energy-fill");
             _carryFill = root.Q<VisualElement>("carry-fill");
             _skillList = root.Q<VisualElement>("skill-list");
             _contextMenu = root.Q<VisualElement>("context-menu");
@@ -195,7 +187,7 @@ namespace Farm.UI
             // «за кем следить» станет отдельной задачей интерфейса.
             if (_farmer == null) _farmer = FarmerRegistry.Primary;
             if (_farmer == null) _farmer = FindFirstObjectByType<FarmerAgent>();
-            if (_farmer != null) _needs = _farmer.GetComponent<CharacterNeeds>();
+
 
             BuildResidentTabs();
             BuildSkillRows();
@@ -372,7 +364,12 @@ namespace Farm.UI
         private void RefreshGold()
         {
             // Подпись словом, а не значком монеты: в шрифте темы таких глифов нет, рисуется квадрат.
-            if (_goldValue != null) _goldValue.text = (_wallet != null ? _wallet.Gold : 0) + " зол.";
+            if (_goldValue == null) return;
+
+            int gold = _wallet != null ? _wallet.Gold : 0;
+            // У потолка — сказать про потолок: дальше золото сгорает (кламп Wallet.MaxGold
+            // зеркалит серверный MAX_GOLD), и молча застывшее число читалось бы как поломка.
+            _goldValue.text = gold >= Wallet.MaxGold ? gold + " зол. — кубышка полна" : gold + " зол.";
         }
 
         private void RefreshClock()
@@ -395,29 +392,20 @@ namespace Farm.UI
         {
             if (_waterValue == null) return;
 
+            // Счётчики уехали на кнопки инструментов (ToolBar, 07.08.2026): запас и то, чем
+            // его тратят, — один предмет, и держать связь между строкой топбара и жестом
+            // приходилось игроку в голове. Строка осталась в разметке ради срока пополнения:
+            // накопление, которого не видно, читается как «перезарядка-стена».
             int capacity = FarmWater.Capacity;
-            bool show = capacity > 0;
+            double next = FarmWater.SecondsToNext;
+            bool show = capacity > 0 && next > 0.0 && !GuestMode.IsGuest;
 
             _waterValue.style.display = show ? DisplayStyle.Flex : DisplayStyle.None;
             if (!show) return;
 
-            string text = "Вода " + FarmWater.Charges + "/" + capacity;
-
-            // Неполный колодец говорит, когда набежит ведро: накопление, которого не видно,
-            // читается как «перезарядка-стена», хотя вода капает всё время (живой отзыв).
-            double next = FarmWater.SecondsToNext;
-            if (next > 0.0)
-                text += next < 3600.0
-                    ? " · ведро через " + Mathf.CeilToInt((float)(next / 60.0)) + " м"
-                    : " · ведро через " + Mathf.CeilToInt((float)(next / 3600.0)) + " ч";
-
-            // Подкормка приписывается к той же строке, а не заводит свою: она бывает не всегда,
-            // и пустая ячейка «Подкормка 0» в топбаре читалась бы как недоделка. Топбар и без
-            // того несёт восемь кнопок.
-            int fertilizer = FarmFertilizer.Charges;
-            if (fertilizer > 0) text += "   Подкормка " + fertilizer;
-
-            _waterValue.text = text;
+            _waterValue.text = next < 3600.0
+                ? "ведро через " + Mathf.CeilToInt((float)(next / 60.0)) + " м"
+                : "ведро через " + Mathf.CeilToInt((float)(next / 3600.0)) + " ч";
         }
 
         /// <summary>
@@ -459,7 +447,7 @@ namespace Farm.UI
             if (!_followChosen && FarmerRegistry.Primary != null && _farmer != FarmerRegistry.Primary)
             {
                 _farmer = FarmerRegistry.Primary;
-                _needs = _farmer.GetComponent<CharacterNeeds>();
+
             }
 
             BuildResidentTabs();
@@ -535,7 +523,7 @@ namespace Farm.UI
 
             _followChosen = true;
             _farmer = resident;
-            _needs = resident.GetComponent<CharacterNeeds>();
+
             RefreshResidentTabs();
             Refresh();
         }
@@ -562,7 +550,9 @@ namespace Farm.UI
         {
             if (_arrivalNote == null) return;
 
-            string note = ColonyRoster.NextArrivalNote;
+            // Гостю — ничего: строка объясняет прогрессию ХОЗЯИНА («кто приедет на его
+            // ступени»), а гость на неё повлиять не может и читал бы её как свою.
+            string note = GuestMode.IsGuest ? null : ColonyRoster.NextArrivalNote;
             _arrivalNote.style.display = string.IsNullOrEmpty(note) ? DisplayStyle.None : DisplayStyle.Flex;
             if (!string.IsNullOrEmpty(note)) _arrivalNote.text = note;
         }
@@ -631,7 +621,7 @@ namespace Farm.UI
                 row.Add(track);
 
                 _skillList.Add(row);
-                _skillRows[skill] = new SkillRow { Level = level, Fill = fill };
+                _skillRows[skill] = new SkillRow { Row = row, Level = level, Fill = fill };
             }
         }
 
@@ -645,12 +635,22 @@ namespace Farm.UI
                 return;
             }
 
+            // «Сбор» у жителя с ролью — мёртвая шкала: MayHarvest требует Role == None,
+            // навык не растёт и ни на что не влияет. Показывать его с обещанием награды —
+            // врать; строка прячется, и подсказка «скоро: …» его не выбирает.
+            bool hideHarvest = _farmer != null && _farmer.Role != Farm.Characters.ResidentRole.None;
+
             // Заодно ищем, какой навык ближе всего к следующему уровню — о нём и подсказка.
             FarmerSkill closest = FarmerSkill.Harvesting;
             float best = -1f;
 
             foreach (var pair in _skillRows)
             {
+                bool hidden = hideHarvest && pair.Key == FarmerSkill.Harvesting;
+                if (pair.Value.Row != null)
+                    pair.Value.Row.style.display = hidden ? DisplayStyle.None : DisplayStyle.Flex;
+                if (hidden) continue;
+
                 int level = skills.LevelOf(pair.Key);
                 float progress = skills.Progress01(pair.Key);
                 bool maxed = level >= skills.MaxLevel;
@@ -708,7 +708,15 @@ namespace Farm.UI
             int have = _storage.GetAmount(resource);
             if (have <= 0) { CloseSellMenu(); return; }
 
-            _contextTitle.text = resource.DisplayName + " — " + have + " шт.";
+            // Сорта в заголовке: игрок должен видеть, что у него в этой стопке лежит
+            // отборное, ДО того как нажмёт «продать всё».
+            int choice = _storage.GetAmount(resource, ResourceGrade.Choice);
+            int prime = _storage.GetAmount(resource, ResourceGrade.Prime);
+            string breakdown = "";
+            if (choice > 0) breakdown += "  ★ " + choice;
+            if (prime > 0) breakdown += "  ★★ " + prime;
+
+            _contextTitle.text = resource.DisplayName + " — " + have + " шт." + breakdown;
             _contextItems.Clear();
 
             if (resource.SellPrice <= 0)
@@ -722,6 +730,12 @@ namespace Farm.UI
                 AddSellOption(shop, resource, 1, have);
                 AddSellOption(shop, resource, 10, have);
                 AddSellOption(shop, resource, have, have, "Продать всё");
+
+                // Отдельные строки для сортов: без них «продать 10» всегда уносило бы
+                // сперва обычное, и добраться до надбавки за уход можно было бы только
+                // распродав склад до дна.
+                AddGradeOption(shop, resource, ResourceGrade.Choice, choice);
+                AddGradeOption(shop, resource, ResourceGrade.Prime, prime);
             }
 
             _contextMenu.style.display = DisplayStyle.Flex;
@@ -735,16 +749,55 @@ namespace Farm.UI
             if (amount <= 0) return;
 
             int actual = Mathf.Min(amount, have);
-            string label = (caption ?? ("Продать " + amount)) + "   +" + shop.SellValue(resource, actual) + " зол.";
 
-            var button = new Button(() =>
+            // Цена — предпросмотром по тому же порядку сортов, каким пойдёт продажа:
+            // считать по обычному значило бы обещать меньше, чем кнопка на самом деле даст.
+            string label = (caption ?? ("Продать " + amount)) +
+                           "   +" + shop.PreviewSell(resource, actual) + " зол.";
+
+            // Роса — валюта расширения земли, добываемая только ночью: продажа за монеты
+            // по незнанию — ловушка, из которой ночами выбираться. Первый клик переспрашивает,
+            // второй продаёт; остальным ресурсам переспрос был бы шумом.
+            bool needsConfirm = FarmLevels.DewResource == resource;
+            bool armed = false;
+
+            Button button = null;
+            button = new Button(() =>
             {
+                if (needsConfirm && !armed)
+                {
+                    armed = true;
+                    button.text = "точно? роса нужна для расширения";
+                    return;
+                }
                 shop.TrySell(resource, actual);
                 CloseSellMenu();
             }) { text = label };
 
             button.AddToClassList("ctx__item");
             button.SetEnabled(actual > 0 && actual <= have);
+            _contextItems.Add(button);
+        }
+
+        /// <summary>
+        /// Строка «продать весь сорт». Появляется, только когда сорт есть: пустая строка
+        /// «Продать отборное — 0» рассказывала бы про механику вместо того, чтобы служить.
+        /// </summary>
+        private void AddGradeOption(Shop shop, ResourceDefinition resource, ResourceGrade grade, int have)
+        {
+            if (have <= 0) return;
+
+            var button = new Button(() =>
+            {
+                shop.TrySell(resource, have, grade);
+                CloseSellMenu();
+            })
+            {
+                text = "Продать " + ResourceGrades.Mark(grade) + " " + have +
+                       "   +" + shop.SellValue(resource, have, grade) + " зол."
+            };
+
+            button.AddToClassList("ctx__item");
             _contextItems.Add(button);
         }
 
@@ -881,12 +934,9 @@ namespace Farm.UI
             // а текст, постоянно висящий над персонажем, перестают замечать.
             if (_farmerThought != null) _farmerThought.text = _farmer.Thought;
 
-            if (_needs != null)
-            {
-                SetMeter(_satietyFill, _satietyLabel, "Сытость", _needs.Satiety01, _needs.IsHungry);
-                SetMeter(_hydrationFill, _hydrationLabel, "Вода", _needs.Hydration01, _needs.IsThirsty);
-                SetMeter(_energyFill, _energyLabel, "Бодрость", _needs.Energy01, _needs.IsTired);
-            }
+            // Нужды (сытость, вода, бодрость) больше не показываются: жителей много, и быт
+            // — их дело, не задача игрока (решение владельца 07.08.2026). Механика цела:
+            // житель ходит есть, пить и спать, а ПОВЕДЕНИЕ объясняют состояние и мысль выше.
 
             var inv = _farmer.Inventory;
             if (inv == null) return;
@@ -961,22 +1011,66 @@ namespace Farm.UI
                                        + _farmer.RoleWagePerDay + " зол.";
             }
 
+            if (_restockButton != null)
+            {
+                // Кнопка есть только у того, кто вообще может покупать: у ролевых жителей
+                // (мастеровой, возчик, сторож, строитель) закупки нет, и тумблер обещал бы
+                // выбор, которого не существует.
+                bool buys = _farmer.Role == ResidentRole.None;
+                _restockButton.style.display = buys ? DisplayStyle.Flex : DisplayStyle.None;
+
+                if (buys)
+                {
+                    // Текст называет нынешнее состояние, а не действие: «Покупки: разрешены»
+                    // читается с одного взгляда, а «Запретить покупки» заставляет догадываться,
+                    // как оно сейчас.
+                    _restockButton.text = _farmer.MayRestock
+                        ? "Покупки: разрешены — тратит своё золото"
+                        : "Покупки: запрещены — копит для тебя";
+                    _restockButton.EnableInClassList("btn--accent", _farmer.MayRestock);
+                }
+            }
+
             RefreshWageSummary();
+        }
+
+        /// <summary>
+        /// Разрешить или запретить жителю тратить золото фермы на грядки и живность.
+        /// <para>
+        /// Кнопка заведена по просьбе владельца: житель покупал сам, и игрок, увидев
+        /// просевшее золото, читал это как пропажу. Механику не убрали — дали выключатель:
+        /// «ферма растёт сама» и «моё золото не трогают» — оба законные ожидания.
+        /// </para>
+        /// </summary>
+        private void OnRestockClicked()
+        {
+            if (_farmer == null) return;
+
+            _farmer.MayRestock = !_farmer.MayRestock;
+
+            Farm.Juice.Sfx.Play(b => _farmer.MayRestock ? b.UiOpen : b.UiClose);
+
+            RefreshFarmer();
+
+            // Немедленного сейва отсюда нет: сохранение живёт в сборке Farm.Game, которую
+            // интерфейс не видит, — и это правильнее, чем ссылка ради одной строки.
+            // Флаг уедет ближайшим автосейвом; цена потери — один переключённый тумблер.
         }
 
         private void OnHireClicked()
         {
             if (_farmer == null) return;
 
-            if (_farmer.TryHire(86400.0, _farmer.RoleWagePerDay))
+            if (_farmer.TryHire(86400.0, _farmer.RoleWagePerDay, out string refusal))
             {
                 Punch(_farmerHire, 0.25f);
                 Farm.Juice.Sfx.Play(b => b.UiOpen);
             }
             else
             {
-                // Отказ обязан быть заметным: строка называет и причину, и цену.
-                _hireMessage = "не хватает золота — жалование " + _farmer.RoleWagePerDay + " зол.";
+                // Отказ обязан быть заметным, а причину знает система: раньше UI гадал
+                // «не хватает золота» на любой false — и соврал бы про гостевой отказ.
+                _hireMessage = refusal;
                 _hireMessageTimer = 2.5f;
                 Farm.Juice.Sfx.Play(b => b.UiClose);
             }
@@ -1019,7 +1113,9 @@ namespace Farm.UI
         private void RefreshFarmLevel()
         {
             if (_farmLevel != null)
-                _farmLevel.text = "Ферма: уровень " + FarmLevels.Current + " из " + FarmLevels.MaxLevel;
+                // «Ступень», не «уровень»: шкал с именем «уровень» в игре пять, и земля
+                // зовётся ступенью во всех новых текстах (приезд жителей, вехи, отказы).
+                _farmLevel.text = "Ферма: ступень " + FarmLevels.Current + " из " + FarmLevels.MaxLevel;
 
             // В гостях кнопки нет вовсе: чужую ферму не расширяют, и предлагать это — врать.
             bool canBuy = !GuestMode.IsGuest && !FarmLevels.IsMax;

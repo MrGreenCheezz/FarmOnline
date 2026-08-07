@@ -107,6 +107,17 @@ namespace Farm.Game
                 }
 
                 NetSession.FarmRev = farm.Value.rev;
+
+                // Конфликт ревизий разрешён: мы только что взяли СВЕЖИЙ снимок и его rev —
+                // дальше наши PUT честны. Держать замок до перезапуска значило бы держать
+                // рынок и подарки закрытыми уже после того, как игрок сам съездил домой
+                // за правдой (аудит 06.08.2026).
+                if (NetSession.PutBlocked)
+                {
+                    NetSession.PutBlocked = false;
+                    NetStatus.Set("свежая версия фермы получена — сохранения снова идут");
+                }
+
                 double offline = Math.Max(0.0, farm.Value.serverNow - farm.Value.savedAt);
                 GameFlow.StartFarm(new PendingLoad { Data = data, OfflineSeconds = offline, Source = "сервер" });
             }

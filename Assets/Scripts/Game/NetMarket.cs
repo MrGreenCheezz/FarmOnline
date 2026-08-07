@@ -22,6 +22,10 @@ namespace Farm.Game
     /// </summary>
     public static class NetMarket
     {
+        /// <summary>Потолок штук в одном лоте — зеркалит MARKET_MAX_AMOUNT сервера.
+        /// Кнопка «Всё ×N» клампится им: предлагать невозможное — получать bad_amount.</summary>
+        public const int MaxLotAmount = 500;
+
         /// <summary>Сделка прошла — окно перечитывает список лотов.</summary>
         public static event Action Changed;
 
@@ -59,9 +63,16 @@ namespace Farm.Game
             var storage = FarmingRuntime.Sink as Inventory;
             if (storage == null) return;
 
-            if (storage.GetAmount(resource) < amount)
+            // Рынок торгует только обычным сортом (решение владельца об охвате, 07.08.2026):
+            // цена лота фиксирована сервером от каталога, а каталог сортов не знает, и
+            // отборное ушло бы туда по цене обычного — тихая потеря надбавки за уход.
+            // Поэтому и проверка, и списание идут по обычному, а отказ называет причину.
+            int plain = storage.GetAmount(resource, ResourceGrade.Common);
+            if (plain < amount)
             {
-                Refuse("на складе нет столько: " + resource.DisplayName);
+                Refuse(storage.GetAmount(resource) >= amount
+                    ? "на рынок идёт только обычный сорт — отборное дороже возьмут в лавке"
+                    : "на складе нет столько: " + resource.DisplayName);
                 return;
             }
 
@@ -75,8 +86,10 @@ namespace Farm.Game
             }
 
             // Сервер принял — теперь можно снимать. Снятие после ok не может не сойтись:
-            // количество мы проверили, а склад в одном потоке с нами.
-            storage.TryRemove(resource, amount);
+            // количество мы проверили, а склад в одном потоке с нами. Сорт назван явно —
+            // иначе общий TryRemove добрал бы недостачу отборным, которое сюда не идёт.
+            storage.TryRemove(resource, amount, ResourceGrade.Common);
+            FarmProgress.NoteMarketLot();
             SaveRunner.SaveIfPossible("лот выставлен");
 
             NetStatus.Set("лот выставлен: " + amount + " × " + resource.DisplayName
@@ -119,13 +132,19 @@ namespace Farm.Game
             // не шлёт — этот ответ и есть его единственная накладная.
             wallet.TrySpend(res.Value.gold);
 
+            // Самовыкуп: продавцовая доля возвращается тем же ответом, итоговая цена
+            // отмены — ровно спред (событие «на рынке купили…» себе не приезжает).
+            if (res.Value.refund > 0) wallet.Add(res.Value.refund);
+
             if (resource != null && res.Value.amount > 0)
                 AddWithOverflow(resource, res.Value.amount);
 
             SaveRunner.SaveIfPossible("покупка на рынке");
 
-            NetStatus.Set("куплено: " + res.Value.amount + " × "
-                          + (resource != null ? resource.DisplayName : res.Value.resourceId));
+            NetStatus.Set(res.Value.refund > 0
+                ? "лот выкуплен обратно — отмена стоила " + (res.Value.gold - res.Value.refund) + " зол. спреда"
+                : "куплено: " + res.Value.amount + " × "
+                  + (resource != null ? resource.DisplayName : res.Value.resourceId));
             Raise(Changed);
         }
 
@@ -150,9 +169,10 @@ namespace Farm.Game
             {
                 case "too_many_lots": return "лотов уже " + 6 + " — дождись покупателей";
                 case "not_in_snapshot": return "сервер ещё не видел этот запас — подожди сохранения";
-                case "daily_limit": return "дневной оборот рынка исчерпан";
+                case "daily_limit": return "дневной оборот рынка исчерпан — завтра";
                 case "no_catalog": return "рынок закрыт: на сервере нет каталога цен";
                 case "bad_resource": return "это не продаётся на рынке";
+                case "bad_amount": return "не больше " + MaxLotAmount + " штук в одном лоте";
                 default: return "лот не принят: " + (code ?? "нет ответа");
             }
         }

@@ -34,7 +34,13 @@ namespace Farm.Farming
         /// <summary>Множитель скорости мастерской или надбавка рынка на текущем уровне.</summary>
         public float Output => _definition != null ? _definition.OutputAt(_level) : 0f;
 
-        private void OnEnable() => BuildingRegistry.Register(this);
+        private void OnEnable()
+        {
+            // Постройка со сцены определение уже несёт (сериализовано), а созданная кодом
+            // получит его в Configure — там тот же оклик. Обе двери в мир закрыты одним правилом.
+            EnsureWorkshop();
+            BuildingRegistry.Register(this);
+        }
         private void OnDisable() => BuildingRegistry.Unregister(this);
 
         internal int RegistryIndex = -1;
@@ -42,7 +48,16 @@ namespace Farm.Farming
         public void Configure(BuildingDefinition definition, int level = 1)
         {
             _definition = definition;
-            _level = Mathf.Max(1, level);
+
+            // Кламп сверху — снисходительность к сейву: контент вправе укоротить лестницу
+            // уровней (так случилось с пугалом), и сохранённый уровень выше новой лестницы
+            // должен сесть на её вершину, а не водить GetLevel за границу массива.
+            int ceiling = definition != null && definition.MaxLevel > 0 ? definition.MaxLevel : int.MaxValue;
+            _level = Mathf.Clamp(Mathf.Max(1, level), 1, ceiling);
+            if (_level < level)
+                Debug.Log($"[Сейв] {definition?.DisplayName}: уровень {level} из сейва выше лестницы, оставлен {_level}.");
+
+            EnsureWorkshop();
 
             // Компонент регистрируется в OnEnable, то есть ещё пустым: Instantiate + AddComponent
             // происходят раньше, чем сюда попадают данные. Без этого оклика только что купленный
@@ -51,11 +66,27 @@ namespace Farm.Farming
             BuildingRegistry.NotifyChanged();
         }
 
+        /// <summary>
+        /// Дать постройке станок, если её определению есть что перерабатывать. Здесь, а не только
+        /// у покупки и у загрузки: постройки приходят на ферму тремя путями (стройплощадка, сейв,
+        /// сцена), и правило, живущее в двух из трёх, — это стартовая кухня, которая не печёт,
+        /// пока партию не перезагрузят.
+        /// </summary>
+        private void EnsureWorkshop()
+        {
+            if (_definition == null || !_definition.HasRecipes) return;
+            if (GetComponent<Workshop>() == null) gameObject.AddComponent<Workshop>();
+        }
+
         // ---- улучшение ----
 
         public bool CanUpgrade(out string reason)
         {
             reason = null;
+
+            // Правило в системе, не в интерфейсе: панель постройки в гостях недостижима
+            // сегодня, но чужое золото обязано быть закрыто и от завтрашних путей нажать.
+            if (GuestMode.IsGuest) { reason = "в гостях не строят — это чужая ферма"; return false; }
 
             if (_definition == null) { reason = "нет данных постройки"; return false; }
             if (IsMaxLevel) { reason = "максимальный уровень"; return false; }

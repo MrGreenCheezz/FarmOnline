@@ -23,6 +23,12 @@ namespace Farm.Farming
         /// <summary>За слияние. Пульс главной механики.</summary>
         public const int PerMerge = 4;
 
+        /// <summary>
+        /// За переход ступени слиянием — умноженное на НОВУЮ ступень. Событие на порядки
+        /// реже рядового слияния (сорок вложенных грядок), и опыт обязан это признавать.
+        /// </summary>
+        public const int PerAscendPerTier = 10;
+
         /// <summary>За полив или подкормку.</summary>
         public const int PerCare = 1;
 
@@ -121,6 +127,14 @@ namespace Farm.Farming
 
         private static void OnMerged(Growable survivor, Growable absorbed) => Add(PerMerge);
 
+        private static void OnTierAscended(Growable survivor, GrowableDefinition from)
+        {
+            int tier = survivor != null && survivor.Definition != null && survivor.Definition.YieldResource != null
+                ? survivor.Definition.YieldResource.Tier
+                : 1;
+            Add(PerAscendPerTier * Mathf.Max(1, tier));
+        }
+
         private static void OnCared(Growable plot) => Add(PerCare);
 
         private static void Raise(Action handler)
@@ -148,11 +162,17 @@ namespace Farm.Farming
             FarmingEvents.Harvested += OnHarvested;
             FarmingEvents.Merged -= OnMerged;
             FarmingEvents.Merged += OnMerged;
+            FarmingEvents.TierAscended -= OnTierAscended;
+            FarmingEvents.TierAscended += OnTierAscended;
 
             FarmWater.Poured -= OnCared;
             FarmWater.Poured += OnCared;
             FarmFertilizer.Applied -= OnCared;
             FarmFertilizer.Applied += OnCared;
+            // Корм — такой же уход, как полив и подкормка: ждать его столько же, а опыта
+            // не давать значило бы сказать «уход за скотиной не считается».
+            FarmFeed.Fed -= OnCared;
+            FarmFeed.Fed += OnCared;
         }
     }
 }

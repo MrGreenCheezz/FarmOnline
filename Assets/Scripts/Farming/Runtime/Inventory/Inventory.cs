@@ -10,6 +10,12 @@ namespace Farm.Farming
     {
         public string ResourceId;
         public int Amount;
+
+        /// <summary>
+        /// Сорт стопки. Поля не было до 07.08.2026, и его отсутствие читается как «обычный» —
+        /// весь урожай старых партий таким и был.
+        /// </summary>
+        public int Grade;
     }
 
     /// <summary>
@@ -137,9 +143,21 @@ namespace Farm.Farming
 
         // ---- чтение ----
 
+        /// <summary>Сколько лежит всего, всех сортов.</summary>
         public int GetAmount(ResourceDefinition resource)
         {
-            int i = IndexOf(resource);
+            if (resource == null) return 0;
+
+            int total = 0;
+            for (int i = 0; i < _entries.Count; i++)
+                if (_entries[i].Resource == resource) total += _entries[i].Amount;
+
+            return total;
+        }
+
+        public int GetAmount(ResourceDefinition resource, ResourceGrade grade)
+        {
+            int i = IndexOf(resource, grade);
             return i >= 0 ? _entries[i].Amount : 0;
         }
 
@@ -151,20 +169,23 @@ namespace Farm.Farming
         /// <summary>Вход <see cref="IResourceSink"/>. О переполнении сообщает через <see cref="Rejected"/>.</summary>
         public void Add(ResourceDefinition resource, int amount) => TryAdd(resource, amount);
 
-        public int TryAdd(ResourceDefinition resource, int amount)
+        public int TryAdd(ResourceDefinition resource, int amount) =>
+            TryAdd(resource, amount, ResourceGrade.Common);
+
+        public int TryAdd(ResourceDefinition resource, int amount, ResourceGrade grade)
         {
             if (resource == null || amount <= 0) return 0;
 
-            int accepted = AllowOverflow ? amount : Mathf.Min(amount, FreeUnitsFor(resource));
+            int accepted = AllowOverflow ? amount : Mathf.Min(amount, FreeUnitsFor(resource, grade));
             if (accepted <= 0)
             {
                 Raise(Rejected, resource, amount);
                 return 0;
             }
 
-            int i = IndexOf(resource);
+            int i = IndexOf(resource, grade);
             if (i >= 0) _entries[i] = _entries[i].WithAmount(_entries[i].Amount + accepted);
-            else _entries.Add(new InventoryEntry(resource, accepted));
+            else _entries.Add(new InventoryEntry(resource, accepted, grade));
 
             TotalUnits += accepted;
 
@@ -174,11 +195,34 @@ namespace Farm.Farming
             return accepted;
         }
 
+        /// <summary>
+        /// Забрать, начиная с обычного сорта: дешёвое расходуется первым, ценное остаётся
+        /// игроку. Это правило и есть защита сорта — без него станок, кухня и заказ съедали
+        /// бы призовое просто потому, что оно лежит в том же списке.
+        /// </summary>
         public int TryRemove(ResourceDefinition resource, int amount)
+        {
+            if (resource == null || amount <= 0) return 0;
+
+            int left = amount;
+            int removed = 0;
+
+            var order = ResourceGrades.All;
+            for (int g = 0; g < order.Length && left > 0; g++)
+            {
+                int taken = TryRemove(resource, left, order[g]);
+                removed += taken;
+                left -= taken;
+            }
+
+            return removed;
+        }
+
+        public int TryRemove(ResourceDefinition resource, int amount, ResourceGrade grade)
         {
             if (amount <= 0) return 0;
 
-            int i = IndexOf(resource);
+            int i = IndexOf(resource, grade);
             if (i < 0) return 0;
 
             int removed = Mathf.Min(amount, _entries[i].Amount);
@@ -217,7 +261,10 @@ namespace Farm.Farming
             for (int i = _entries.Count - 1; i >= 0; i--)
             {
                 var entry = _entries[i];
-                int accepted = target.TryAdd(entry.Resource, entry.Amount);
+
+                // С сортом: рюкзак фермера — единственная остановка урожая по дороге к складу,
+                // и потеря сорта здесь обнулила бы весь уход одной строкой.
+                int accepted = target.TryAdd(entry.Resource, entry.Amount, entry.Grade);
                 if (accepted <= 0) continue;
 
                 moved += accepted;
@@ -253,7 +300,8 @@ namespace Farm.Farming
                 snapshot.Entries[i] = new InventorySnapshotEntry
                 {
                     ResourceId = _entries[i].Resource != null ? _entries[i].Resource.Id : null,
-                    Amount = _entries[i].Amount
+                    Amount = _entries[i].Amount,
+                    Grade = (int)_entries[i].Grade
                 };
             }
 
@@ -282,7 +330,10 @@ namespace Farm.Farming
                     continue;
                 }
 
-                TryAdd(resource, e.Amount);
+                // Сорт из сейва зажимаем в известные: чужой номер (сейв новее кода) должен
+                // лечь обычным товаром, а не потерять стопку целиком.
+                var grade = (ResourceGrade)Mathf.Clamp(e.Grade, 0, ResourceGrades.All.Length - 1);
+                TryAdd(resource, e.Amount, grade);
             }
         }
 
@@ -291,7 +342,14 @@ namespace Farm.Farming
         /// мозг фермера спрашивает это перед доставкой — нести урожай на склад, который
         /// его не возьмёт, значит уничтожить урожай и соврать игроку об успехе.
         /// </summary>
-        public int FreeUnitsFor(ResourceDefinition resource)
+        public int FreeUnitsFor(ResourceDefinition resource) =>
+            FreeUnitsFor(resource, ResourceGrade.Common);
+
+        /// <summary>
+        /// Сколько единиц этого сорта склад ещё примет. Сорт важен и здесь: стопки разных
+        /// сортов не смешиваются, поэтому недобитый стек отборного места обычному не даёт.
+        /// </summary>
+        public int FreeUnitsFor(ResourceDefinition resource, ResourceGrade grade)
         {
             switch (CapacityMode)
             {
@@ -301,9 +359,9 @@ namespace Farm.Farming
                 {
                     long units = FreeSlotUnits();
 
-                    // Верхний стек этого ресурса мог остаться недобитым — в него ещё влезет,
+                    // Верхний стек этой стопки мог остаться недобитым — в него ещё влезет,
                     // и это единственное, что отличает «место для него» от «места вообще».
-                    int tail = GetAmount(resource) % _stackSize;
+                    int tail = GetAmount(resource, grade) % _stackSize;
                     if (tail > 0) units += _stackSize - tail;
 
                     return ClampToInt(units);
@@ -322,11 +380,11 @@ namespace Farm.Farming
 
         private static int ClampToInt(long units) => units >= int.MaxValue ? int.MaxValue : (int)units;
 
-        private int IndexOf(ResourceDefinition resource)
+        private int IndexOf(ResourceDefinition resource, ResourceGrade grade)
         {
             if (resource == null) return -1;
             for (int i = 0; i < _entries.Count; i++)
-                if (_entries[i].Resource == resource) return i;
+                if (_entries[i].Resource == resource && _entries[i].Grade == grade) return i;
             return -1;
         }
 

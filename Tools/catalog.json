@@ -1,5 +1,5 @@
 {
-    "generatedAtUtc": "2026-08-06T12:07:55.7718169Z",
+    "generatedAtUtc": "2026-08-07T09:17:01.9991380Z",
     "resources": [
         {
             "id": "adamant",
@@ -25,6 +25,16 @@
             "id": "beam",
             "tier": 3,
             "sellPrice": 24
+        },
+        {
+            "id": "beam_yew",
+            "tier": 6,
+            "sellPrice": 516
+        },
+        {
+            "id": "bread",
+            "tier": 3,
+            "sellPrice": 28
         },
         {
             "id": "cheese",
@@ -72,6 +82,16 @@
             "sellPrice": 24
         },
         {
+            "id": "firefur",
+            "tier": 6,
+            "sellPrice": 516
+        },
+        {
+            "id": "flour",
+            "tier": 2,
+            "sellPrice": 6
+        },
+        {
             "id": "ginseng",
             "tier": 5,
             "sellPrice": 184
@@ -97,9 +117,19 @@
             "sellPrice": 8
         },
         {
+            "id": "ingot_gold",
+            "tier": 5,
+            "sellPrice": 184
+        },
+        {
             "id": "ingot_iron",
             "tier": 3,
             "sellPrice": 24
+        },
+        {
+            "id": "ingot_silver",
+            "tier": 4,
+            "sellPrice": 66
         },
         {
             "id": "iron",
@@ -137,6 +167,16 @@
             "sellPrice": 24
         },
         {
+            "id": "moonfang",
+            "tier": 8,
+            "sellPrice": 4048
+        },
+        {
+            "id": "moonroot",
+            "tier": 7,
+            "sellPrice": 1446
+        },
+        {
             "id": "moonstone",
             "tier": 10,
             "sellPrice": 31735
@@ -157,14 +197,29 @@
             "sellPrice": 11334
         },
         {
+            "id": "pie",
+            "tier": 4,
+            "sellPrice": 95
+        },
+        {
             "id": "plank",
             "tier": 2,
             "sellPrice": 8
         },
         {
+            "id": "plank_maple",
+            "tier": 5,
+            "sellPrice": 184
+        },
+        {
             "id": "platinum",
             "tier": 5,
             "sellPrice": 184
+        },
+        {
+            "id": "plume",
+            "tier": 7,
+            "sellPrice": 1446
         },
         {
             "id": "pumpkin",
@@ -177,9 +232,24 @@
             "sellPrice": 24
         },
         {
+            "id": "skyhorn",
+            "tier": 9,
+            "sellPrice": 11334
+        },
+        {
+            "id": "spiritherb",
+            "tier": 9,
+            "sellPrice": 11334
+        },
+        {
             "id": "spiritwood",
             "tier": 8,
             "sellPrice": 4048
+        },
+        {
+            "id": "starclaw",
+            "tier": 12,
+            "sellPrice": 248805
         },
         {
             "id": "starheart",
@@ -192,14 +262,39 @@
             "sellPrice": 4048
         },
         {
+            "id": "starstalk",
+            "tier": 12,
+            "sellPrice": 248805
+        },
+        {
+            "id": "stormberry",
+            "tier": 10,
+            "sellPrice": 31735
+        },
+        {
             "id": "stormwood",
             "tier": 11,
             "sellPrice": 88859
         },
         {
+            "id": "sunmane",
+            "tier": 10,
+            "sellPrice": 31735
+        },
+        {
+            "id": "sunroot",
+            "tier": 8,
+            "sellPrice": 4048
+        },
+        {
             "id": "sunwood",
             "tier": 10,
             "sellPrice": 31735
+        },
+        {
+            "id": "titantusk",
+            "tier": 11,
+            "sellPrice": 88859
         },
         {
             "id": "wheat",
@@ -210,6 +305,11 @@
             "id": "wood",
             "tier": 1,
             "sellPrice": 3
+        },
+        {
+            "id": "worldfruit",
+            "tier": 11,
+            "sellPrice": 88859
         },
         {
             "id": "worldtree",
@@ -266,10 +366,31 @@
             "baseYield": 1
         },
         {
+            "id": "elephant",
+            "resourceId": "titantusk",
+            "tier": 11,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
+            "id": "fox",
+            "resourceId": "firefur",
+            "tier": 6,
+            "growSeconds": 18000.0,
+            "baseYield": 1
+        },
+        {
             "id": "ginseng",
             "resourceId": "ginseng",
             "tier": 5,
             "growSeconds": 10800.0,
+            "baseYield": 1
+        },
+        {
+            "id": "giraffe",
+            "resourceId": "skyhorn",
+            "tier": 9,
+            "growSeconds": 43200.0,
             "baseYield": 1
         },
         {
@@ -280,6 +401,13 @@
             "baseYield": 1
         },
         {
+            "id": "lion",
+            "resourceId": "sunmane",
+            "tier": 10,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
             "id": "melon",
             "resourceId": "melon",
             "tier": 3,
@@ -287,10 +415,31 @@
             "baseYield": 1
         },
         {
+            "id": "moonroot",
+            "resourceId": "moonroot",
+            "tier": 7,
+            "growSeconds": 28800.0,
+            "baseYield": 1
+        },
+        {
+            "id": "parrot",
+            "resourceId": "plume",
+            "tier": 7,
+            "growSeconds": 28800.0,
+            "baseYield": 1
+        },
+        {
             "id": "pig",
             "resourceId": "bacon",
             "tier": 1,
             "growSeconds": 300.0,
+            "baseYield": 1
+        },
+        {
+            "id": "polar",
+            "resourceId": "starclaw",
+            "tier": 12,
+            "growSeconds": 43200.0,
             "baseYield": 1
         },
         {
@@ -312,6 +461,41 @@
             "resourceId": "meat",
             "tier": 1,
             "growSeconds": 300.0,
+            "baseYield": 1
+        },
+        {
+            "id": "spiritherb",
+            "resourceId": "spiritherb",
+            "tier": 9,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
+            "id": "starstalk",
+            "resourceId": "starstalk",
+            "tier": 12,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
+            "id": "stormberry",
+            "resourceId": "stormberry",
+            "tier": 10,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
+            "id": "sunroot",
+            "resourceId": "sunroot",
+            "tier": 8,
+            "growSeconds": 43200.0,
+            "baseYield": 1
+        },
+        {
+            "id": "tiger",
+            "resourceId": "moonfang",
+            "tier": 8,
+            "growSeconds": 43200.0,
             "baseYield": 1
         },
         {
@@ -488,44 +672,203 @@
             "tier": 1,
             "growSeconds": 300.0,
             "baseYield": 3
+        },
+        {
+            "id": "worldfruit",
+            "resourceId": "worldfruit",
+            "tier": 11,
+            "growSeconds": 43200.0,
+            "baseYield": 1
         }
     ],
     "workshops": [
         {
+            "buildingId": "kitchen",
+            "inputs": [
+                {
+                    "id": "flour",
+                    "amount": 2
+                },
+                {
+                    "id": "eggs",
+                    "amount": 1
+                }
+            ],
+            "inputId": "flour",
+            "inputAmount": 2,
+            "outputId": "bread",
+            "outputAmount": 1,
+            "seconds": 9.899999618530274,
+            "maxOutput": 1.0,
+            "unlockLevel": 1
+        },
+        {
+            "buildingId": "kitchen",
+            "inputs": [
+                {
+                    "id": "bread",
+                    "amount": 1
+                },
+                {
+                    "id": "pumpkin",
+                    "amount": 2
+                },
+                {
+                    "id": "honey",
+                    "amount": 1
+                }
+            ],
+            "inputId": "bread",
+            "inputAmount": 1,
+            "outputId": "pie",
+            "outputAmount": 1,
+            "seconds": 16.299999237060548,
+            "maxOutput": 1.0,
+            "unlockLevel": 3
+        },
+        {
             "buildingId": "sawmill",
+            "inputs": [
+                {
+                    "id": "wood",
+                    "amount": 2
+                }
+            ],
             "inputId": "wood",
             "inputAmount": 2,
             "outputId": "plank",
             "outputAmount": 1,
             "seconds": 6.0,
-            "maxOutput": 3.75
+            "maxOutput": 3.75,
+            "unlockLevel": 1
         },
         {
             "buildingId": "sawmill",
+            "inputs": [
+                {
+                    "id": "oak",
+                    "amount": 2
+                }
+            ],
             "inputId": "oak",
             "inputAmount": 2,
             "outputId": "beam",
             "outputAmount": 1,
             "seconds": 9.899999618530274,
-            "maxOutput": 3.75
+            "maxOutput": 3.75,
+            "unlockLevel": 3
+        },
+        {
+            "buildingId": "sawmill",
+            "inputs": [
+                {
+                    "id": "maple",
+                    "amount": 2
+                }
+            ],
+            "inputId": "maple",
+            "inputAmount": 2,
+            "outputId": "plank_maple",
+            "outputAmount": 1,
+            "seconds": 16.299999237060548,
+            "maxOutput": 3.75,
+            "unlockLevel": 4
+        },
+        {
+            "buildingId": "sawmill",
+            "inputs": [
+                {
+                    "id": "yew",
+                    "amount": 2
+                }
+            ],
+            "inputId": "yew",
+            "inputAmount": 2,
+            "outputId": "beam_yew",
+            "outputAmount": 1,
+            "seconds": 27.0,
+            "maxOutput": 3.75,
+            "unlockLevel": 5
         },
         {
             "buildingId": "smelter",
+            "inputs": [
+                {
+                    "id": "copper",
+                    "amount": 2
+                }
+            ],
             "inputId": "copper",
             "inputAmount": 2,
             "outputId": "ingot_copper",
             "outputAmount": 1,
             "seconds": 6.0,
-            "maxOutput": 3.75
+            "maxOutput": 3.75,
+            "unlockLevel": 1
         },
         {
             "buildingId": "smelter",
+            "inputs": [
+                {
+                    "id": "iron",
+                    "amount": 2
+                }
+            ],
             "inputId": "iron",
             "inputAmount": 2,
             "outputId": "ingot_iron",
             "outputAmount": 1,
             "seconds": 9.899999618530274,
-            "maxOutput": 3.75
+            "maxOutput": 3.75,
+            "unlockLevel": 3
+        },
+        {
+            "buildingId": "smelter",
+            "inputs": [
+                {
+                    "id": "silver",
+                    "amount": 2
+                }
+            ],
+            "inputId": "silver",
+            "inputAmount": 2,
+            "outputId": "ingot_silver",
+            "outputAmount": 1,
+            "seconds": 16.299999237060548,
+            "maxOutput": 3.75,
+            "unlockLevel": 4
+        },
+        {
+            "buildingId": "smelter",
+            "inputs": [
+                {
+                    "id": "gold",
+                    "amount": 2
+                }
+            ],
+            "inputId": "gold",
+            "inputAmount": 2,
+            "outputId": "ingot_gold",
+            "outputAmount": 1,
+            "seconds": 27.0,
+            "maxOutput": 3.75,
+            "unlockLevel": 5
+        },
+        {
+            "buildingId": "windmill",
+            "inputs": [
+                {
+                    "id": "wheat",
+                    "amount": 2
+                }
+            ],
+            "inputId": "wheat",
+            "inputAmount": 2,
+            "outputId": "flour",
+            "outputAmount": 1,
+            "seconds": 6.0,
+            "maxOutput": 1.0,
+            "unlockLevel": 1
         }
     ]
 }

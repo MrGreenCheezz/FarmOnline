@@ -35,6 +35,27 @@ namespace Farm.Farming
         /// </summary>
         public static event Action<Growable, Growable> Merged;
 
+        /// <summary>
+        /// Слияние двух грядок 20 уровня переродило выжившую в следующую ступень линии.
+        /// Второй аргумент — прежнее определение. Обычный <see cref="Merged"/> при этом
+        /// НЕ поднимается: у перехода свои текст, звук и опыт, а двойное событие дало бы
+        /// два всплывающих текста друг на друге.
+        /// </summary>
+        public static event Action<Growable, GrowableDefinition> TierAscended;
+
+        /// <summary>
+        /// Игрок бросил грядку на несливаемую пару того же вида (потолок 20, вершина линии).
+        /// Отказ обязан быть слышен — UI показывает причину в точке события.
+        /// </summary>
+        public static event Action<string, Vector3> MergeRefused;
+
+        /// <summary>
+        /// Игрок ткнул пустой рукой в то, что ещё не готово, — грядка отвечает сроком
+        /// («поспеет через 2 ч»). Это не отказ, а ответ на вопрос «когда?»: молчание
+        /// на прямой жест игрок читает как поломку.
+        /// </summary>
+        public static event Action<string, Vector3> Notice;
+
         internal static void RaisePlanted(Growable g) => Safe(Planted, g, nameof(Planted));
         internal static void RaiseReady(Growable g) => Safe(Ready, g, nameof(Ready));
         internal static void RaiseCleared(Growable g) => Safe(Cleared, g, nameof(Cleared));
@@ -61,6 +82,31 @@ namespace Farm.Farming
             if (handler == null) return;
             try { handler(survivor, absorbed); }
             catch (Exception e) { Debug.LogException(e, survivor); }
+        }
+
+        internal static void RaiseTierAscended(Growable survivor, GrowableDefinition from)
+        {
+            var handler = TierAscended;
+            if (handler == null) return;
+            try { handler(survivor, from); }
+            catch (Exception e) { Debug.LogException(e, survivor); }
+        }
+
+        internal static void RaiseMergeRefused(string reason, Vector3 at)
+        {
+            var handler = MergeRefused;
+            if (handler == null || string.IsNullOrEmpty(reason)) return;
+            try { handler(reason, at); }
+            catch (Exception e) { Debug.LogException(e); }
+        }
+
+        /// <summary>Публичное: зовёт слой взаимодействия, он не видит UI напрямую.</summary>
+        public static void RaiseNotice(string text, Vector3 at)
+        {
+            var handler = Notice;
+            if (handler == null || string.IsNullOrEmpty(text)) return;
+            try { handler(text, at); }
+            catch (Exception e) { Debug.LogException(e); }
         }
 
         internal static void RaiseHarvested(Growable g, in HarvestResult result)
@@ -93,6 +139,9 @@ namespace Farm.Farming
             Cleared = null;
             Constructed = null;
             Merged = null;
+            TierAscended = null;
+            MergeRefused = null;
+            Notice = null;
         }
     }
 }

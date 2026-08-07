@@ -82,6 +82,19 @@ namespace Farm.Farming
         /// <summary>Помощь кончилась, а игрок ещё кликает. Отказ обязан быть заметным — UI скажет вслух.</summary>
         public static event Action HelpRefused;
 
+        /// <summary>
+        /// Полив кончился, а игрок кликает по растущей. Своё событие, не HelpRefused:
+        /// лимиты раздельные, и отказ «помощь исчерпана» при счётчике «помощь 0/5»
+        /// на экране читался бы как враньё.
+        /// </summary>
+        public static event Action CareRefused;
+
+        /// <summary>
+        /// Гость кликнул по ночному узлу (светлячки, роса). Ночь принадлежит хозяину
+        /// (правило 2), но молчать по видимому светящемуся объекту нельзя.
+        /// </summary>
+        public static event Action NightRefused;
+
         public static void Enter(int ownerId, string ownerName)
         {
             IsGuest = true;
@@ -103,12 +116,21 @@ namespace Farm.Farming
             Raise(Changed);
         }
 
+        /// <summary>
+        /// Накопитель добрых дел между сценами: гостевая сцена живёт на ЧУЖОМ FarmProgress,
+        /// и инкремент там утонул бы при возвращении домой. PlayerPrefs переживает и
+        /// перезапуск — дом вливает при загрузке (SaveRunner) и обнуляет.
+        /// </summary>
+        public const string PendingHelpKey = "Farm.PendingHelp";
+
         /// <summary>Засчитать помощь и разнести весть. Зовётся ПОСЛЕ удачного сбора.</summary>
         public static void ReportHelp(in HelpReport report)
         {
             if (!IsGuest) return;
 
             HelpUsed++;
+            PlayerPrefs.SetInt(PendingHelpKey, PlayerPrefs.GetInt(PendingHelpKey, 0) + 1);
+            PlayerPrefs.Save(); // WebGL без Save теряет prefs с закрытой вкладкой
             Raise(Changed);
 
             var handler = Helped;
@@ -118,6 +140,10 @@ namespace Farm.Farming
         }
 
         public static void RefuseHelp() => Raise(HelpRefused);
+
+        public static void RefuseCare() => Raise(CareRefused);
+
+        public static void RefuseNight() => Raise(NightRefused);
 
         /// <summary>Засчитать полив в гостях. Зовётся ПОСЛЕ того, как жест принят.</summary>
         public static void ReportCare(in CareReport report)
@@ -154,6 +180,8 @@ namespace Farm.Farming
             Helped = null;
             Cared = null;
             HelpRefused = null;
+            CareRefused = null;
+            NightRefused = null;
         }
     }
 }

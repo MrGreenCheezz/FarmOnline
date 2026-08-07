@@ -18,7 +18,9 @@ namespace Farm.Farming
     {
         [SerializeField] private GrowableDefinition _definition;
 
-        [Tooltip("Уровень слияния. Два уровня N сливаются в один N+1; уровень масштабирует урожай.")]
+        [Tooltip("Уровень слияния — число слитых грядок: при слиянии уровни складываются " +
+                 "(потолок 20), урожай линеен уровню. Две двадцатки перерождаются в следующую " +
+                 "ступень линии уровня 10.")]
         [SerializeField, Min(1)] private int _level = 1;
 
         [Tooltip("Собственный множитель скорости роста этой грядки. Надбавки построек " +
@@ -50,6 +52,9 @@ namespace Farm.Farming
 
         /// <summary>Подкормлена ли в этом цикле. Флагом и по той же причине, что и полив.</summary>
         private bool _fertilized;
+
+        /// <summary>Накормлена ли скотина в этом цикле. Свой флаг, а не общий с подкормкой.</summary>
+        private bool _fed;
 
         /// <summary>
         /// Сколько циклов подряд грядку поливали — память ухода, из которой растёт качество.
@@ -122,7 +127,7 @@ namespace Farm.Farming
         public int Level
         {
             get => _level;
-            set => _level = Mathf.Max(1, value);
+            set => _level = Mathf.Clamp(value, 1, MaxMergeLevel);
         }
 
         /// <summary>
@@ -266,9 +271,62 @@ namespace Farm.Farming
         public int QualityBonus =>
             _careStreak >= PrimeCareStreak ? 2 : _careStreak >= GoodCareStreak ? 1 : 0;
 
+        /// <summary>С какого счёта урожай идёт отборным.</summary>
+        public const int ChoiceGradeStreak = 5;
+
+        /// <summary>С какого — призовым. Это потолок ухоженности: выше подниматься некуда.</summary>
+        public const int PrimeGradeStreak = CareStreakMax;
+
+        /// <summary>
+        /// Каким сортом снимется урожай при нынешней ухоженности.
+        /// <para>
+        /// Пороги выше, чем у <see cref="QualityBonus"/> (2 и 5), нарочно: уход по решению
+        /// владельца даёт всё то же, что и раньше, а сорт идёт сверх — за постоянство.
+        /// Совпади пороги, две награды слились бы в одну ступень, и «отборное» стало бы
+        /// просто вторым именем прибавки в штуках.
+        /// </para>
+        /// <para>
+        /// Свойство, а не поле: сорт считается в момент сбора из живого счёта ухода и
+        /// потому не может разойтись со звёздами, которые видит игрок на плашке.
+        /// </para>
+        /// </summary>
+        public ResourceGrade Grade =>
+            _careStreak >= PrimeGradeStreak ? ResourceGrade.Prime :
+            _careStreak >= ChoiceGradeStreak ? ResourceGrade.Choice :
+            ResourceGrade.Common;
+
         /// <summary>Можно ли подкормить: растёт, не подкормлена — и это растение, как и полив.</summary>
         public bool CanFertilize => _phase == GrowthPhase.Growing && _definition != null && !_fertilized
                                     && Category == ResourceCategory.Crop;
+
+        /// <summary>Накормлено ли животное в текущем цикле.</summary>
+        public bool Fed => _fed;
+
+        /// <summary>
+        /// Можно ли накормить: растёт, ещё не кормлено — и это скотина.
+        /// <para>
+        /// Зеркало <see cref="CanFertilize"/> для другой половины фермы: обещание из
+        /// комментария выше («у скотины будет свой уход, а не позаимствованный у грядок»)
+        /// исполнено 07.08.2026 — свой запас (<see cref="FarmFeed"/>), свой инструмент,
+        /// свой флаг. Категории не пересекаются, поэтому перепутать корм с удобрением
+        /// нельзя: каждый отвечает вслух, что взяли не то.
+        /// </para>
+        /// </summary>
+        public bool CanFeed => _phase == GrowthPhase.Growing && _definition != null && !_fed
+                               && Category == ResourceCategory.Livestock;
+
+        /// <summary>
+        /// Накормить. Как и подкормка — только отметка: сколько добавит, решается на сборе.
+        /// Отдельный флаг, а не общий с удобрением: категории сегодня не пересекаются, но
+        /// одно поле с двумя смыслами не переживёт первой же правки дизайна, а цена
+        /// раздельности — один bool в сейве.
+        /// </summary>
+        public bool TryFeed()
+        {
+            if (!CanFeed) return false;
+            _fed = true;
+            return true;
+        }
 
         /// <summary>
         /// Подкормить. Только отметка: сколько она добавит, решается на сборе — иначе урожай
@@ -360,7 +418,7 @@ namespace Farm.Farming
             }
 
             _definition = definition;
-            _level = Mathf.Max(1, level);
+            _level = Mathf.Clamp(level, 1, MaxMergeLevel);
             StartCycle(0);
         }
 
@@ -384,13 +442,25 @@ namespace Farm.Farming
             // в счёт следующего сбора. Уход — вложение, и платит он со следующего урожая.
             int amount = _definition.YieldFor(_level) + QualityBonus;
 
-            // Подкормка — до аур и целым множителем, а не долей: у почти всех культур базовый
-            // урожай равен единице, и любая дробная надбавка сгорела бы в округлении ниже.
-            if (_fertilized) amount *= FarmFertilizer.YieldMultiplier;
+            // Сорт — из того же счёта и тем же правилом «по прошлым циклам»: снимок берётся
+            // ДО того, как ниже счёт сдвинется за нынешний цикл, иначе последний полив
+            // платил бы дважды — и штуками, и сортом.
+            var grade = Grade;
 
-            // Политый цикл растит счёт, брошенный — снимает одну отметку, а не всё: серия
-            // из недели ухода не должна сгорать за один пропущенный вечер.
-            _careStreak = _watered
+            // Подкормка и корм — до аур и целым множителем, а не долей: у почти всех культур
+            // базовый урожай равен единице, и любая дробная надбавка сгорела бы в округлении.
+            // Сложиться они не могут: удобрение — растениям, корм — скотине (CanFertilize
+            // и CanFeed требуют разных категорий), поэтому множитель всегда ровно один.
+            if (_fertilized) amount *= FarmFertilizer.YieldMultiplier;
+            else if (_fed) amount *= FarmFeed.YieldMultiplier;
+
+            // Ухоженный цикл растит счёт, брошенный — снимает одну отметку, а не всё: серия
+            // из недели ухода не должна сгорать за один пропущенный вечер. Для растений
+            // ухоженность — полив, для скотины — корм: поливать её нельзя, и без этой ветки
+            // половина фермы была бы навсегда выключена из системы качества (звезда на плашке
+            // не появилась бы никогда — молча, что игрок прочёл бы как поломку).
+            bool tended = Category == ResourceCategory.Livestock ? _fed : _watered;
+            _careStreak = tended
                 ? Mathf.Min(CareStreakMax, _careStreak + 1)
                 : Mathf.Max(0, _careStreak - 1);
 
@@ -400,9 +470,14 @@ namespace Farm.Farming
             float yieldBuff = FarmBuffs.HarvestYieldAt(transform.position, Category);
             if (yieldBuff > 1f) amount = Mathf.Max(amount, Mathf.RoundToInt(amount * yieldBuff));
 
-            result = new HarvestResult(this, _definition.YieldResource, amount, _level);
+            result = new HarvestResult(this, _definition.YieldResource, amount, _level, grade);
 
-            (into ?? FarmingRuntime.Sink).Add(result.Resource, result.Amount);
+            // Сорт доезжает до склада только через IInventory: простой сток (отладочный,
+            // безлимитный) сортов не различает, и требовать их от него значило бы тащить
+            // сорт в интерфейс, которому он не нужен.
+            var sink = into ?? FarmingRuntime.Sink;
+            if (sink is IInventory inventory) inventory.TryAdd(result.Resource, result.Amount, grade);
+            else sink.Add(result.Resource, result.Amount);
 
             GrowableRegistry.SetReady(this, false);
             Raise(Harvested, result);
@@ -426,36 +501,109 @@ namespace Farm.Farming
         }
 
         /// <summary>
-        /// Можно ли слить <paramref name="other"/> в эту грядку? Та же культура, тот же уровень,
-        /// обе реально посажены — правило, на котором держится вся прогрессия, поэтому оно
-        /// живёт здесь, а не в том, что в данный момент таскает объекты.
+        /// Потолок уровня слияния. Две грядки потолка перерождаются в следующую ступень
+        /// линии (<see cref="GrowableDefinition.MergeNext"/>) уровня <see cref="AscendLevel"/> —
+        /// решение владельца 06.08.2026: слияние и есть «необязательный путь к дорогим видам».
+        /// </summary>
+        public const int MaxMergeLevel = 20;
+
+        /// <summary>С какого уровня начинает жить грядка после перехода ступени.</summary>
+        public const int AscendLevel = 10;
+
+        /// <summary>
+        /// Можно ли слить <paramref name="other"/> в эту грядку? Та же культура, обе реально
+        /// посажены, уровни складываются (правило «суммой»): сумма не выше потолка — обычное
+        /// слияние; двум ровно-потолочным открыт переход ступени. Правило, на котором держится
+        /// вся прогрессия, поэтому оно живёт здесь, а не в том, что таскает объекты.
         /// </summary>
         public bool CanMergeWith(Growable other)
         {
             if (other == null || other == this) return false;
             if (_definition == null || other._definition != _definition) return false;
-            if (_level != other._level) return false;
-            return _phase != GrowthPhase.Empty && other._phase != GrowthPhase.Empty;
+            if (_phase == GrowthPhase.Empty || other._phase == GrowthPhase.Empty) return false;
+
+            if (_level + other._level <= MaxMergeLevel) return true;
+            return IsAscension(other);
+        }
+
+        /// <summary>Это слияние — переход ступени (обе на потолке и линия продолжается)?</summary>
+        // StageCount тоже проверяется: Plant с битым определением выходит, не сменив вида,
+        // а донор к тому моменту уже уничтожен — битая связка обязана честно читаться вершиной.
+        private bool IsAscension(Growable other) =>
+            _level == MaxMergeLevel && other._level == MaxMergeLevel &&
+            _definition.MergeNext != null && _definition.MergeNext.StageCount > 0;
+
+        /// <summary>
+        /// Почему <paramref name="dragged"/> не сливается сюда, хотя вид тот же, — или null,
+        /// если сливается. Отказ обязан быть слышен: молчание при дропе на «почти пару»
+        /// читается как поломка, а не как правило.
+        /// </summary>
+        public string MergeRefusal(Growable dragged)
+        {
+            if (dragged == null || dragged == this) return null;
+            if (_definition == null || dragged._definition != _definition) return null;
+            if (_phase == GrowthPhase.Empty || dragged._phase == GrowthPhase.Empty) return null;
+            if (CanMergeWith(dragged)) return null;
+
+            if (_level == MaxMergeLevel && dragged._level == MaxMergeLevel)
+                return "дальше некуда — вершина линии";
+            return "вместе выйдет " + (_level + dragged._level) + " — потолок " + MaxMergeLevel;
+        }
+
+        /// <summary>Поднять отказ слияния вслух (шину слушает UI). Зовёт тот, кто принял дроп.</summary>
+        public void RefuseMergeAloud(Growable dragged)
+        {
+            string reason = MergeRefusal(dragged);
+            if (reason != null)
+                FarmingEvents.RaiseMergeRefused(reason, transform.position);
         }
 
         /// <summary>
-        /// Поглотить <paramref name="other"/>: эта грядка растёт на уровень, вторая уничтожается.
+        /// Поглотить <paramref name="other"/>: уровни складываются, вторая уничтожается.
+        /// Две грядки потолка перерождаются в следующую ступень линии.
         /// <para>
-        /// Прогресс роста намеренно сохраняется, а не сбрасывается. Слияние задумано как чистый
-        /// выигрыш — брать за него плату в виде нового цикла роста значило бы превратить главное
-        /// действие игры в откат. Если балансу позже понадобится цена, менять нужно ровно тут.
+        /// Прогресс роста при обычном слиянии намеренно сохраняется, а не сбрасывается:
+        /// слияние задумано как чистый выигрыш — плата новым циклом превратила бы главное
+        /// действие игры в откат. Переход ступени цикл начинает заново: это уже новый посев.
         /// </para>
         /// </summary>
         public bool TryMergeWith(Growable other)
         {
             if (!CanMergeWith(other)) return false;
 
-            _level++;
-
-            // Ухоженность переживает слияние лучшей из двух: сливая выхоженную грядку
-            // с запущенной, игрок не теряет вложенный уход — иначе слияние и уход спорили бы
-            // друг с другом, а они обязаны складываться.
+            // Ухоженность переживает и слияние, и переход — лучшей из двух: сливая выхоженную
+            // грядку с запущенной, игрок не теряет вложенный уход. Иначе слияние и уход
+            // спорили бы друг с другом, а они обязаны складываться.
             _careStreak = Mathf.Max(_careStreak, other._careStreak);
+
+            if (IsAscension(other))
+            {
+                var from = _definition;
+                // С обеих грядок: подкормлен (или накормлен) мог быть и донор, а его отметка
+                // оплачена тем же дефицитным запасом, что и наша.
+                bool wasFertilized = _fertilized || other._fertilized;
+                bool wasFed = _fed || other._fed;
+
+                other.Clear();
+                Destroy(other.gameObject);
+
+                // Ворота уровня магазина здесь НЕ проверяются намеренно: переход даёт вид,
+                // до которого игрок магазином мог ещё не дорасти, — это и есть обещанный
+                // «необязательный путь к дорогим видам» (ONLINE.md, решения владельца).
+                //
+                // Uid не трогаем: для событий друзей это та же грядка, лишь пересаженная.
+                // Plant → StartCycle честно даёт новый CycleId и снимает полив/подкормку;
+                // подкормку возвращаем — игрок платил за неё дефицитным запасом, и сгорание
+                // на переходе читалось бы как кража, а не как правило.
+                Plant(_definition.MergeNext, AscendLevel);
+                _fertilized = wasFertilized;
+                _fed = wasFed;
+
+                FarmingEvents.RaiseTierAscended(this, from);
+                return true;
+            }
+
+            _level = Mathf.Min(MaxMergeLevel, _level + other._level);
 
             Raise(Merged, other);
             FarmingEvents.RaiseMerged(this, other);
@@ -503,10 +651,11 @@ namespace Farm.Farming
         /// <see cref="RestoreState"/>: секунды роста полив уже отдал — в сейве лежит их сумма,
         /// — и восстанавливать надо не эффект, а только запрет полить второй раз за цикл.
         /// </summary>
-        public void RestoreCare(bool watered, bool fertilized, int careStreak, int cycleId)
+        public void RestoreCare(bool watered, bool fertilized, int careStreak, int cycleId, bool fed = false)
         {
             _watered = watered;
             _fertilized = fertilized;
+            _fed = fed;
             _careStreak = Mathf.Clamp(careStreak, 0, CareStreakMax);
 
             // Восстановление проходит через StartCycle и уже накрутило счётчик — возвращаем
@@ -537,7 +686,8 @@ namespace Farm.Farming
             if (!string.IsNullOrEmpty(uid)) _uid = uid;
 
             _definition = definition;
-            _level = Mathf.Max(1, level);
+            // Кламп сверху — снисходительность к сейву: потолок 20 моложе живых партий.
+            _level = Mathf.Clamp(level, 1, MaxMergeLevel);
 
             _ownGrowthSpeed = Mathf.Max(0.01f, ownGrowthSpeed);
             _ownSpeedCaptured = true;
@@ -606,6 +756,7 @@ namespace Farm.Farming
             // уход превратился бы в постоянную прибавку, которую никто не покупал.
             _watered = false;
             _fertilized = false;
+            _fed = false;
             _cycleId++;
 
             // Перебазируем таймстамп так, чтобы «прошло» уже покрывало пропускаемые стадии.

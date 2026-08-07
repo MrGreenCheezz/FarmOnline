@@ -315,15 +315,29 @@ namespace Farm.UI
 
         // ---- отрисовка ----
 
+        private bool _rebuilding;
+
         private void Rebuild()
         {
             if (_list == null) return;
 
-            _list.Clear();
-            RefreshNote();
+            // Страж реентерабельности: Board() внутри BuildOrders может поднять Changed
+            // (смена окна поймана при открытой панели) → вложенный Rebuild задваивал бы
+            // карточки. Вложенный вызов гасится — внешний дорисует уже свежую доску.
+            if (_rebuilding) return;
+            _rebuilding = true;
+            try
+            {
+                _list.Clear();
+                RefreshNote();
 
-            if (_active == Tab.Orders) BuildOrders();
-            else BuildGoals();
+                if (_active == Tab.Orders) BuildOrders();
+                else BuildGoals();
+            }
+            finally
+            {
+                _rebuilding = false;
+            }
         }
 
         /// <summary>Строка над списком: у заказов — срок доски, у успехов — счёт взятого.</summary>
@@ -536,6 +550,11 @@ namespace Farm.UI
                 case AchievementCounter.FarmLevel: return "ступень фермы";
                 case AchievementCounter.OrdersFilled: return "сдано заказов";
                 case AchievementCounter.Gold: return "золота в кубышке";
+                case AchievementCounter.PlayerLevel: return "уровень игрока";
+                case AchievementCounter.FriendsSeen: return "друзей в списке";
+                case AchievementCounter.HelpGiven: return "помощь друзьям";
+                case AchievementCounter.GiftsSent: return "подарков отправлено";
+                case AchievementCounter.MarketLots: return "лотов на рынке";
                 default: return "";
             }
         }
@@ -544,9 +563,14 @@ namespace Farm.UI
 
         private void Fill(FarmOrder order)
         {
-            if (FarmOrders.TryFill(order, out string refusal))
+            // Награда заказа включает подкормку, и при полном запасе она сгорает —
+            // молчать об этом нельзя (правило отказа). Число — по факту от доски,
+            // а не по догадке окна: знание о награде живёт в одном месте.
+            if (FarmOrders.TryFill(order, out string refusal, out int fert))
             {
-                Message("заказ сдан: +" + order.Gold + " зол.", good: true);
+                Message("заказ сдан: +" + order.Gold + " зол." +
+                        (fert > 0 ? " · +" + fert + " подкормка" : " · подкормка не влезла — запас полон"),
+                        good: true);
                 Farm.Juice.Sfx.Play(b => b.UiOpen);
             }
             else

@@ -144,14 +144,24 @@ namespace Farm.Game
 
             data.TotalHarvested = FarmProgress.TotalHarvested;
             data.TotalMerges = FarmProgress.TotalMerges;
+            data.FriendsSeen = FarmProgress.FriendsSeen;
+            data.HelpGiven = FarmProgress.HelpGiven;
+            data.GiftsSent = FarmProgress.GiftsSent;
+            data.MarketLots = FarmProgress.MarketLots;
             data.FarmLevel = FarmLevels.Current;
 
             FarmWater.Capture(out int water, out double waterFilled);
             data.WaterCharges = water;
             data.WaterFilledUnix = waterFilled;
             data.FertilizerCharges = FarmFertilizer.Charges;
+
+            FarmFeed.Capture(out int feed, out double feedFilled);
+            data.FeedCharges = feed;
+            data.FeedFilledUnix = feedFilled;
             data.TotalXp = FarmExperience.TotalXp;
             data.FilledOrders = FarmOrders.CaptureFilled();
+            data.OrdersWindow = FarmOrders.CacheWindow;
+            data.OrdersBoard = FarmOrders.CaptureBoard();
             data.Achievements = FarmAchievements.CaptureState();
             data.OrdersFilled = FarmAchievements.OrdersFilled;
             data.Footpaths = Footpaths.CaptureWorn();
@@ -194,6 +204,7 @@ namespace Farm.Game
                     OwnGrowthSpeed = ownSpeed,
                     Watered = plot.Watered,
                     Fertilized = plot.Fertilized,
+                    Fed = plot.Fed,
                     CareStreak = plot.CareStreak,
                     CycleId = plot.CycleId,
                     Position = plot.transform.position,
@@ -361,7 +372,8 @@ namespace Farm.Game
                     Position = farmer.transform.position,
                     Yaw = farmer.transform.eulerAngles.y,
                     Pack = pack != null ? pack.CaptureState() : new InventorySnapshot(),
-                    HiredUntilUnix = farmer.HiredUntil
+                    HiredUntilUnix = farmer.HiredUntil,
+                    MayRestock = farmer.MayRestock
                 };
 
                 var needs = farmer.GetComponent<CharacterNeeds>();
@@ -472,18 +484,24 @@ namespace Farm.Game
             var clock = DayNightCycle.Instance;
             if (clock != null) clock.RestoreState(data.Time01, data.Day);
 
-            FarmProgress.RestoreState(data.TotalHarvested, data.TotalMerges);
+            FarmProgress.RestoreState(data.TotalHarvested, data.TotalMerges,
+                                      data.FriendsSeen, data.HelpGiven,
+                                      data.GiftsSent, data.MarketLots);
 
             // Партии старше опыта досыпаем его задним числом по счётчикам: игрок с фермой
             // восьмой ступени не должен упереться в «нужен уровень 14» на грядке, которую
-            // покупал уже десять раз. Формула повторяет живые начисления — сбор, слияние, заказ.
+            // покупал уже десять раз. Оценка ПЛОСКАЯ (сбор ×3), а живые начисления считают
+            // ступень (1+tier): точнее по счётчикам не восстановить — истории сборов нет.
             int xp = data.TotalXp;
             if (xp <= 0 && data.TotalHarvested > 0)
                 xp = data.TotalHarvested * 3 + data.TotalMerges * FarmExperience.PerMerge
                    + data.OrdersFilled * FarmExperience.PerOrder;
 
             FarmExperience.Restore(xp);
-            FarmOrders.RestoreState(data.FilledOrders);
+            // Отметки сдачи — с доской в руках: длинные заказы прошлых окон в ней носят
+            // старые Id, и без доски фильтр отметок воскрешал бы их несданными.
+            FarmOrders.RestoreState(data.FilledOrders, data.OrdersBoard);
+            FarmOrders.RestoreBoard(data.OrdersWindow, data.OrdersBoard, registry.Resource);
             FarmAchievements.RestoreState(data.Achievements, data.OrdersFilled);
 
             var buildings = ApplyBuildings(data, registry);
@@ -524,6 +542,12 @@ namespace Farm.Game
             if (data.WaterFilledUnix <= 0.0) FarmWater.ResetForNewFarm();
             else FarmWater.Restore(data.WaterCharges, data.WaterFilledUnix);
             FarmFertilizer.Restore(data.FertilizerCharges);
+
+            // Корм — здесь же и по той же причине, что вода: ПОСЛЕ построек. Раньше —
+            // и накопленное за отсутствие упрётся в нулевой потолок (кормушки ещё нет)
+            // и молча пропадёт. Ноль отметки у старых партий = полная кормушка, как у воды.
+            if (data.FeedFilledUnix <= 0.0) FarmFeed.ResetForNewFarm();
+            else FarmFeed.Restore(data.FeedCharges, data.FeedFilledUnix);
 
             Footpaths.RestoreWorn(data.Footpaths);
             FarmBuffs.Refresh();
@@ -655,7 +679,10 @@ namespace Farm.Game
                 if (building == null) building = instance.AddComponent<Building>();
                 building.Configure(definition, save.Level);
 
-                if (definition.Service == BuildingService.Workshop && instance.GetComponent<Workshop>() == null)
+                // По рецептам, а не по службе (см. ConstructionSite): иначе загруженная
+                // кухня печь бы перестала, хотя построенная в этой же партии — пекла.
+                if ((definition.HasRecipes || definition.Service == BuildingService.Workshop) &&
+                    instance.GetComponent<Workshop>() == null)
                     instance.AddComponent<Workshop>();
 
                 if (instance.GetComponent<Movable>() == null) instance.AddComponent<Movable>();
@@ -694,7 +721,7 @@ namespace Farm.Game
                 growable.RestoreState(definition, save.Level, save.Ready,
                                       save.ElapsedGrowth, save.RipeSeconds, save.OwnGrowthSpeed,
                                       offlineSeconds, save.Uid);
-                growable.RestoreCare(save.Watered, save.Fertilized, save.CareStreak, save.CycleId);
+                growable.RestoreCare(save.Watered, save.Fertilized, save.CareStreak, save.CycleId, save.Fed);
 
                 if (shop != null) shop.RegisterPlaced(go.transform);
             }
@@ -780,6 +807,7 @@ namespace Farm.Game
             // по месту в списке, и место №0 обязано быть жителем №1.
             var agents = ResidentsInSaveOrder();
 
+            var restored = new HashSet<FarmerAgent>();
             for (int i = 0; i < saves.Length; i++)
             {
                 var save = saves[i];
@@ -791,6 +819,23 @@ namespace Farm.Game
                 if (farmer == null) continue;
 
                 ApplyResident(farmer, save, registry, buildings);
+                restored.Add(farmer);
+            }
+
+            // Первое появление жителя в СТАРОЙ партии: уровень земли уже дорос до его
+            // ступени, житель включён ростером, но своего снимка у него ещё нет — сейв
+            // писан до его эпохи. Без пересева он жил бы с характером от имени определения,
+            // одинаковым у всех игроков мира (судья этапа 9). Авторитет сейва цел: тех,
+            // кого сейв знает, этот цикл не трогает.
+            string seed = Farm.Characters.ColonyRoster.PlayerSeed;
+            if (!string.IsNullOrEmpty(seed))
+            {
+                foreach (var farmer in agents)
+                {
+                    if (farmer == null || restored.Contains(farmer)) continue;
+                    var traits = farmer.Traits;
+                    if (traits != null) traits.Reroll(seed + "·" + farmer.name);
+                }
             }
         }
 
@@ -823,6 +868,10 @@ namespace Farm.Game
 
             // Часы найма — те же unix-часы, что растят грядки: наём честно тикает и без нас.
             farmer.RestoreHired(save.HiredUntilUnix);
+
+            // Разрешение на покупки — молча, без мысли вслух: житель ничего сейчас не решил,
+            // он просто вспомнил, о чём вы договорились в прошлый раз.
+            farmer.RestoreMayRestock(save.MayRestock);
 
             foreach (var built in save.Built)
             {

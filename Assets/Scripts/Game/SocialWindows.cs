@@ -46,6 +46,8 @@ namespace Farm.Game
         private VisualElement _badgesButton;
         private VisualElement _panelFarmer;
         private VisualElement _panelSkills;
+        private VisualElement _levelValue;
+        private VisualElement _waterValue;
 
         private bool _refreshing;
 
@@ -77,6 +79,11 @@ namespace Farm.Game
             _panelFarmer = _root.Q<VisualElement>("panel-farmer");
             _panelSkills = _root.Q<VisualElement>("panel-skills");
 
+            // Чужие числа гостю не показываются: уровень игрока и вода восстановлены
+            // из снимка хозяина, а свой топбар с чужими значениями — тихое враньё.
+            _levelValue = _root.Q<VisualElement>("level-value");
+            _waterValue = _root.Q<VisualElement>("water-value");
+
             if (_friendsButton != null) _friendsButton.clicked += ToggleFriends;
             if (_guestHome != null) _guestHome.clicked += OnlineFlow.GoHome;
 
@@ -91,6 +98,8 @@ namespace Farm.Game
 
             GuestMode.Changed += OnGuestChanged;
             GuestMode.HelpRefused += OnHelpRefused;
+            GuestMode.CareRefused += OnCareRefused;
+            GuestMode.NightRefused += OnNightRefused;
             NetEvents.InboxReady += OnInboxReady;
 
             OnGuestChanged();
@@ -100,6 +109,8 @@ namespace Farm.Game
         {
             GuestMode.Changed -= OnGuestChanged;
             GuestMode.HelpRefused -= OnHelpRefused;
+            GuestMode.CareRefused -= OnCareRefused;
+            GuestMode.NightRefused -= OnNightRefused;
             NetEvents.InboxReady -= OnInboxReady;
         }
 
@@ -111,7 +122,10 @@ namespace Farm.Game
 
             if (_guestTitle != null) _guestTitle.text = guest ? "В гостях у " + GuestMode.OwnerName : "";
             if (_guestHelp != null)
-                _guestHelp.text = guest ? "помощь " + GuestMode.HelpUsed + " / " + GuestMode.HelpLimit : "";
+                _guestHelp.text = guest
+                    ? "помощь " + GuestMode.HelpUsed + " / " + GuestMode.HelpLimit +
+                      " · полив " + GuestMode.CareUsed + " / " + GuestMode.CareLimit
+                    : "";
 
             Show(_guestTitle, guest);
             Show(_guestHelp, guest);
@@ -121,14 +135,30 @@ namespace Farm.Game
             Show(_inventoryButton, !guest);
             Show(_shopButton, !guest);
             Show(_friendsButton, !guest);
-            Show(_badgesButton, !guest);
             Show(_panelFarmer, !guest);
             Show(_panelSkills, !guest);
+
+            // Чужой уровень игрока прячется; кнопка «Уровни» гостю ОСТАЁТСЯ: плашки уровней
+            // над грядками видны и в гостях (наблюдение без действия — не дыра), и выключатель
+            // обязан быть там же, где само наблюдаемое. Воду не трогаем вовсе: её строкой
+            // владеет GameHud.RefreshWater — он и знает про гостя (двойное управление display
+            // из двух мест кончилось бы перетиранием, судьи этапа 4 это поймали).
+            Show(_levelValue, !guest);
         }
 
         private void OnHelpRefused()
         {
             NetStatus.Set("помощь здесь исчерпана — до " + GuestMode.HelpLimit + " грядок за визит");
+        }
+
+        private void OnCareRefused()
+        {
+            NetStatus.Set("полив здесь исчерпан — до " + GuestMode.CareLimit + " грядок за визит");
+        }
+
+        private void OnNightRefused()
+        {
+            NetStatus.Set("ночь чужой фермы — светлячки и роса достаются хозяину");
         }
 
         // ---- окно друзей ----
@@ -205,6 +235,11 @@ namespace Farm.Game
                 }
 
                 var friends = res.Value.friends;
+
+                // Веха «первый друг» считает по факту списка: заявку мог принять и друг
+                // на своей стороне, и узнаём мы об этом ровно здесь.
+                if (friends != null) FarmProgress.NoteFriendsSeen(friends.Length);
+
                 if (friends != null && friends.Length > 0)
                 {
                     Section("ДРУЗЬЯ");

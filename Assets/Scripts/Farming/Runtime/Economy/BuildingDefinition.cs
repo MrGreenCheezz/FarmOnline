@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace Farm.Farming
 {
@@ -89,19 +90,35 @@ namespace Farm.Farming
         public string Note;
     }
 
+    /// <summary>Одна строка сырья в рецепте: столько-то такого-то ресурса.</summary>
+    [Serializable]
+    public sealed class RecipeInput
+    {
+        public ResourceDefinition Resource;
+        [Min(1)] public int Amount = 1;
+
+        public bool IsValid => Resource != null && Amount > 0;
+    }
+
     /// <summary>
-    /// Одно превращение, доступное мастерской: столько-то одного ресурса становится столько-то другого.
+    /// Одно превращение, доступное мастерской: перечисленное сырьё становится столько-то другого.
     /// <para>
     /// Рецепты живут на постройке, а не в собственном ассете, потому что рецепт бессмыслен без
     /// мастерской, которая его крутит, — разделение лишь добавило бы ссылку, которую надо держать в согласии.
+    /// </para>
+    /// <para>
+    /// Строк сырья может быть несколько (хлеб = мука + вода): пока вход был один, все 48 ресурсов
+    /// жили независимыми вертикалями «сырьё → слиток», и держать выгодно было ту линию, что даёт
+    /// больше золота в час. Составной рецепт связывает линии между собой — это и есть глубина
+    /// ресурсов, ради которой он заведён (07.08.2026, docs/PLAN-RESOURCES.md).
     /// </para>
     /// </summary>
     [Serializable]
     public sealed class WorkshopRecipe
     {
-        [Tooltip("Что забирается со склада.")]
-        public ResourceDefinition Input;
-        [Min(1)] public int InputAmount = 2;
+        [Tooltip("Что забирается со склада. Несколько строк — составной рецепт: партия начнётся, " +
+                 "только когда на складе есть ВСЁ перечисленное.")]
+        public RecipeInput[] Inputs = Array.Empty<RecipeInput>();
 
         [Tooltip("Что кладётся обратно.")]
         public ResourceDefinition Output;
@@ -113,15 +130,114 @@ namespace Farm.Farming
         [Tooltip("С какого уровня постройки рецепт доступен.")]
         [Min(1)] public int UnlockLevel = 1;
 
-        public bool IsValid => Input != null && Output != null && InputAmount > 0 && OutputAmount > 0;
+        // Наследие одиночного входа: ассеты, написанные до составных рецептов, держат сырьё
+        // в этих двух полях. Читаются они через FormerlySerializedAs и раздаются наружу как
+        // одна строка — благодаря этому переход не потребовал ни одной правки ассетов, и
+        // партия в чужом сейве не потерялась. Инструмент «Farm → Онлайн → Перевести рецепты
+        // на составные» переносит их в Inputs; после переноса поля стоят пустыми.
+        [SerializeField, HideInInspector, FormerlySerializedAs("Input")]
+        private ResourceDefinition _legacyInput;
+
+        [SerializeField, HideInInspector, FormerlySerializedAs("InputAmount")]
+        private int _legacyInputAmount = 2;
+
+        /// <summary>Сколько строк сырья у рецепта. Ноль — рецепт пуст.</summary>
+        public int InputCount
+        {
+            get
+            {
+                if (Inputs != null && Inputs.Length > 0) return Inputs.Length;
+                return _legacyInput != null ? 1 : 0;
+            }
+        }
+
+        public ResourceDefinition InputResourceAt(int index)
+        {
+            if (Inputs != null && Inputs.Length > 0)
+                return index >= 0 && index < Inputs.Length && Inputs[index] != null
+                    ? Inputs[index].Resource : null;
+
+            return index == 0 ? _legacyInput : null;
+        }
+
+        public int InputAmountAt(int index)
+        {
+            if (Inputs != null && Inputs.Length > 0)
+                return index >= 0 && index < Inputs.Length && Inputs[index] != null
+                    ? Inputs[index].Amount : 0;
+
+            return index == 0 ? _legacyInputAmount : 0;
+        }
+
+        /// <summary>Наследие для инструмента миграции: что лежит в старых полях.</summary>
+        public bool CaptureLegacy(out ResourceDefinition resource, out int amount)
+        {
+            resource = _legacyInput;
+            amount = _legacyInputAmount;
+            return _legacyInput != null;
+        }
+
+        /// <summary>Перенести наследие в <see cref="Inputs"/>. Зовёт только редакторский инструмент.</summary>
+        public void AdoptLegacy()
+        {
+            if (_legacyInput == null) return;
+
+            if (Inputs == null || Inputs.Length == 0)
+                Inputs = new[] { new RecipeInput { Resource = _legacyInput, Amount = _legacyInputAmount } };
+
+            _legacyInput = null;
+        }
+
+        public bool IsValid
+        {
+            get
+            {
+                if (Output == null || OutputAmount <= 0) return false;
+
+                int lines = InputCount;
+                if (lines == 0) return false;
+
+                // Каждая строка обязана быть целой: полустрока молча превратила бы составной
+                // рецепт в более дешёвый, и игрок получил бы хлеб без муки.
+                for (int i = 0; i < lines; i++)
+                    if (InputResourceAt(i) == null || InputAmountAt(i) <= 0) return false;
+
+                return true;
+            }
+        }
 
         /// <summary>Ценность партии в золоте. По ней выбирается рецепт, когда доступно несколько.</summary>
         public int OutputValue => Output != null ? Output.SellPrice * OutputAmount : 0;
 
+        /// <summary>Во что обходится партия по продажным ценам сырья — для маржи и подсказок.</summary>
+        public int InputValue
+        {
+            get
+            {
+                int total = 0;
+                int lines = InputCount;
+                for (int i = 0; i < lines; i++)
+                {
+                    var resource = InputResourceAt(i);
+                    if (resource != null) total += resource.SellPrice * InputAmountAt(i);
+                }
+                return total;
+            }
+        }
+
         public override string ToString()
         {
             if (!IsValid) return "<пустой рецепт>";
-            return InputAmount + " " + Input.DisplayName + " -> " + OutputAmount + " " + Output.DisplayName;
+
+            var sb = new System.Text.StringBuilder();
+            int lines = InputCount;
+            for (int i = 0; i < lines; i++)
+            {
+                if (i > 0) sb.Append(" + ");
+                sb.Append(InputAmountAt(i)).Append(' ').Append(InputResourceAt(i).DisplayName);
+            }
+
+            return sb.Append(" -> ").Append(OutputAmount).Append(' ').Append(Output.DisplayName).ToString();
         }
     }
 
@@ -158,7 +274,9 @@ namespace Farm.Farming
         [SerializeField, Range(0.1f, 1f)] private float _baseRestore = 1f;
 
         [Header("Мастерская")]
-        [Tooltip("Что эта постройка умеет перерабатывать. Только для службы Workshop.")]
+        [Tooltip("Что эта постройка умеет перерабатывать. Рецепты делают станком любую постройку, " +
+                 "а не только службу Workshop: кухня печёт и продолжает кормить, ветряк мелет и " +
+                 "продолжает подгонять рост.")]
         [SerializeField] private WorkshopRecipe[] _recipes = Array.Empty<WorkshopRecipe>();
 
         [Header("Усилитель")]
@@ -176,6 +294,11 @@ namespace Farm.Farming
         [Tooltip("Кого касается аура. Узкая — дешевле и читается как личность постройки.")]
         [SerializeField] private AuraFilter _auraFilter = AuraFilter.Everything;
 
+        [Tooltip("Вкл: в постройке копится корм для скотины (FarmFeed), потолок растёт с её уровнем.\n" +
+                 "Отдельный признак, а не служба: хлев служит аурой роста живности, и менять\n" +
+                 "одну механику на другую вместо того, чтобы добавить, — потеря, а не размен.")]
+        [SerializeField] private bool _givesFeed;
+
         public string Id => string.IsNullOrEmpty(_id) ? name : _id;
         public string DisplayName => string.IsNullOrEmpty(_displayName) ? Id : _displayName;
         public string Description => _description;
@@ -187,6 +310,9 @@ namespace Farm.Farming
 
         /// <summary>Кого касается аура усилителя.</summary>
         public AuraFilter AuraFilter => _auraFilter;
+
+        /// <summary>Копится ли в постройке корм для скотины. См. <see cref="FarmFeed"/>.</summary>
+        public bool GivesFeed => _givesFeed;
 
         /// <summary>Радиус ауры на уровне. 0 — действует на всю ферму.</summary>
         public float AuraRadiusAt(int level) =>
@@ -209,6 +335,22 @@ namespace Farm.Farming
         public float BaseRestore => _baseRestore;
 
         public IReadOnlyList<WorkshopRecipe> Recipes => _recipes;
+
+        /// <summary>
+        /// Есть ли у постройки хоть одно живое превращение. По этому, а не по службе, на неё
+        /// вешается <c>Workshop</c>: служба у постройки одна, а кухне нужно и кормить, и печь.
+        /// Привязка станка к службе означала бы, что вторая роль стоит первой.
+        /// </summary>
+        public bool HasRecipes
+        {
+            get
+            {
+                if (_recipes == null) return false;
+                for (int i = 0; i < _recipes.Length; i++)
+                    if (_recipes[i] != null && _recipes[i].IsValid) return true;
+                return false;
+            }
+        }
 
         /// <summary>Истина, когда персонажу нужно подойти, чтобы постройка что-то сделала.</summary>
         public bool IsVisited => _service == BuildingService.Kitchen || _service == BuildingService.Well;

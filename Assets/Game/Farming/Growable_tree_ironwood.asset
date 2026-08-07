@@ -25,8 +25,7 @@ MonoBehaviour:
     _visual: {fileID: 9177682835947032513, guid: f031649518833944fbd0e3fcf8b299b8, type: 3}
   _yieldResource: {fileID: 11400000, guid: 742be8c0e1ea1a8479d4edd0fc87c73b, type: 2}
   _baseYield: 1
-  _yieldPerLevel: 2
+  _mergeNext: {fileID: 11400000, guid: 16d5fa5e6f2d3704394e1efa2847d25e, type: 2}
   _regrows: 1
   _regrowStage: 0
   _removeWhenEmpty: 0
-  _witherAfter: 0

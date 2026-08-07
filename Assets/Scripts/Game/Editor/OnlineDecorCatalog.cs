@@ -46,8 +46,14 @@ namespace Farm.Game.EditorTools
             { "signpost",       new Entry("Указатель", 140) },
             { "well_barrel",    new Entry("Бочка у колодца", 70) },
             { "well_flowers",   new Entry("Цветы у колодца", 130) },
-            { "yardfire",       new Entry("Костровище", 350) },
         };
+
+        /// <summary>
+        /// Замыслы, из которых товар НЕ делать. «yardfire» — дубль «Костра» по второй цене,
+        /// вырезан af88b70: замысел жив (жители строят костровище сами), а прилавку он не нужен.
+        /// Просто убрать из Known мало — цикл Build() создал бы товар с дефолтной ценой.
+        /// </summary>
+        private static readonly HashSet<string> Skip = new HashSet<string> { "yardfire" };
 
         private const string AssetFolder = "Assets/Game/Farming";
         private const int DefaultGold = 120;
@@ -64,6 +70,7 @@ namespace Farm.Game.EditorTools
                 var improvement = AssetDatabase.LoadAssetAtPath<ImprovementDefinition>(
                     AssetDatabase.GUIDToAssetPath(guid));
                 if (improvement == null || improvement.Prefab == null) continue;
+                if (Skip.Contains(improvement.Id)) continue;
 
                 string path = AssetFolder + "/Shop_Decor_" + improvement.Id + ".asset";
                 var item = AssetDatabase.LoadAssetAtPath<ShopItemDefinition>(path);

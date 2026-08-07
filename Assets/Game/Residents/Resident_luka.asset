@@ -18,4 +18,7 @@ MonoBehaviour:
   _wagePerDay: 0
   _tidyZeal: 0.6
   _projectZeal: 0.9
-  _improvements: []
+  _improvements:
+  - {fileID: 11400000, guid: d0df984cf4e400e4d98f655b98d93a9c, type: 2}
+  - {fileID: 11400000, guid: 6ca5ee2a09c01ec4aa866bbf4ae7c1c3, type: 2}
+  - {fileID: 11400000, guid: 1ed38d2fc3e17ab4ebd1623acbaf5a1f, type: 2}

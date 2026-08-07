@@ -30,7 +30,7 @@ MonoBehaviour:
         Amount: 6
     Efficiency: 0.35
     Output: 1
-    Note: "\u043D\u0430\u043F\u043E\u043B\u043D\u044F\u0435\u0442 \u0434\u043E 74%"
+    Note: "\u043D\u0430\u043F\u043E\u043B\u043D\u044F\u0435\u0442 \u0434\u043E 74% \u00B7 \u043F\u0435\u0447\u0451\u0442: \u043C\u0443\u043A\u0430 + \u044F\u0439\u0446\u0430 \u2192 \u0445\u043B\u0435\u0431"
   - Cost:
       Gold: 276
       Resources:
@@ -50,7 +50,7 @@ MonoBehaviour:
         Amount: 14
     Efficiency: 0.78999996
     Output: 1
-    Note: "\u043D\u0430\u043F\u043E\u043B\u043D\u044F\u0435\u0442 \u0434\u043E 92%"
+    Note: "\u043D\u0430\u043F\u043E\u043B\u043D\u044F\u0435\u0442 \u0434\u043E 92% \u00B7 \u043D\u043E\u0432\u043E\u0435 \u0434\u0435\u043B\u043E: \u0445\u043B\u0435\u0431 + \u0442\u044B\u043A\u0432\u0430 + \u043C\u0451\u0434 \u2192 \u043F\u0438\u0440\u043E\u0433"
   - Cost:
       Gold: 1460
       Resources:
@@ -63,4 +63,28 @@ MonoBehaviour:
     Note: "\u043D\u0430\u043F\u043E\u043B\u043D\u044F\u0435\u0442 \u0434\u043E 100%"
   _serviceDuration: 1.4
   _baseRestore: 1
-  _recipes: []
+  _recipes:
+  - Inputs:
+    - Resource: {fileID: 11400000, guid: 0ae0f511b0a64dadbd7ff62ca5d88403, type: 2}
+      Amount: 2
+    - Resource: {fileID: 11400000, guid: 461f69a9a96755e47a91d40551c3eb07, type: 2}
+      Amount: 1
+    Output: {fileID: 11400000, guid: f89fd241eadb42cda5308f2e87f67872, type: 2}
+    OutputAmount: 1
+    Seconds: 9.9
+    UnlockLevel: 1
+    _legacyInput: {fileID: 0}
+    _legacyInputAmount: 0
+  - Inputs:
+    - Resource: {fileID: 11400000, guid: f89fd241eadb42cda5308f2e87f67872, type: 2}
+      Amount: 1
+    - Resource: {fileID: 11400000, guid: 881a1c1dddf195f44a3a31bee3934f47, type: 2}
+      Amount: 2
+    - Resource: {fileID: 11400000, guid: 27f834436b19d9444a10643d96de2f5c, type: 2}
+      Amount: 1
+    Output: {fileID: 11400000, guid: e172631a94654537a46e6f08932bbef9, type: 2}
+    OutputAmount: 1
+    Seconds: 16.3
+    UnlockLevel: 3
+    _legacyInput: {fileID: 0}
+    _legacyInputAmount: 0

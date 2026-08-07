@@ -97,30 +97,47 @@ namespace Farm.Farming
 
         // ---- покупка ----
 
-        public bool CanBuy(ShopItemDefinition item, out string reason)
+        /// <summary>
+        /// Заперт ли товар прогрессией (максимум владения, уровень игрока) — в отличие от
+        /// «просто дорого». Витрина показывает замок видимой строкой: запертая воротами
+        /// грядка, выкрашенная как дорогая, читалась бы «накоплю и куплю» — а копить тут
+        /// бесполезно, нужен уровень. Тултип не годится: рантайм UI Toolkit его не рисует,
+        /// а выключенная кнопка и клика не принимает — отказ был бы нем.
+        /// </summary>
+        public bool ProgressLock(ShopItemDefinition item, out string reason)
         {
             reason = null;
-
-            if (item == null) { reason = "нет товара"; return false; }
+            if (item == null) return false;
 
             if (item.MaxOwned > 0 && OwnedCount(item) >= item.MaxOwned)
             {
                 reason = "уже куплено максимум (" + item.MaxOwned + ")";
-                return false;
+                return true;
             }
 
             // Ворота уровня — только на грядки: ступень меряет глубину прогрессии, и перескочить
             // её кошельком нельзя. Постройки и декор уровня не спрашивают — они про обустройство,
-            // а не про лестницу.
+            // а не про лестницу. «Уровень игрока» — словами: шкал с именем «уровень» в игре
+            // пять, и безымянный отказ не говорит, какую качать.
             if (item.Growable != null && item.Growable.YieldResource != null)
             {
                 int need = FarmExperience.LevelForTier(item.Growable.YieldResource.Tier);
                 if (FarmExperience.Level < need)
                 {
-                    reason = "нужен уровень " + need;
-                    return false;
+                    reason = "нужен уровень игрока " + need + " (сейчас " + FarmExperience.Level + ")";
+                    return true;
                 }
             }
+
+            return false;
+        }
+
+        public bool CanBuy(ShopItemDefinition item, out string reason)
+        {
+            reason = null;
+
+            if (item == null) { reason = "нет товара"; return false; }
+            if (ProgressLock(item, out reason)) return false;
 
             int gold = Wallet != null ? Wallet.Gold : 0;
             return item.Price.CanPay(gold, Storage, out reason);
@@ -128,6 +145,15 @@ namespace Farm.Farming
 
         public bool TryBuy(ShopItemDefinition item)
         {
+            // Правило в системе, а не в интерфейсе (как в FarmLevels.TryBuyNext): спрятанная
+            // кнопка держится ровно до первого нового способа нажать, а тратить чужое
+            // золото в гостях нельзя ни одним из них.
+            if (GuestMode.IsGuest)
+            {
+                RaiseRefused("в гостях не покупают — это чужая ферма");
+                return false;
+            }
+
             if (!CanBuy(item, out string reason))
             {
                 RaiseRefused(reason);
@@ -338,19 +364,60 @@ namespace Farm.Farming
         /// Золото за стопку, с учётом рынков. Каждая продажа проходит здесь, поэтому рынок
         /// с надбавкой — одна строка, а не правило, которое UI и продавец должны помнить каждый сам.
         /// </summary>
-        public int SellValue(ResourceDefinition resource, int amount)
+        public int SellValue(ResourceDefinition resource, int amount) =>
+            SellValue(resource, amount, ResourceGrade.Common);
+
+        /// <summary>
+        /// Золото за стопку названного сорта. Надбавка сорта считается до рыночной, а не
+        /// после: рынок платит процент с цены товара, а сорт эту цену и определяет.
+        /// </summary>
+        public int SellValue(ResourceDefinition resource, int amount, ResourceGrade grade)
         {
             if (resource == null || amount <= 0) return 0;
 
-            int raw = Mathf.Max(0, resource.SellPrice) * amount;
+            int raw = Mathf.RoundToInt(Mathf.Max(0, resource.SellPrice) * amount *
+                                       ResourceGrades.PriceFactor(grade));
             if (raw <= 0) return 0;
 
             return Mathf.Max(raw, Mathf.RoundToInt(raw * (1f + BuildingRegistry.MarketBonus)));
         }
 
-        /// <summary>Продать до <paramref name="amount"/> единиц. Возвращает полученное золото.</summary>
-        public int TrySell(ResourceDefinition resource, int amount)
+        /// <summary>
+        /// Сколько даст продажа <paramref name="amount"/> единиц прямо сейчас — с тем же
+        /// порядком сортов, каким её проведёт <see cref="TrySell(ResourceDefinition,int)"/>.
+        /// Нужен UI: цена в меню, посчитанная по обычному сорту, соврала бы ровно на надбавку
+        /// за уход, а обещание кнопки обязано совпадать с её делом.
+        /// </summary>
+        public int PreviewSell(ResourceDefinition resource, int amount)
         {
+            var storage = Storage;
+            if (resource == null || amount <= 0 || storage == null) return 0;
+
+            int gold = 0;
+            int left = amount;
+
+            var order = ResourceGrades.All;
+            for (int i = 0; i < order.Length && left > 0; i++)
+            {
+                int take = Mathf.Min(left, storage.GetAmount(resource, order[i]));
+                if (take <= 0) continue;
+
+                gold += SellValue(resource, take, order[i]);
+                left -= take;
+            }
+
+            return gold;
+        }
+
+        /// <summary>Продать до <paramref name="amount"/> единиц названного сорта.</summary>
+        public int TrySell(ResourceDefinition resource, int amount, ResourceGrade grade)
+        {
+            if (GuestMode.IsGuest)
+            {
+                RaiseRefused("в гостях не продают — это чужой склад");
+                return 0;
+            }
+
             var storage = Storage;
             if (resource == null || amount <= 0 || storage == null) return 0;
 
@@ -360,14 +427,70 @@ namespace Farm.Farming
                 return 0;
             }
 
-            int removed = storage.TryRemove(resource, amount);
+            int removed = storage.TryRemove(resource, amount, grade);
             if (removed <= 0)
             {
                 RaiseRefused("нечего продавать");
                 return 0;
             }
 
-            int gold = SellValue(resource, removed);
+            int gold = SellValue(resource, removed, grade);
+            if (Wallet != null) Wallet.Add(gold);
+
+            var handler = Sold;
+            if (handler != null)
+            {
+                try { handler(this, resource, removed, gold); }
+                catch (Exception e) { Debug.LogException(e, this); }
+            }
+
+            return gold;
+        }
+
+        /// <summary>Продать до <paramref name="amount"/> единиц. Возвращает полученное золото.</summary>
+        public int TrySell(ResourceDefinition resource, int amount)
+        {
+            // Симметрично TryBuy: чужой склад в гостях не распродают, каким бы путём
+            // ни пришёл вызов.
+            if (GuestMode.IsGuest)
+            {
+                RaiseRefused("в гостях не продают — это чужой склад");
+                return 0;
+            }
+
+            var storage = Storage;
+            if (resource == null || amount <= 0 || storage == null) return 0;
+
+            if (resource.SellPrice <= 0)
+            {
+                RaiseRefused(resource.DisplayName + " не продаётся");
+                return 0;
+            }
+
+            // Продаём сортами от обычного к лучшему и платим за каждый по его цене. Одной
+            // строкой это не сделать: TryRemove вернул бы общее число, а стопки стоят разного,
+            // и «в среднем» тут означало бы обмануть игрока ровно на надбавку за уход.
+            int removed = 0;
+            int gold = 0;
+            int left = amount;
+
+            var order = ResourceGrades.All;
+            for (int i = 0; i < order.Length && left > 0; i++)
+            {
+                int taken = storage.TryRemove(resource, left, order[i]);
+                if (taken <= 0) continue;
+
+                removed += taken;
+                left -= taken;
+                gold += SellValue(resource, taken, order[i]);
+            }
+
+            if (removed <= 0)
+            {
+                RaiseRefused("нечего продавать");
+                return 0;
+            }
+
             if (Wallet != null) Wallet.Add(gold);
 
             var handler = Sold;

@@ -61,6 +61,9 @@ namespace Farm.Interaction
         /// <summary>Спелая грядка под пальцем гостя — кандидат на «помочь» при отпускании.</summary>
         private Growable _guestPlot;
 
+        /// <summary>Нажатие гостя было принято миром (не съедено UI) — отпускание имеет право действовать.</summary>
+        private bool _guestPressValid;
+
         /// <summary>Узел, который игрок сейчас собирает руками, или null.</summary>
         public Gatherable Gathering => _gathering;
 
@@ -74,6 +77,37 @@ namespace Farm.Interaction
         {
             if (_camera == null) _camera = Camera.main;
             if (_ui == null) _ui = FindFirstObjectByType<UIDocument>();
+        }
+
+        private void OnEnable() => FarmTool.ApplyRequested += OnToolDropped;
+
+        /// <summary>
+        /// Иконку инструмента бросили на ферму (панель в Farm.UI позвала через FarmTool).
+        /// Точку берём у мыши здесь: панель про Input System не знает и знать не должна.
+        /// </summary>
+        private void OnToolDropped()
+        {
+            // Pointer, а не Mouse: на телефоне мыши нет вовсе, и сброс иконки молча
+            // не делал бы ничего — тихая точка отказа там, где жест только что был.
+            var pointer = Pointer.current;
+            if (pointer == null)
+            {
+                FarmingEvents.RaiseNotice("не понял, куда", transform.position);
+                return;
+            }
+
+            Vector2 screen = pointer.position.ReadValue();
+
+            // Сброс над интерфейсом — это отмена, а не применение: иначе иконка, отпущенная
+            // над панелью или топбаром, тратила бы заряд на грядку, спрятанную ЗА ними
+            // (блокер судей). Путь нажатия ту же проверку делает в Update.
+            if (IsPointerOverUI(screen))
+            {
+                Sfx.Play(b => b.UiClose);
+                return;
+            }
+
+            ApplyToolAt(screen);
         }
 
         private void Update()
@@ -97,7 +131,18 @@ namespace Farm.Interaction
             // хватать грядку, до светлячка над ней клик не дойдёт никогда.
             if (mouse.leftButton.wasPressedThisFrame && !IsPointerOverUI(screen))
             {
-                if (!TryStartGather(screen)) TryPick(screen);
+                // Ночные узлы берут ТОЛЬКО рукой: с ведром в руке клик по светлячку над
+                // грядкой уходил бы в сбор, и названный инструмент молча подменялся чужим
+                // действием. Правило 2 цело — ночь по-прежнему собирает игрок и только он.
+                bool gathered = FarmTool.Current == FarmToolKind.Hand && TryStartGather(screen);
+                if (!gathered)
+                {
+                    // Инструмент решает всё: поднимает грядку в руку ТОЛЬКО перенос.
+                    // Раньше объект поднимался на любом нажатии, а смысл жеста выяснялся
+                    // при отпускании — оттуда и брались случайные поливы соседней грядки.
+                    if (FarmTool.Current == FarmToolKind.Move) TryPick(screen);
+                    else ApplyToolAt(screen);
+                }
             }
             else if (_gathering != null && mouse.leftButton.isPressed) ContinueGather();
             else if (_dragged != null && mouse.leftButton.isPressed) DragTo(screen);
@@ -123,6 +168,7 @@ namespace Farm.Interaction
         private void GuestPress(Vector2 screen)
         {
             _pressScreen = screen;
+            _guestPressValid = true;
             _guestPlot = FindGuestPlot(screen);
         }
 
@@ -131,8 +177,24 @@ namespace Farm.Interaction
             var plot = _guestPlot;
             _guestPlot = null;
 
-            if (plot == null) return;
+            // Отпускание без принятого нажатия (нажали над UI — GuestPress не звался):
+            // сверка со старым _pressScreen дала бы ложный ночной отказ по клику в панель.
+            if (!_guestPressValid) return;
+            _guestPressValid = false;
+
             if ((screen - _pressScreen).sqrMagnitude > TapSlopSqr()) return;
+
+            // Узел — раньше грядки, как и дома («узлы мельче грядок»): грамматика жеста
+            // не должна меняться в гостях. Собрать нельзя (ночь хозяйская, правило 2),
+            // но молчать по видимому светящемуся объекту — читаться поломкой.
+            if (FindNearestGatherable(screen) != null)
+            {
+                GuestMode.RefuseNight();
+                Sfx.Play(b => b.UiClose);
+                return;
+            }
+
+            if (plot == null) return;
 
             // Тот же язык жестов, что и дома: тап по спелой — собрать, по растущей — полить.
             // Гостю не приходится учить вторую грамматику ради визита.
@@ -176,7 +238,9 @@ namespace Farm.Interaction
         {
             if (!GuestMode.CanCare)
             {
-                GuestMode.RefuseHelp();
+                // Свой отказ, не RefuseHelp: лимиты сбора и полива раздельные, и текст
+                // «помощь исчерпана» при счётчике «помощь 0/5» на экране был бы враньём.
+                GuestMode.RefuseCare();
                 Sfx.Play(b => b.UiClose);
                 return;
             }
@@ -281,6 +345,106 @@ namespace Farm.Interaction
             return best;
         }
 
+        // ---- инструменты ----
+
+        /// <summary>
+        /// Применить инструмент, который сейчас в руке, к тому, что под точкой экрана.
+        /// <para>
+        /// Единственная точка применения — сюда приходит и обычное нажатие мышью, и сброс
+        /// перетащенной с панели иконки. Два пути ввода, ведущие в разный код, разошлись бы
+        /// на первой же правке; здесь они сходятся до того, как что-то произойдёт.
+        /// </para>
+        /// <para>
+        /// Правило 1 не страдает: сбор по-прежнему делает игрок и только игрок — инструмент
+        /// лишь называет, какой из его собственных жестов сейчас в руке.
+        /// </para>
+        /// </summary>
+        public void ApplyToolAt(Vector2 screen)
+        {
+            if (GuestMode.IsGuest) return;   // в гостях своя грамматика жестов, см. GuestPress
+
+            if (!TryFindNearest(screen, _pickRadiusPixels, null, out Transform found, out Growable growable))
+            {
+                // Мимо всего — снять выделение постройки, как в любом редакторе.
+                BuildingSelection.Clear();
+
+                // С инструментом в руке промах обязан звучать: игрок держит ведро и должен
+                // понять, что оно НЕ вылилось. Пустая рука по пустой земле молчит, как и раньше.
+                if (FarmTool.Current != FarmToolKind.Hand) Sfx.Play(b => b.UiClose);
+                return;
+            }
+
+            // Уход требует цели, у которой есть что растить: по постройке ведром — не отказ
+            // системы, а промах игрока, и назвать его должен тот, кто промахнулся.
+            if (growable == null && FarmTool.Current != FarmToolKind.Hand)
+            {
+                FarmingEvents.RaiseNotice("сюда не льют", found.position + Vector3.up * _plotAimHeight);
+                Sfx.Play(b => b.UiClose);
+                return;
+            }
+
+            // Клеймо игрока раньше ставилось побочно, внутри DragFocus.Set при захвате в руку.
+            // Рука больше ничего не поднимает — значит метку «этого я только что трогал»
+            // ставим сами, иначе жители начнут переставлять грядки под курсором игрока.
+            DragFocus.Claim(found);
+
+            Vector3 at = found.position;
+            switch (FarmTool.Current)
+            {
+                case FarmToolKind.Water:
+                    Care(FarmWater.Pour(growable), at);
+                    return;
+
+                case FarmToolKind.Feed:
+                    Care(FarmFeed.Feed(growable), at);
+                    return;
+
+                case FarmToolKind.Fertilizer:
+                    Care(FarmFertilizer.Apply(growable), at);
+                    return;
+
+                default:
+                    HandAt(found, growable, at);
+                    return;
+            }
+        }
+
+        /// <summary>Пустая рука: собрать спелое, открыть постройку, а по растущему — сказать срок.</summary>
+        private void HandAt(Transform found, Growable growable, Vector3 at)
+        {
+            if (growable == null)
+            {
+                BuildingSelection.Select(found.GetComponent<Building>());
+                return;
+            }
+
+            if (growable.IsReady)
+            {
+                if (growable.TryHarvest())
+                {
+                    Effects.Play(l => l.Harvest, at + Vector3.up * _plotAimHeight);
+                    Sfx.Play(b => b.Harvest);
+                }
+                return;
+            }
+
+            // Ткнули в растущее. Это не отказ, а вопрос «когда?» — и молчать на него нельзя
+            // (правило заметности), поэтому грядка отвечает сроком, а не отговоркой.
+            FarmingEvents.RaiseNotice(RipeNote(growable), at + Vector3.up * _plotAimHeight);
+        }
+
+        /// <summary>«поспеет через 2 ч» — человеческим языком, без секунд и процентов.</summary>
+        private static string RipeNote(Growable plot)
+        {
+            double left = plot.TimeUntilReady;
+            if (left < 0.0) return "тут пусто";
+            if (left <= 0.0) return "вот-вот поспеет";
+
+            if (left >= 3600.0) return "поспеет через " + Mathf.RoundToInt((float)(left / 3600.0)) + " ч";
+            if (left >= 60.0) return "поспеет через " + Mathf.RoundToInt((float)(left / 60.0)) + " мин";
+            return "поспеет вот-вот";
+        }
+
         // ---- этапы ----
 
         private void TryPick(Vector2 screen)
@@ -342,48 +506,32 @@ namespace Farm.Interaction
             // постройке открывает её панель; по остальному — просто снимает выделение.
             // Отдельная кнопка «осмотреть» не нужна, а правая кнопка мыши не переживёт
             // переезда на тач.
-            if ((screen - _pressScreen).sqrMagnitude <= TapSlopSqr())
-            {
-                if (growable != null && growable.IsReady)
-                {
-                    // Однолетку сбор уничтожает (отложенно, в конце кадра) — решаем судьбу
-                    // приземления до сбора, пока определение точно живо.
-                    bool vanishes = growable.Definition != null &&
-                                    !growable.Definition.Regrows && growable.Definition.RemoveWhenEmpty;
-
-                    Vector3 at = dragged.position;
-                    if (growable.TryHarvest())
-                    {
-                        Effects.Play(l => l.Harvest, at + Vector3.up * _plotAimHeight);
-                        Sfx.Play(b => b.Harvest);
-
-                        // Собранное исчезнет — возвращать на землю нечего и некому.
-                        if (vanishes) return;
-                    }
-                }
-                else if (growable != null && growable.CanWater)
-                {
-                    Care(FarmWater.Pour(growable), dragged.position);
-                }
-                else if (growable != null && growable.CanFertilize && FarmFertilizer.Charges > 0)
-                {
-                    // Подкормка предлагается только когда она есть. Иначе каждый второй тап по
-                    // политой грядке ругался бы «нет подкормки» — а это не отказ в действии,
-                    // это отсутствие действия, и говорить о нём должен счётчик в HUD, не грядка.
-                    Care(FarmFertilizer.Apply(growable), dragged.position);
-                }
-                else
-                {
-                    BuildingSelection.Select(dragged.GetComponent<Building>());
-                }
-            }
+            // Тап с инструментом переноса — это «поднял и положил обратно»: он ничего не
+            // делает с грядкой, потому что сбор и уход живут на своих инструментах
+            // (ApplyToolAt, вызывается прямо на нажатии). Раньше здесь стояла лестница
+            // «сбор → полив → подкормка → панель», и она же была источником путаницы.
+            bool wasTap = (screen - _pressScreen).sqrMagnitude <= TapSlopSqr();
 
             _dragged = null;
             _draggedGrowable = null;
             DragFocus.Clear();
             ClearHighlight();
 
-            if (target != null && growable != null && target.TryMergeWith(growable)) return;   // growable уничтожен внутри
+            // Слияние принадлежит жесту ПЕРЕНОСА (правило 1: «сливает — игрок сбросом мыши»).
+            // Тап исчерпывается сбором/поливом/подкормкой/выбором выше и до слияния не доходит:
+            // с правилом «суммой» целью стал бы почти любой сосед того же вида, и клик-сбор
+            // молча сливал бы грядки — а тап по 20-ке запускал бы необратимый переход ступени.
+            if (!wasTap)
+            {
+                if (target != null && growable != null && target.TryMergeWith(growable)) return;   // growable уничтожен внутри
+
+                // Рядом лежит пара того же вида, но слиться нельзя (потолок 20, вершина линии) —
+                // причину говорим вслух: молчание при дропе на «почти пару» читается как поломка.
+                if (target == null && growable != null &&
+                    TryFindNearest(screen, _dropRadiusPixels, growable.transform, out _, out Growable refusedBy) &&
+                    refusedBy != null)
+                    refusedBy.RefuseMergeAloud(growable);
+            }
 
             Vector3 point = dragged.position;
             if (TryGroundPoint(screen, _groundY, out Vector3 hit)) point = hit;
@@ -561,6 +709,7 @@ namespace Farm.Interaction
 
         private void OnDisable()
         {
+            FarmTool.ApplyRequested -= OnToolDropped;
             ClearHighlight();
             SetGathering(null);
             DragFocus.Clear();

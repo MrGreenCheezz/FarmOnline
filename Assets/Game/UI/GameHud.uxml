@@ -73,26 +73,11 @@
                 <ui:Label name="farmer-state" text="—" class="row row--strong" />
                 <ui:Label name="farmer-thought" text="" class="row row--muted" />
 
-                <ui:VisualElement class="meter">
-                    <ui:Label name="satiety-label" text="Сытость" class="meter__label" />
-                    <ui:VisualElement class="meter__track">
-                        <ui:VisualElement name="satiety-fill" class="meter__fill meter__fill--food" />
-                    </ui:VisualElement>
-                </ui:VisualElement>
-
-                <ui:VisualElement class="meter">
-                    <ui:Label name="hydration-label" text="Вода" class="meter__label" />
-                    <ui:VisualElement class="meter__track">
-                        <ui:VisualElement name="hydration-fill" class="meter__fill meter__fill--water" />
-                    </ui:VisualElement>
-                </ui:VisualElement>
-
-                <ui:VisualElement class="meter">
-                    <ui:Label name="energy-label" text="Бодрость" class="meter__label" />
-                    <ui:VisualElement class="meter__track">
-                        <ui:VisualElement name="energy-fill" class="meter__fill meter__fill--energy" />
-                    </ui:VisualElement>
-                </ui:VisualElement>
+                <!-- Полосы нужд (сытость, вода, бодрость) убраны 07.08.2026: жителей много,
+                     и следить за их бытом игрок не должен. Сами нужды живы и работают —
+                     это живость, а не задача игрока: житель по-прежнему ходит есть, пить
+                     и спать, кухня с колодцем нужны ему так же, как раньше. Видимым
+                     остаётся то, что объясняет ПОВЕДЕНИЕ: состояние и мысль. -->
 
                 <ui:VisualElement class="meter">
                     <ui:Label name="carry-label" text="Рюкзак" class="meter__label" />
@@ -103,6 +88,7 @@
 
                 <ui:Label name="farmer-hire" text="" class="row row--muted" />
                 <ui:Button name="hire-button" text="Нанять" class="btn btn--accent hire-btn" />
+                <ui:Button name="restock-button" text="Покупки" class="btn hire-btn" />
             </ui:VisualElement>
 
             <ui:VisualElement name="panel-skills" class="panel">
@@ -126,6 +112,46 @@
                 <ui:Button name="farm-expand" text="Расширить" class="btn btn--accent hire-btn" />
             </ui:VisualElement>
 
+            </ui:VisualElement>
+
+            <!-- ================= ИНСТРУМЕНТЫ =================
+                 Карточки снизу по центру — там, где их ищет большой палец на телефоне и
+                 взгляд на мониторе. Панель абсолютная и центрируется сама, а не живёт в
+                 колонке hud (та выравнивает детей по левому краю); в hud-panels её класть
+                 нельзя тем более — та гаснет до 0.25, пока игрок что-то тащит, а тащат
+                 как раз отсюда.
+                 Каждая карточка обязана быть Button: MakeReadout снимает picking со всего
+                 поддерева hud и возвращает его только кнопкам, поэтому VisualElement здесь
+                 молча не получил бы ни одного события. Дети карточки (иконка, подпись,
+                 счёт) — обычные элементы: клик ловит сама карточка.
+                 Инструмент берут двумя способами и оба ведут в PlotDragger.ApplyToolAt:
+                 нажать (остаётся в руке) или перетащить карточку прямо на цель. -->
+            <ui:VisualElement name="toolbar" class="toolbar">
+                <ui:Button name="tool-hand" class="tool tool--on">
+                    <ui:VisualElement name="tool-hand-icon" class="tool__icon" />
+                    <ui:Label text="Рука" class="tool__name" />
+                    <ui:Label name="tool-hand-count" text="" class="tool__count" />
+                </ui:Button>
+                <ui:Button name="tool-move" class="tool">
+                    <ui:VisualElement name="tool-move-icon" class="tool__icon" />
+                    <ui:Label text="Перенос" class="tool__name" />
+                    <ui:Label name="tool-move-count" text="" class="tool__count" />
+                </ui:Button>
+                <ui:Button name="tool-water" class="tool">
+                    <ui:VisualElement name="tool-water-icon" class="tool__icon" />
+                    <ui:Label text="Ведро" class="tool__name" />
+                    <ui:Label name="tool-water-count" text="" class="tool__count" />
+                </ui:Button>
+                <ui:Button name="tool-feed" class="tool">
+                    <ui:VisualElement name="tool-feed-icon" class="tool__icon" />
+                    <ui:Label text="Корм" class="tool__name" />
+                    <ui:Label name="tool-feed-count" text="" class="tool__count" />
+                </ui:Button>
+                <ui:Button name="tool-fert" class="tool">
+                    <ui:VisualElement name="tool-fert-icon" class="tool__icon" />
+                    <ui:Label text="Удобрение" class="tool__name" />
+                    <ui:Label name="tool-fert-count" text="" class="tool__count" />
+                </ui:Button>
             </ui:VisualElement>
 
         </ui:VisualElement>

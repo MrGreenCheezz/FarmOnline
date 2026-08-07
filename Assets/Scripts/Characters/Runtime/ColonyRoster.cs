@@ -39,12 +39,23 @@ namespace Farm.Characters
         public static event Action<FarmerAgent> Arrived;
 
         /// <summary>
-        /// Строка о следующем прибытии — для панели жителей. Null, когда все уже дома.
-        /// Игрок обязан видеть, что́ приводит людей: рост без причины читается как случайность.
+        /// Строка о следующем прибытии — для панели жителей; когда все дома — «все дома…»,
+        /// null остаётся только у выключенного ростера (вне сцены фермы). Игрок обязан видеть,
+        /// что́ приводит людей — и что больше не приведёт: рост без причины читается как
+        /// случайность, а молча исчезнувшая строка — как поломка.
         /// </summary>
         public static string NextArrivalNote { get; private set; }
 
         private static ColonyRoster _instance;
+
+        /// <summary>
+        /// Зерно характера от имени игрока — для тех, кто приезжает ЖИВЬЁМ: их не было
+        /// ни в сейве, ни в реестре при пересеве SaveRunner, и без этого поля Глашу,
+        /// Тимофея, Луку и Захара весь мир получал бы с одним и тем же характером от
+        /// имени объекта сцены (аудит). Ставит SaveRunner на старте; пусто — оффлайн,
+        /// характер остаётся сценовым.
+        /// </summary>
+        public static string PlayerSeed;
 
         /// <summary>Известный ростеру уровень земли. Ноль — ещё не видел ни одного.</summary>
         private int _seenLevel;
@@ -92,7 +103,10 @@ namespace Farm.Characters
         /// </summary>
         private void OnFarmLevelChanged(int level)
         {
-            bool live = _seenLevel > 0 && level > _seenLevel;
+            // Окно восстановления гасит «живость»: RestoreState на загрузке поднимает Changed
+            // с 1 до сохранённого уровня, и без стража каждая загрузка объявляла бы «к вам
+            // приехал(а)…» про людей, которые давно живут на ферме.
+            bool live = !Farming.FarmingRuntime.Restoring && _seenLevel > 0 && level > _seenLevel;
 
             foreach (var entry in _entries)
             {
@@ -104,7 +118,19 @@ namespace Farm.Characters
 
                 go.SetActive(here);
 
-                if (here && live) Raise(entry.Agent);
+                if (here && live)
+                {
+                    // Характер новичка — от имени игрока: живой приезд значит, что в сейве
+                    // его ещё не было. SetActive выше уже прогнал Awake — компоненты живы
+                    // (та самая грабля «не трогать чужое до Awake» здесь не стреляет).
+                    if (!string.IsNullOrEmpty(PlayerSeed))
+                    {
+                        var traits = entry.Agent.GetComponent<FarmerTraits>();
+                        if (traits != null) traits.Reroll(PlayerSeed + "·" + entry.Agent.name);
+                    }
+
+                    Raise(entry.Agent);
+                }
             }
 
             _seenLevel = level;
@@ -124,9 +150,12 @@ namespace Farm.Characters
                     next = entry.Definition;
             }
 
+            // «Все дома» — не null: строка-объяснение роста колонии не имеет права молча
+            // исчезнуть после последнего приезда (правило заметности; сам же комментарий
+            // выше обещает, что игрок видит, что́ приводит людей — и что больше не приведёт).
             NextArrivalNote = next != null
                 ? next.DisplayName + " приедет на " + next.ArrivesAtFarmLevel + "-й ступени земли"
-                : null;
+                : "все дома — больше никто не приедет";
         }
 
         private static void Raise(FarmerAgent arrived)

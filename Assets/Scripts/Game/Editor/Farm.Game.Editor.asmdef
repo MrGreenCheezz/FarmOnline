@@ -5,7 +5,8 @@
         "Farm.Farming",
         "Farm.Characters",
         "Farm.Game",
-        "Farm.Juice"
+        "Farm.Juice",
+        "Farm.Net"
     ],
     "includePlatforms": [
         "Editor"

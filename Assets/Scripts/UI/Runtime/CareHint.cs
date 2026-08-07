@@ -19,9 +19,11 @@ namespace Farm.UI
     [AddComponentMenu("Farm/UI/Care Hint")]
     public sealed class CareHint : MonoBehaviour
     {
-        private const string WaterLesson = "посевы и деревья можно полить, пока растут, — тапни, созреют раньше";
+        // Тексты называют ИНСТРУМЕНТ и место, где его взять: с 07.08.2026 клик пустой рукой
+        // только собирает, и урок «тапни, созреют раньше» звал бы к жесту, которого нет.
+        private const string WaterLesson = "возьми внизу «Ведро» и ткни растущую грядку — созреет раньше";
         private const string WaterLearned = "полито! вода набегает в колодец сама — ведро каждые два часа";
-        private const string FeedLesson = "за заказ дали подкормку — тапни по политой грядке ещё раз, урожай удвоится";
+        private const string FeedLesson = "за заказ дали удобрение — возьми его внизу и ткни растущую грядку: урожай удвоится";
         private const string FeedLearned = "подкормлено! урожай с этой грядки будет двойным";
 
         [Tooltip("Сколько молчать в начале партии. Урок в первую секунду читается как окно-затычка.")]
@@ -126,13 +128,14 @@ namespace Farm.UI
 
         private static bool AnyFeedable()
         {
-            // Подкормку жест предлагает только по политой грядке (см. PlotDragger) — урок
-            // обязан звать ровно к тому жесту, который сработает.
+            // Требование «сначала полить» ушло вместе со старым жестом: удобрение теперь
+            // свой инструмент и работает по любой растущей грядке. Урок обязан звать ровно
+            // к тому, что сработает, — значит и условие у него теперь шире.
             var plots = GrowableRegistry.All;
             for (int i = 0; i < plots.Count; i++)
             {
                 var plot = plots[i];
-                if (plot != null && plot.Watered && plot.CanFertilize) return true;
+                if (plot != null && plot.CanFertilize) return true;
             }
             return false;
         }

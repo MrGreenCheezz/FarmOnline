@@ -50,9 +50,11 @@ namespace Farm.Farming
         [Tooltip("Урожай на уровне 1.")]
         [SerializeField, Min(1)] private int _baseYield = 1;
 
-        [Tooltip("Во столько раз урожай умножается за каждый уровень выше первого.\n" +
-                 "2 зеркалит правило слияния: два уровня N дают один N+1, платящий вдвое.")]
-        [SerializeField, Min(1f)] private float _yieldPerLevel = 2f;
+        [Header("Слияние")]
+        [Tooltip("В какой вид перерождается грядка, когда сливаются две 20 уровня.\n" +
+                 "Следующая ступень своей линии (дуб для саженца, железо для меди).\n" +
+                 "Пусто — вершина линии: выше 20 уровня пути нет.")]
+        [SerializeField] private GrowableDefinition _mergeNext;
 
         [Header("После сбора")]
         [Tooltip("Вкл: грядка перезапускается с Regrow Stage вместо опустошения.")]
@@ -75,6 +77,9 @@ namespace Farm.Farming
         public ResourceDefinition YieldResource => _yieldResource;
         public bool Regrows => _regrows;
         public bool RemoveWhenEmpty => _removeWhenEmpty;
+
+        /// <summary>Следующая ступень линии для перехода слиянием; null — вершина.</summary>
+        public GrowableDefinition MergeNext => _mergeNext;
 
         public int StageCount => _stages != null ? _stages.Length : 0;
         public int LastStageIndex => StageCount - 1;
@@ -121,13 +126,17 @@ namespace Farm.Farming
             return 0;
         }
 
-        /// <summary>Размер урожая для данного уровня слияния.</summary>
+        /// <summary>
+        /// Размер урожая для данного уровня слияния. Линейно уровню: уровень — это число
+        /// слитых грядок (правило «суммой», решение владельца 06.08.2026), и слияние
+        /// сохраняет суммарный доход, выигрывая место, а не печатает его. Экспонента ×2,
+        /// жившая здесь раньше, на потолке 20 давала бы полмиллиона единиц за сбор.
+        /// </summary>
         public int YieldFor(int level)
         {
             int lvl = Mathf.Max(1, level);
-            double amount = _baseYield * Math.Pow(_yieldPerLevel, lvl - 1);
-            if (amount >= int.MaxValue) return int.MaxValue;
-            return Mathf.Max(1, (int)Math.Round(amount));
+            long amount = (long)_baseYield * lvl;
+            return (int)Math.Min(int.MaxValue, Math.Max(1, amount));
         }
 
         private void EnsureCache()

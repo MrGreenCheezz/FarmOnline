@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Farm.Farming
@@ -116,7 +117,9 @@ namespace Farm.Farming
             _running = null;
 
             var storage = FarmingRuntime.Sink as IInventory;
-            int stored = storage != null ? storage.TryAdd(recipe.Output, recipe.OutputAmount) : 0;
+            int stored = storage != null
+                ? storage.TryAdd(recipe.Output, recipe.OutputAmount, _runningGrade)
+                : 0;
 
             // Полный склад откажет — тогда партия пропадает, но молча этого делать нельзя.
             if (stored < recipe.OutputAmount)
@@ -135,13 +138,30 @@ namespace Farm.Farming
             var storage = FarmingRuntime.Sink as IInventory;
             if (storage == null) return false;
 
-            int taken = storage.TryRemove(recipe.Input, recipe.InputAmount);
-            if (taken < recipe.InputAmount)
+            // Списываем строку за строкой и откатываем всё разом при первой же недостаче:
+            // у составного рецепта частичное списание оставило бы игрока без муки и без
+            // хлеба — цена взята, товара нет.
+            int lines = recipe.InputCount;
+            var taken = _takenGrades;
+            taken.Clear();
+
+            for (int i = 0; i < lines; i++)
             {
-                // Кто-то успел забрать сырьё между проверкой и списанием — вернуть и подождать.
-                if (taken > 0) storage.TryAdd(recipe.Input, taken);
+                var resource = recipe.InputResourceAt(i);
+                int need = recipe.InputAmountAt(i);
+
+                if (TakeLine(storage, resource, need, taken)) continue;
+
+                Refund(storage, taken);
                 return false;
             }
+
+            // Сорт партии — худший среди взятого: цепочка не бывает лучше слабого звена,
+            // и отборная доска из отборного клёна с обычным клеем была бы обманом ожидания.
+            _runningGrade = ResourceGrade.Prime;
+            for (int i = 0; i < taken.Count; i++)
+                if (taken[i].Grade < _runningGrade) _runningGrade = taken[i].Grade;
+            if (taken.Count == 0) _runningGrade = ResourceGrade.Common;
 
             _running = recipe;
             _startedAt = now;
@@ -181,7 +201,7 @@ namespace Farm.Farming
                 var recipe = recipes[i];
                 if (recipe == null || !recipe.IsValid) continue;
                 if (level < recipe.UnlockLevel) continue;
-                if (storage.GetAmount(recipe.Input) < recipe.InputAmount) continue;
+                if (!HasAllInputs(storage, recipe)) continue;
 
                 int value = recipe.OutputValue;
                 if (best != null && value <= bestValue) continue;
@@ -191,6 +211,103 @@ namespace Farm.Farming
             }
 
             return best;
+        }
+
+        /// <summary>Что уже взято под текущую партию — для отката и для сорта выхода.</summary>
+        private readonly List<InventoryEntry> _takenGrades = new List<InventoryEntry>(4);
+
+        /// <summary>Сорт идущей партии: он же станет сортом выхода.</summary>
+        private ResourceGrade _runningGrade = ResourceGrade.Common;
+
+        /// <summary>
+        /// Взять строку сырья, начиная с ЛУЧШЕГО сорта. Именно лучшее, а не дешёвое:
+        /// игрок, поливший клён девять циклов, ждёт отборную доску, и станок, аккуратно
+        /// обошедший его отборное сырьё ради обычного, читался бы как поломка. Ценность
+        /// при этом не теряется — маржа станка переносит надбавку в выход.
+        /// </summary>
+        private static bool TakeLine(IInventory storage, ResourceDefinition resource, int need,
+                                     List<InventoryEntry> taken)
+        {
+            var order = ResourceGrades.All;
+            int left = need;
+
+            for (int g = order.Length - 1; g >= 0 && left > 0; g--)
+            {
+                int got = storage.TryRemove(resource, left, order[g]);
+                if (got <= 0) continue;
+
+                taken.Add(new InventoryEntry(resource, got, order[g]));
+                left -= got;
+            }
+
+            return left <= 0;
+        }
+
+        /// <summary>Вернуть на склад всё, что успели взять, — каждую стопку своим сортом.</summary>
+        private static void Refund(IInventory storage, List<InventoryEntry> taken)
+        {
+            for (int i = 0; i < taken.Count; i++)
+                storage.TryAdd(taken[i].Resource, taken[i].Amount, taken[i].Grade);
+
+            taken.Clear();
+        }
+
+        /// <summary>Лежит ли на складе всё сырьё рецепта разом.</summary>
+        private static bool HasAllInputs(IInventory storage, WorkshopRecipe recipe)
+        {
+            int lines = recipe.InputCount;
+            for (int i = 0; i < lines; i++)
+                if (storage.GetAmount(recipe.InputResourceAt(i)) < recipe.InputAmountAt(i)) return false;
+
+            return true;
+        }
+
+        /// <summary>
+        /// Чего не хватает станку, чтобы взяться за самый ценный доступный уровню рецепт, —
+        /// или null, когда дело только в пустом складе целиком. Существует ради правила
+        /// заметности: составной рецепт стоит молча ровно так же, как простой, но причин
+        /// у простоя стало больше одной, и «сырья бы» перестало быть ответом.
+        /// </summary>
+        public ResourceDefinition MissingInput()
+        {
+            var definition = Building != null ? Building.Definition : null;
+            var recipes = definition != null ? definition.Recipes : null;
+            var storage = FarmingRuntime.Sink as IInventory;
+            if (recipes == null || storage == null) return null;
+
+            int level = Building.Level;
+
+            ResourceDefinition missing = null;
+            int bestValue = 0;
+
+            for (int i = 0; i < recipes.Count; i++)
+            {
+                var recipe = recipes[i];
+                if (recipe == null || !recipe.IsValid || level < recipe.UnlockLevel) continue;
+
+                // Интересен самый ценный рецепт, которому не хватает ОДНОЙ строки: он и есть
+                // «почти можем». Рецепт, где нет ничего, назвать нечем — это просто пустой склад.
+                ResourceDefinition lacking = null;
+                int lines = recipe.InputCount;
+                bool single = true;
+
+                for (int line = 0; line < lines; line++)
+                {
+                    var resource = recipe.InputResourceAt(line);
+                    if (storage.GetAmount(resource) >= recipe.InputAmountAt(line)) continue;
+
+                    if (lacking != null) { single = false; break; }
+                    lacking = resource;
+                }
+
+                if (!single || lacking == null) continue;
+                if (recipe.OutputValue <= bestValue) continue;
+
+                bestValue = recipe.OutputValue;
+                missing = lacking;
+            }
+
+            return missing;
         }
 
         // ---- сохранение ----
@@ -205,9 +322,13 @@ namespace Farm.Farming
             outputId = null;
             elapsed = 0.0;
 
-            if (_running == null || _running.Input == null || _running.Output == null) return false;
+            if (_running == null || !_running.IsValid) return false;
 
-            inputId = _running.Input.Id;
+            // Формат снимка не тронут ради составных рецептов: в inputId уезжает ПЕРВАЯ
+            // строка сырья, а узнаётся партия по выходу — он у станка уникален. Менять
+            // формат ради второго ингредиента значило бы сломать чужие партии в сейвах
+            // ради поля, которое и так не решает.
+            inputId = _running.InputResourceAt(0) != null ? _running.InputResourceAt(0).Id : null;
             outputId = _running.Output.Id;
             elapsed = System.Math.Max(0.0, FarmingRuntime.Now - _startedAt);
             return true;
@@ -224,12 +345,19 @@ namespace Farm.Farming
             var recipes = definition != null ? definition.Recipes : null;
             if (recipes == null) return;
 
+            // Ищем по выходу — он у станка уникален, — а первой строкой сырья лишь уточняем
+            // при совпадении выходов. Так партия переживает и превращение простого рецепта
+            // в составной: сырьё уже списано, и терять её из-за нового ингредиента нельзя.
             WorkshopRecipe found = null;
             for (int i = 0; i < recipes.Count; i++)
             {
                 var recipe = recipes[i];
-                if (recipe == null || recipe.Input == null || recipe.Output == null) continue;
-                if (recipe.Input.Id == inputId && recipe.Output.Id == outputId) { found = recipe; break; }
+                if (recipe == null || !recipe.IsValid || recipe.Output.Id != outputId) continue;
+
+                found = recipe;
+
+                var first = recipe.InputResourceAt(0);
+                if (first != null && first.Id == inputId) break;
             }
 
             // Рецепт исчез из ассета — честно сказать и отпустить: сырьё этой партии
@@ -254,8 +382,24 @@ namespace Farm.Farming
         {
             if (_running == null) return;
 
+            // Возвращаем ровно те стопки, что взяли, — со своими сортами. Список пуст,
+            // если партия пришла из сейва: там сортов взятого нет, и вернуть их неоткуда
+            // (сырьё в снимке уже списано). Тогда возвращаем обычным — потеря надбавки
+            // за уход честнее исчезновения сырья.
             var storage = FarmingRuntime.Sink as IInventory;
-            if (storage != null) storage.TryAdd(_running.Input, _running.InputAmount);
+            if (storage != null)
+            {
+                if (_takenGrades.Count > 0)
+                {
+                    Refund(storage, _takenGrades);
+                }
+                else
+                {
+                    int lines = _running.InputCount;
+                    for (int i = 0; i < lines; i++)
+                        storage.TryAdd(_running.InputResourceAt(i), _running.InputAmountAt(i));
+                }
+            }
 
             _running = null;
             Raise(WorkChanged, null);

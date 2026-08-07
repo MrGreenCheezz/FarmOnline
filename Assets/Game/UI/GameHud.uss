@@ -402,7 +402,7 @@
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 44px;
+    bottom: 116px;  /* над панелью инструментов: карточки занимают низ до ~104 px */
     font-size: var(--text-md);
     color: var(--ink-warm);
     -unity-text-align: middle-center;
@@ -697,6 +697,7 @@
     border-radius: 0;
     padding: 8px 16px;
     margin: 0;
+    white-space: normal; /* взведённое подтверждение росы длиннее обычного пункта */
     -unity-text-align: middle-left;
 }
 
@@ -923,6 +924,16 @@
 }
 
 .shop-item__price--unaffordable { color: var(--danger); }
+
+/* Замок прогрессии («нужен уровень игрока N») — не цвет цены: дорогое копится,
+   запертое требует уровня, и путать их значит звать копить там, где копить нечего. */
+.shop-item__lock {
+    font-size: var(--text-sm);
+    color: var(--muted);
+    -unity-font-style: italic;
+    margin-top: 2px;
+    white-space: normal; /* у Label переноса нет по умолчанию — на телефоне строка ушла бы под кнопку */
+}
 
 /* ================= полосы прокрутки =================
 
@@ -1418,10 +1429,12 @@
    стоит на 20…292 — центрированная надпись обязана лечь на «ФЕРМЕРА», куда её ни двигай
    по вертикали (замер: 04_toast_queue, первый заход — легла).
    Внизу портрета пусто до самого края: колонка кончается около 1165, экран — 1714.
-   96 снизу оставляет место первому уроку (`.lesson`, 44) и не спорит с ним. */
+   Отсчёт снизу вверх: панель инструментов (карточки, до ~104), над ней первый урок
+   (`.lesson`, 116), над ним поздравление — иначе три сообщения дерутся за одну полосу
+   ровно в тот вечер, когда игрок берёт первую веху и ещё читает уроки. */
 .vp--narrow .toast-layer {
     top: auto;
-    bottom: 96px;
+    bottom: 168px;
 }
 
 .vp--narrow .toast {
@@ -1447,4 +1460,114 @@
 .vp--wide #shop-list > .shop-item {
     width: 48%;
     margin: 4px 1%;
+}
+
+/* ================= панель инструментов =================
+
+   Карточки снизу по центру: там их ищет большой палец на телефоне и взгляд на
+   мониторе, и там они не спорят ни с топбаром (верх), ни с колонкой панелей (право).
+   Абсолютная, а не ребёнок колонки hud: та выравнивает детей по левому краю, и
+   центровать в ней пришлось бы распорками.
+
+   Карточка, а не кнопка-строка: у инструмента три вещи, которые игрок читает разом, —
+   что это (иконка), как называется (подпись) и сколько осталось (счёт). В строку они
+   влезают только сокращениями, а сокращённый интерфейс перестают читать. */
+.toolbar {
+    position: absolute;
+    bottom: 12px;
+    left: 0;
+    right: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+.tool {
+    width: 104px;
+    /* Высота фиксирована: карточка со счётчиком иначе выше соседей, и ряд прыгает —
+       неровный ряд читается как недоделка, а не как «у этого есть запас». */
+    height: 92px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 6px 2px 4px 2px;
+    margin: 0 4px;
+
+    /* Плашка HUD, а не деревянная кнопка: подпись на дереве тонет (тёмное по тёмному),
+       а карточек пять — читаться должны все разом, с одного взгляда вниз. Сквозь плашку
+       по-прежнему видно ферму: панель садится на поле, и глухая доска отняла бы полосу
+       земли, по которой игрок как раз и работает. */
+    background-image: none;
+    background-color: var(--panel);
+    border-width: 1px;
+    border-color: var(--wood-edge-soft);
+    border-radius: 8px;
+    color: var(--ink);
+    text-shadow: 1px 1px 2px var(--shadow);
+}
+
+.tool:hover {
+    background-color: var(--plate-quiet-hover);
+    border-color: var(--wood-edge);
+}
+
+/* Выбранный инструмент — зелёная кромка и подсветка: игрок обязан видеть, что у него
+   в руке, иначе «ведро в руке» превращается в невидимый режим, и первый же клик
+   по спелой грядке станет поливом. */
+.tool--on {
+    background-color: var(--accent-wash);
+    border-color: var(--accent);
+    border-width: 2px;
+    padding: 5px 1px 3px 1px;   /* минус толщина рамки: карточки не должны прыгать */
+}
+
+/* Инструмент, которым сейчас нечего делать (кормушки нет, удобрение кончилось),
+   гаснет, но остаётся нажимаемым: отказ обязан быть слышен, а спрятанная кнопка
+   молчит. Гашение — подсказка «нечем», а не запрет. */
+.tool--empty { opacity: 0.5; }
+
+.tool__icon {
+    width: 40px;
+    height: 40px;
+    -unity-background-scale-mode: scale-to-fit;
+}
+
+/* Иконки — из USS, а не кодом: спрайт через AssetDatabase живёт только в редакторе
+   и в веб-сборке пропал бы молча. Тем же путём приходит весь остальной скин. */
+#tool-hand-icon  { background-image: url("project://database/Assets/Game/UI/Icons/tool_hand.png"); }
+#tool-move-icon  { background-image: url("project://database/Assets/Game/UI/Icons/tool_move.png"); }
+#tool-water-icon { background-image: url("project://database/Assets/Game/UI/Icons/tool_water.png"); }
+#tool-feed-icon  { background-image: url("project://database/Assets/Game/UI/Icons/tool_feed.png"); }
+#tool-fert-icon  { background-image: url("project://database/Assets/Game/UI/Icons/tool_fert.png"); }
+
+/* Кегль сносок, а не рабочего текста: «Удобрение» и «Перенос» рвались надвое даже
+   на широкой карточке, а разорванное слово читается медленнее целого мелкого. */
+.tool__name {
+    font-size: var(--text-xs);
+    -unity-font-style: bold;
+    -unity-text-align: middle-center;
+    color: var(--ink);
+    white-space: nowrap;
+    margin-top: 2px;
+}
+
+/* Счёт зарядов — под подписью и тише её: он меняется, а название нет. Пустая строка
+   при отсутствии счёта не занимает места (display ставит код). */
+.tool__count {
+    font-size: var(--text-sm);
+    color: var(--gold);
+    -unity-text-align: middle-center;
+}
+
+/* Призрак перетаскиваемой иконки: летит за пальцем поверх всего и кликов не ловит. */
+.tool-ghost {
+    position: absolute;
+    translate: -50% -50%;
+    padding: 6px 12px;
+    background-color: var(--plate-quiet);
+    border-radius: 8px;
+    color: var(--ink-warm);
+    -unity-font-style: bold;
+    font-size: var(--text-sm);
 }

@@ -16,5 +16,4 @@ MonoBehaviour:
   Harvest: {fileID: 9157759754266823691, guid: 0d821853a162ed6459129c3f8d12ffc4, type: 3}
   Plant: {fileID: 1643873110058818884, guid: 938572ccd599c8548aaa1f1a416ad88f, type: 3}
   Ready: {fileID: 141639185576527995, guid: 519d1f9c08b9a7041825028e51b4fdb9, type: 3}
-  Wither: {fileID: 5449794246490436675, guid: 78b13db778c2bc54db79ead961a75032, type: 3}
   Place: {fileID: 679957706177514889, guid: 9f56e3d332bff7b4d98b48f984ac16fc, type: 3}

@@ -51,11 +51,24 @@ namespace Farm.Farming
             if (Instance == this) Instance = null;
         }
 
+        /// <summary>
+        /// Потолок кошелька — зеркалит MAX_GOLD сервера (server.py): снимок с бо́льшим
+        /// золотом сервер отклоняет 400 bad_gold НАВСЕГДА, и без клампа здесь ферма,
+        /// перелившаяся через миллиард, перестала бы сохраняться. Заметность потери —
+        /// в HUD: у потолка строка золота говорит «кубышка полна» (GameHud.RefreshGold).
+        /// </summary>
+        public const int MaxGold = 1_000_000_000;
+
         public void Add(int amount)
         {
             if (amount <= 0) return;
-            _gold = Gold + amount;
-            Raise(amount);
+
+            long total = (long)Gold + amount;
+            int lost = (int)Math.Max(0, total - MaxGold);
+            _gold = (int)Math.Min(MaxGold, total);
+
+            if (lost > 0) Debug.Log("[Economy] Кубышка полна: сгорело " + lost + " зол. (потолок сервера)");
+            Raise(amount - lost);
         }
 
         public bool CanAfford(int amount) => Gold >= amount;
@@ -74,8 +87,9 @@ namespace Farm.Farming
         /// <summary>Поставить золото как есть — для загрузки сохранения. Событие поднимается с дельтой.</summary>
         public void RestoreState(int gold)
         {
-            int delta = Mathf.Max(0, gold) - Gold;
-            _gold = Mathf.Max(0, gold);
+            int clamped = Mathf.Clamp(gold, 0, MaxGold);
+            int delta = clamped - Gold;
+            _gold = clamped;
             _initialised = true;
             if (delta != 0) Raise(delta);
         }

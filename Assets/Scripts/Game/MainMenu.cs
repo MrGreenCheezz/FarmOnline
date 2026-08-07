@@ -460,6 +460,9 @@ namespace Farm.Game
 
                 NetSession.Clear();
                 FarmSave.Delete();
+                // Накопитель гостевой помощи — тоже персональный: без чистки помощь
+                // аккаунта A влилась бы первому вошедшему здесь аккаунту B (судья этапа 8).
+                PlayerPrefs.DeleteKey(Farm.Farming.GuestMode.PendingHelpKey);
                 Refresh();
 
                 Status(res.Transport

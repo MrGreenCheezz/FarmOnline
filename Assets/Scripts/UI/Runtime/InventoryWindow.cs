@@ -130,7 +130,9 @@ namespace Farm.UI
                 while (left > 0)
                 {
                     int part = Mathf.Min(stack, left);
-                    _stacks.Add(new InventoryEntry(entries[i].Resource, part));
+                    // Сорт едет с куском: стопки разных сортов лежат в складе порознь,
+                    // и в сетке они обязаны выглядеть разными ячейками, а не одной кучей.
+                    _stacks.Add(new InventoryEntry(entries[i].Resource, part, entries[i].Grade));
                     left -= part;
                 }
             }
@@ -201,8 +203,14 @@ namespace Farm.UI
                 // не должна обещать меньше, чем реально заплатит кнопка продажи.
                 // Всего — потому что ресурс мог растечься по нескольким ячейкам, а продажа
                 // всё равно берёт со склада целиком.
+                // Сорт называется словом в подсказке и звездой на ячейке: слово объясняет,
+                // звезда замечается боковым зрением. Одного мало — надбавка за уход должна
+                // быть видна и при беглом взгляде, и при разглядывании.
+                string mark = ResourceGrades.Mark(entry.Grade);
                 cell.tooltip = entry.Resource != null
-                    ? entry.Resource.DisplayName + " — " + UnitPrice(entry.Resource) + " зол./шт" +
+                    ? entry.Resource.DisplayName +
+                      (entry.Grade == ResourceGrade.Common ? "" : " (" + ResourceGrades.Name(entry.Grade) + ")") +
+                      " — " + UnitPrice(entry.Resource, entry.Grade) + " зол./шт" +
                       ", всего " + _storage.GetAmount(entry.Resource)
                     : null;
 
@@ -211,15 +219,20 @@ namespace Farm.UI
                         ? new StyleBackground(entry.Resource.Icon)
                         : new StyleBackground();
 
-                if (label != null) label.text = entry.Amount.ToString();
+                if (label != null)
+                    label.text = mark.Length > 0
+                        ? entry.Amount + " " + mark
+                        : entry.Amount.ToString();
             }
         }
 
-        /// <summary>Сколько золота даёт единица прямо сейчас. До появления магазина — сырая цена ресурса.</summary>
-        private static int UnitPrice(ResourceDefinition resource)
+        /// <summary>Сколько золота даёт единица этого сорта. До появления магазина — сырая цена.</summary>
+        private static int UnitPrice(ResourceDefinition resource, ResourceGrade grade)
         {
             var shop = Shop.Instance;
-            return shop != null ? shop.SellValue(resource, 1) : resource.SellPrice;
+            return shop != null
+                ? shop.SellValue(resource, 1, grade)
+                : Mathf.RoundToInt(resource.SellPrice * ResourceGrades.PriceFactor(grade));
         }
 
         private VisualElement CreateCell()

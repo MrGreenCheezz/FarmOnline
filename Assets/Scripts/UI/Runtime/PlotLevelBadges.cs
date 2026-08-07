@@ -116,6 +116,10 @@ namespace Farm.UI
             _blockers.Clear();
             Add(root?.Q<VisualElement>("topbar"));
             Add(root?.Q<VisualElement>("hud-panels"));
+            // Панель инструментов — тот же случай: мировой слой рисуется поверх HUD, и плашка
+            // грядки в нижнем левом углу легла бы прямо на кнопки (с панорамой и зумом грядка
+            // там — обычное дело).
+            Add(root?.Q<VisualElement>("toolbar"));
 
             if (_camera == null) _camera = Camera.main;
             if (_layer == null) enabled = false;
@@ -202,8 +206,15 @@ namespace Farm.UI
 
                 // Качество земли — звёздами, отдельно от уровня: уровень говорит «с чем сливать»,
                 // звезда — «эту грядку выхаживали». Пустая строка сжимается раскладкой сама.
-                int bonus = plot.QualityBonus;
-                badge.Quality.text = bonus >= 2 ? "★★" : bonus == 1 ? "★" : "";
+                // <para>
+                // Третья звезда появилась вместе с сортом (07.08.2026) и держит шкалу единой:
+                // ★★ — отборный урожай, ★★★ — призовой. Без неё девять циклов ухода выглядели
+                // бы так же, как пять, и сорт читался бы как случайность.
+                // </para>
+                int streak = plot.CareStreak;
+                badge.Quality.text = streak >= Growable.PrimeGradeStreak ? "★★★"
+                                   : streak >= Growable.PrimeCareStreak ? "★★"
+                                   : streak >= Growable.GoodCareStreak ? "★" : "";
 
                 // Иконка есть не у всего: у жилы или дерева без назначенного ресурса плашка
                 // просто остаётся цифрой, а не показывает пустой квадрат.

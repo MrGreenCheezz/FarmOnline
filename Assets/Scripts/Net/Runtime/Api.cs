@@ -285,6 +285,11 @@ namespace Farm.Net
         public string resourceId;
         public int amount;
         public int gold;
+
+        /// <summary>Возврат продавцовой доли при самовыкупе своего лота (иначе 0):
+        /// отмена стоит ровно спред, и возврат едет сразу в ответе, не событием.</summary>
+        public int refund;
+
         public string error;
     }
 }

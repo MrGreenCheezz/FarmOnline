@@ -171,10 +171,23 @@ namespace Farm.UI
             if (_workLabel != null)
                 _workLabel.text = running != null
                     ? running.ToString() + "   " + _workshop.BatchSeconds(running).ToString("0.0") + " с"
-                    : "простаивает — нет сырья";
+                    : IdleReason();
 
             if (_workFill != null)
                 _workFill.style.width = new StyleLength(Length.Percent(_workshop.Progress01 * 100f));
+        }
+
+        /// <summary>
+        /// Почему станок стоит. С составными рецептами «нет сырья» перестало быть ответом:
+        /// мука есть, яиц нет — и молчаливое «нет сырья» отправляет игрока искать не то.
+        /// Названная строка превращает простой из поломки в задачу.
+        /// </summary>
+        private string IdleReason()
+        {
+            var missing = _workshop.MissingInput();
+            return missing != null
+                ? "стоит — нужно: " + missing.DisplayName
+                : "простаивает — нет сырья";
         }
 
         private void RefreshNextLevel(BuildingDefinition definition)

@@ -85,13 +85,25 @@ TARGET_LUMA = 0.27
 # поэтому у руды почти серый сланец. У растений наоборот: стебли тусклые, плашке
 # можно быть сочной.
 LINES = {
-    "crop":      (0.30, 0.40, ["wheat", "corn", "pumpkin", "melon", "bamboo", "ginseng", "goldbloom"]),
+    # Посевы и живность дотянуты до двенадцатой ступени 07.08.2026 — линии сравнялись
+    # с деревом и рудой, и насечек у них теперь столько же.
+    "crop":      (0.30, 0.40, ["wheat", "corn", "pumpkin", "melon", "bamboo", "ginseng", "goldbloom",
+                               "moonroot", "sunroot", "spiritherb", "stormberry", "worldfruit",
+                               "starstalk"]),
     "wood":      (0.055, 0.50, ["wood", "oak", "ironwood", "maple", "yew", "ebony", "crimsonwood", "spiritwood",
                                 "moonwood", "sunwood", "stormwood", "worldtree"]),
     "ore":       (0.58, 0.16, ["copper", "iron", "silver", "gold", "platinum", "mithril", "adamant", "starmetal",
                                "orichalcum", "moonstone", "dragonite", "starheart"]),
-    "livestock": (0.95, 0.36, ["meat", "cheese", "bacon", "eggs", "honey", "down", "antler"]),
-    "crafted":   (0.72, 0.28, ["plank", "beam", "ingot_copper", "ingot_iron"]),
+    "livestock": (0.95, 0.36, ["meat", "cheese", "bacon", "eggs", "honey", "down", "antler",
+                               "firefur", "plume", "moonfang", "skyhorn", "sunmane",
+                               "titantusk", "starclaw"]),
+    "crafted":   (0.72, 0.28, ["plank", "beam", "ingot_copper", "ingot_iron",
+                                "ingot_silver", "plank_maple", "ingot_gold", "beam_yew"]),
+    # Готовая еда — своя линия, а не хвост crafted: доска и хлеб расходятся не ступенью,
+    # а тем, что с ними делают, и общая плашка врала бы о родстве. Тон 0.85 — единственная
+    # широкая щель, оставшаяся между crafted (0.72) и живностью (0.95); насыщенность
+    # высокая по той же причине, что у посевов: печёное имеет право быть аппетитным.
+    "cooked":    (0.85, 0.45, ["flour", "bread", "pie"]),
     "night":     (0.47, 0.32, ["firefly", "moondew"]),
 }
 

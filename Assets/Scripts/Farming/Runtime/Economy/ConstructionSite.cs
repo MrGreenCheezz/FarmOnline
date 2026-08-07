@@ -142,7 +142,11 @@ namespace Farm.Farming
                     if (building == null) building = built.AddComponent<Building>();
                     building.Configure(definition, 1);
 
-                    if (definition.Service == BuildingService.Workshop && built.GetComponent<Workshop>() == null)
+                    // Станком делают рецепты, а не служба: кухня печёт и продолжает кормить.
+                    // Служба проверяется тоже — станок без рецептов раньше компонент получал,
+                    // и отнимать это на ровном месте значило бы менять поведение молча.
+                    if ((definition.HasRecipes || definition.Service == BuildingService.Workshop) &&
+                        built.GetComponent<Workshop>() == null)
                         built.AddComponent<Workshop>();
                 }
             }

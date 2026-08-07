@@ -169,6 +169,12 @@ CREATE TABLE IF NOT EXISTS market_ledger(
     day        TEXT,
     sold_today INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS gift_ledger(
+    player       INTEGER PRIMARY KEY REFERENCES players(id),
+    day          TEXT,
+    gifted_today INTEGER NOT NULL DEFAULT 0
+);
 """
 
 
@@ -177,12 +183,35 @@ CREATE TABLE IF NOT EXISTS market_ledger(
 #: не должен доехать до базы.
 MAX_GOLD = 1_000_000_000
 MAX_PLOTS = 500
-MAX_LEVEL = 30
+# Потолок уровня слияния — 20 (слияние 2.0, 06.08.2026): две двадцатки перерождаются
+# в следующую ступень уровня 10, выше клиент подняться не даёт. Сейвов старше нового
+# правила с уровнем 21..30 существовать не может: экспонента прежнего правила требовала
+# бы порядка двух миллионов КУПЛЕННЫХ грядок суммарно (2^21 вливаний) — цена, а не
+# одновременность; замер по живой базе: максимум уровня в сейвах — 6.
+MAX_LEVEL = 20
 
-# Вода и подкормка (FarmWater, FarmFertilizer в клиенте). Потолок воды — колодец
-# последнего уровня с запасом на будущие уровни; подкормка потолок держит сама.
+# Вода, подкормка и корм (FarmWater, FarmFertilizer, FarmFeed в клиенте). Потолок воды —
+# колодец последнего уровня с запасом на будущие уровни; подкормка потолок держит сама;
+# корм — хлев третьего, последнего уровня даёт 4 + 2×2 = 8 мешков, остальное запас на вырост
+# (лестницу хлева удлинить проще, чем ловить отказ снимка у игрока).
 MAX_WATER_CHARGES = 60
 MAX_FERTILIZER_CHARGES = 12
+MAX_FEED_CHARGES = 40
+
+# Награды вех — зеркало FarmAchievements.All в клиенте (поменял там — поменяй здесь).
+# Нужны эвристике: веха падает золотом из ниоткуда в одном интервале PUT, и без
+# кредита КАЖДЫЙ честный игрок на крупных вехах получал бы пометку suspicious —
+# предсказуемый шум, замусоривающий сигнал человеку (судья этапа 8).
+ACHIEVEMENT_GOLD = {
+    "first_harvest": 50, "harvest_100": 400, "harvest_1000": 3000, "harvest_10000": 25000,
+    "first_merge": 50, "merge_50": 600, "merge_500": 6000,
+    "farm_2": 300, "farm_4": 4000, "farm_6": 40000, "farm_8": 300000, "farm_10": 1500000,
+    "order_1": 100, "order_25": 2500, "order_100": 12000,
+    "gold_10000": 1000, "gold_100k": 2000, "gold_1m": 15000,
+    "gold_10m": 120000, "gold_100m": 800000,
+    "level_10": 2000, "level_20": 20000, "level_35": 100000,
+    "friend_1": 300, "help_1": 300, "help_50": 3000, "gift_10": 1000, "market_1": 300,
+}
 
 # Опыт растёт только сложением малых чисел; сто миллионов не набрать и за годы —
 # всё сверх читается как подделка, а не как рекорд.
@@ -191,9 +220,21 @@ MAX_XP = 100_000_000
 # Growable.CareStreakMax в клиенте.
 MAX_CARE_STREAK = 9
 
+# Последний сорт ResourceGrade в клиенте (обычный=0, отборный=1, призовой=2).
+# Сорт входит в оценку богатства надбавкой к цене, поэтому номер из ниоткуда — это
+# множитель из ниоткуда, и дверь ему закрыта так же, как множителю роста грядки.
+MAX_GRADE = 2
+
 # Потолок одного подарка, штук. Щедрость — да, канал перекачки — нет: крупная передача
 # ценности должна быть видна (рынок), а не прятаться в поздравительной открытке.
-MAX_GIFT_AMOUNT = 100
+# Было 100 — граница, недостижимая из UI (кнопка дарит по 5) и дырявая по ценности
+# (100 сердец звезды = 24.9 млн в одном письме). Снижено при закрытии дыр подарков.
+MAX_GIFT_AMOUNT = 20
+
+# Потолок ЦЕННОСТИ подарков за календарные сутки на дарителя, по каталожной цене.
+# Подарки были единственным каналом без лимитов вовсе (аудит 06.08.2026): счётный
+# потолок штук не видит разницы между пшеницей и сердцем звезды — видит золото.
+GIFT_DAILY_GOLD = 25_000
 
 # --- Рынок. Цены фиксированы от каталога, а не свободны, и это главное решение:
 # --- свободная цена тащит за собой вилки, демпинг, арбитраж с лавкой и твинко-насосы,
@@ -206,11 +247,16 @@ MARKET_MAX_AMOUNT = 500       # штук в одном лоте
 MARKET_LOT_TTL = 48 * 3600.0  # через столько невыкупленный лот едет домой событием
 MARKET_DAILY_SELL_GOLD = 50_000  # потолок выручки продавца в календарные сутки — капельница вместо насоса
 
-# Во сколько раз уход может поднять доход фермы: подкормка удваивает урожай
-# (FarmFertilizer.YieldMultiplier), полив срезает часть ожидания. Учитывается
-# в потолке дохода отдельным множителем, чтобы общий запас ×3 остался тому,
-# для чего вводился, — аурам, рынку и подаркам, а не съедался уходом.
-CARE_INCOME_FACTOR = 2.4
+# Во сколько раз уход может поднять доход фермы. Каналов ухода три: подкормка удваивает
+# урожай растениям (FarmFertilizer.YieldMultiplier), корм — скотине (FarmFeed, 07.08.2026),
+# полив срезает часть ожидания. Сложиться на одной грядке они не могут (категории
+# не пересекаются), но корм добавил ×2 той половине фермы, у которой раньше множителя
+# не было вовсе. Замер худшего честного случая: ферма из живности с кормом при ветряке
+# и большом амбаре последних уровней даёт ≈7.0× базовой ставки каталога — при 2.4 запас
+# сходился впритык (2.4 × 3 = 7.2). Поднято до 2.8, чтобы честный максимум не помечался
+# от одного лишнего усилителя; общий запас ×3 по-прежнему принадлежит аурам, рынку
+# и подаркам, а не уходу.
+CARE_INCOME_FACTOR = 2.8
 
 #: Запас на мастерового у станка (этап 2 колонии): Ремесло последнего уровня ускоряет
 #: партии в 1.25 + 9×0.14 = 2.51 раза — берём 2.6, чтобы честный максимум не помечался.
@@ -235,7 +281,7 @@ class Catalog:
     def __init__(self, path):
         self.prices = {}   # resourceId -> цена продажи за единицу
         self.rates = {}    # growableId -> золото/сек с грядки 1-го уровня
-        self.craft = {}    # buildingId -> лучший прирост золота/сек мастерской (уже с потолком уровня)
+        self.craft = {}    # buildingId -> [(unlockLevel, прирост золота/сек)] по рецептам
         self.loaded = False
         self.generated = "?"
 
@@ -255,26 +301,44 @@ class Catalog:
 
         # Маржа мастерских (этап 2 колонии): партия превращает дешёвое сырьё в дорогой
         # выход, и прирост богатства за секунду — это маржа рецепта на скорости
-        # последнего уровня постройки. Мастеровой у станка умножается уже снаружи,
-        # общим запасом CRAFT_TEND_FACTOR в income_ceiling.
+        # последнего уровня постройки. Рецепты хранятся с уровнем открытия: кредитовать
+        # лесопилку первого уровня маржой рецепта пятого значило бы поднять её потолок
+        # в ~7 раз и ослепить эвристику (судья этапа 7). Мастеровой у станка умножается
+        # уже снаружи, общим запасом CRAFT_TEND_FACTOR в income_ceiling.
         for row in data.get("workshops", []):
             seconds = row.get("seconds") or 0
             if seconds <= 0:
                 continue
-            gain = (self.prices.get(row.get("outputId", ""), 0) * row.get("outputAmount", 1)
-                    - self.prices.get(row.get("inputId", ""), 0) * row.get("inputAmount", 1))
+            # Составной рецепт (мука + яйца → пирог) стоит суммы своих строк. Список
+            # inputs — новый формат; старый каталог с одиночным входом читается как
+            # раньше, иначе перезапуск сервера до перегона каталога обнулил бы цену
+            # сырья и завысил потолок дохода вдвое.
+            inputs = row.get("inputs")
+            if isinstance(inputs, list) and inputs:
+                cost = sum(self.prices.get(line.get("id", ""), 0) * line.get("amount", 1)
+                           for line in inputs if isinstance(line, dict))
+            else:
+                cost = self.prices.get(row.get("inputId", ""), 0) * row.get("inputAmount", 1)
+
+            gain = self.prices.get(row.get("outputId", ""), 0) * row.get("outputAmount", 1) - cost
             if gain <= 0:
                 continue
             rate = gain / seconds * max(1.0, row.get("maxOutput", 1.0))
-            building = row.get("buildingId", "")
-            if rate > self.craft.get(building, 0.0):
-                self.craft[building] = rate
+            unlock = row.get("unlockLevel", 1)
+            if not isinstance(unlock, int) or unlock < 1:
+                unlock = 1  # старый каталог без поля — как раньше, всё открыто
+            self.craft.setdefault(row.get("buildingId", ""), []).append((unlock, rate))
 
         self.generated = data.get("generatedAtUtc", "?")
         self.loaded = True
 
+    # Надбавка сорта к цене — зеркало ResourceGrades.PriceFactor на клиенте (07.08.2026).
+    # Расходиться им нельзя: отборный склад честного игрока иначе выглядел бы дешевле,
+    # чем есть, и первая же его распродажа читалась бы эвристикой как печать золота.
+    GRADE_FACTOR = {0: 1.0, 1: 1.4, 2: 2.0}
+
     def wealth(self, doc):
-        """Богатство снимка: золото + склад по ценам продажи."""
+        """Богатство снимка: золото + склад по ценам продажи с надбавкой за сорт."""
         total = float(doc.get("Gold") or 0)
         storage = doc.get("Storage") or {}
         for entry in storage.get("Entries") or []:
@@ -282,14 +346,16 @@ class Catalog:
                 continue
             amount = entry.get("Amount", 0)
             if isinstance(amount, (int, float)) and amount > 0:
-                total += self.prices.get(entry.get("ResourceId", ""), 0) * amount
+                grade = entry.get("Grade", 0)
+                factor = self.GRADE_FACTOR.get(grade if isinstance(grade, int) else 0, 1.0)
+                total += self.prices.get(entry.get("ResourceId", ""), 0) * amount * factor
         return total
 
     def income_ceiling(self, doc):
         """Потолок честного дохода фермы, золота в секунду.
 
-        Урожай удваивается с уровнем слияния — как в GrowableDefinition.YieldFor,
-        и это главный множитель; ауры и рынок покрываются общим запасом снаружи.
+        Урожай линеен уровню слияния — как в GrowableDefinition.YieldFor (слияние 2.0:
+        уровень — число слитых грядок); ауры и рынок покрываются общим запасом снаружи.
         """
         rate = 0.0
         for plot in doc.get("Plots") or []:
@@ -299,7 +365,9 @@ class Catalog:
             if not is_int(level):
                 level = 1
             level = max(1, min(MAX_LEVEL, level))
-            rate += self.rates.get(plot.get("GrowableId", ""), 0.0) * (2 ** (level - 1))
+            # Линейно уровню, как YieldFor в клиенте (слияние 2.0): уровень — число
+            # слитых грядок, урожай складывается, а не удваивается.
+            rate += self.rates.get(plot.get("GrowableId", ""), 0.0) * level
 
         # Мастерские фермы: маржа лучшего рецепта на потолочной скорости постройки,
         # с запасом на мастерового у станка (Ремесло 10 даёт ×2.51 — берём 2.6).
@@ -308,7 +376,14 @@ class Catalog:
         for building in doc.get("Buildings") or []:
             if not isinstance(building, dict):
                 continue
-            rate += self.craft.get(building.get("BuildingId", ""), 0.0) * CRAFT_TEND_FACTOR
+            recipes = self.craft.get(building.get("BuildingId", ""))
+            if not recipes:
+                continue
+            level = building.get("Level", 1)
+            if not is_int(level) or level < 1:
+                level = 1
+            best = max((rate for unlock, rate in recipes if unlock <= level), default=0.0)
+            rate += best * CRAFT_TEND_FACTOR
 
         # Уход поднимает потолок для всех грядок, а не только для отмеченных сейчас:
         # флаги в снимке говорят о текущем цикле, а богатство копится за многие циклы —
@@ -356,13 +431,29 @@ def validate_state(doc):
             return "bad_speed"
 
         # Уход — только да/нет. Клиент шлёт bool; число здесь означает подделку.
-        for flag in ("Watered", "Fertilized"):
+        # Fed — корм для скотины (07.08.2026), тот же класс поля, что и два соседних.
+        for flag in ("Watered", "Fertilized", "Fed"):
             if flag in plot and not isinstance(plot.get(flag), bool):
                 return "bad_plots"
 
         streak = plot.get("CareStreak", 0)
         if not is_int(streak) or streak < 0 or streak > MAX_CARE_STREAK:
             return "bad_plots"
+
+    # Склад: сорт стопки — только известная ступень. Проверка того же класса, что
+    # OwnGrowthSpeed у грядки: и то и другое — множитель ценности, и оба обязаны
+    # приходить из короткого списка, а не любым числом, какое пожелает клиент.
+    storage = doc.get("Storage") or {}
+    if not isinstance(storage, dict):
+        return "bad_state"
+
+    for entry in storage.get("Entries") or []:
+        if not isinstance(entry, dict):
+            return "bad_state"
+
+        grade = entry.get("Grade", 0)
+        if not is_int(grade) or grade < 0 or grade > MAX_GRADE:
+            return "bad_grade"
 
     water = doc.get("WaterCharges", 0)
     if not is_int(water) or water < 0 or water > MAX_WATER_CHARGES:
@@ -371,6 +462,15 @@ def validate_state(doc):
     fertilizer = doc.get("FertilizerCharges", 0)
     if not is_int(fertilizer) or fertilizer < 0 or fertilizer > MAX_FERTILIZER_CHARGES:
         return "bad_water"
+
+    # Корм: новое корневое поле, и без этой проверки оно прошло бы вообще без разбора —
+    # validate_state смотрит только перечисленные ключи, а безлимитный запас на клиенте
+    # означал бы безлимитный множитель урожая у всей скотины.
+    feed = doc.get("FeedCharges", 0)
+    if not is_int(feed) or feed < 0 or feed > MAX_FEED_CHARGES:
+        # Свой код, а не общий «bad_water»: отказ доезжает до игрока строкой, и врать
+        # ему про воду там, где дело в корме, — тот же молчаливый отказ, только хуже.
+        return "bad_feed"
 
     xp = doc.get("TotalXp", 0)
     if not is_int(xp) or xp < 0 or xp > MAX_XP:
@@ -817,7 +917,13 @@ class Db:
     def market_buy(self, buyer, lot_id, now):
         """Атомарная покупка: проверка, удаление лота, событие продавцу и его рыночный
         кредит — под одним замком. Второй покупатель того же лота получает None,
-        и его клиент не тронет ни золота, ни склада."""
+        и его клиент не тронет ни золота, ни склада.
+
+        Самовыкуп (buyer == seller — документированная отмена лота ценой спреда) идёт
+        без события и без кредита: возврат seller_gold едет прямо в ответе buy, клиент
+        зачисляет его сразу. Событие «на рынке купили…» самому себе читалось бы как
+        продажа кому-то, а кредит эвристике сгорал бы первым же PUT впустую и дарил
+        ложный suspicious на дорогих лотах (судья этапа 5)."""
         with self._lock:
             lot = self._conn.execute(
                 "SELECT id, seller, resource, amount, seller_gold, buyer_gold"
@@ -825,12 +931,16 @@ class Db:
             if lot is None:
                 return None
 
+            self._conn.execute("DELETE FROM market_lots WHERE id = ?", (lot_id,))
+
+            if buyer == lot["seller"]:
+                return lot
+
             payload = json.dumps({"ResourceId": lot["resource"], "Amount": lot["amount"],
                                   "Gold": lot["seller_gold"]})
             self._conn.execute(
                 "INSERT INTO events(to_player, from_player, type, payload, created_at)"
                 " VALUES (?, ?, 'market_sold', ?, ?)", (lot["seller"], buyer, payload, now))
-            self._conn.execute("DELETE FROM market_lots WHERE id = ?", (lot_id,))
 
             # Кредит к эвристике: сервер сам провёл сделку и знает сумму точно,
             # поэтому allowance поднимается ровно на неё, а не множителем на глазок.
@@ -859,6 +969,26 @@ class Db:
             self._conn.execute(
                 "UPDATE market_ledger SET sold_today = MAX(0, sold_today - ?) WHERE player = ?",
                 (gold, seller))
+
+    def gift_day_value(self, giver, day, add_gold):
+        """Ценность подарков дарителя за календарные сутки, по образцу market_day_turnover:
+        add_gold резервирует под новый подарок, вызвавший сравнивает с потолком и откатывает."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT day, gifted_today FROM gift_ledger WHERE player = ?", (giver,)).fetchone()
+            gifted = row["gifted_today"] if row is not None and row["day"] == day else 0
+            gifted += add_gold
+            self._conn.execute(
+                "INSERT INTO gift_ledger(player, day, gifted_today) VALUES (?, ?, ?)"
+                " ON CONFLICT(player) DO UPDATE SET day = ?, gifted_today = ?",
+                (giver, day, gifted, day, gifted))
+            return gifted
+
+    def gift_day_rollback(self, giver, gold):
+        with self._lock:
+            self._conn.execute(
+                "UPDATE gift_ledger SET gifted_today = MAX(0, gifted_today - ?) WHERE player = ?",
+                (gold, giver))
 
     def market_take_credit(self, player):
         """Забрать накопленный рыночный кредит (и обнулить): он одноразовый — до первого PUT."""
@@ -1222,6 +1352,13 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
                     # провёл эти сделки и знает их до монеты. Кредит одноразовый — до этого PUT.
                     allowance += self.db.market_take_credit(player["id"])
 
+                    # Награды свежевзятых вех — тоже точной суммой: снимок сам везёт их
+                    # список, и разница со старым называет каждую новую веху по имени.
+                    prev_earned = set(prev_doc.get("Achievements") or [])
+                    for earned_id in doc.get("Achievements") or []:
+                        if isinstance(earned_id, str) and earned_id not in prev_earned:
+                            allowance += ACHIEVEMENT_GOLD.get(earned_id, 0)
+
                     gain = self.catalog.wealth(doc) - self.catalog.wealth(prev_doc)
                     if gain > allowance:
                         suspicion = (gain, allowance, dt)
@@ -1308,6 +1445,11 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
         if data["type"] == "help_reward" and to_player != player["id"]:
             raise ApiError(403, "self_only")
 
+        # Дружба — раньше подарочных замков: gift-ветка ниже РЕЗЕРВИРУЕТ дневную
+        # ценность, и отказ not_friends после резерва сжигал бы лимит впустую.
+        if to_player != player["id"] and self.db.friendship(player["id"], to_player) != "accepted":
+            raise ApiError(403, "not_friends")
+
         # Подарок обязан быть скромным и настоящим: существующий ресурс, штук по каталогу.
         # Клиент зачисляет его на склад не глядя — значит смотреть обязан сервер.
         if data["type"] == "gift":
@@ -1324,9 +1466,27 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
             if self.catalog is not None and self.catalog.loaded and resource not in self.catalog.prices:
                 raise ApiError(400, "bad_gift")
 
-        # События — только друзьям: подарок от незнакомца — это спам-канал.
-        if to_player != player["id"] and self.db.friendship(player["id"], to_player) != "accepted":
-            raise ApiError(403, "not_friends")
+            # «Настоящий» — значит лежит в последнем снимке дарителя, как у рыночного
+            # лота: сервер не обязан верить, что дарёное вообще существовало. Клиент
+            # СПИСЫВАЕТ до отправки и сохраняется ПОСЛЕ ok — сверка идёт по снимку до
+            # списания, поэтому дарение всего запаса проходит. Снимок не дебетуется:
+            # модифицированный клиент может дарить один запас до следующего PUT — это
+            # осознанный остаток, зажатый потолком GIFT_DAILY_GOLD (≤25к/сутки).
+            if self._snapshot_amount(player["id"], resource) < amount:
+                raise ApiError(409, "not_in_snapshot")
+
+            # Суточный потолок ЦЕННОСТИ: подарки были единственным каналом вообще без
+            # лимитов, и именно они кормили ложные срабатывания эвристики богатства.
+            # Считаем золотом по каталогу — счётный потолок штук не отличает пшеницу
+            # от сердца звезды. Без каталога ценность неизвестна — тогда только штучный.
+            if self.catalog is not None and self.catalog.loaded:
+                value = int(amount * float(self.catalog.prices.get(resource, 0)))
+                day = time.strftime("%Y-%m-%d", time.gmtime(time.time()))
+                if self.db.gift_day_value(player["id"], day, value) > GIFT_DAILY_GOLD:
+                    self.db.gift_day_rollback(player["id"], value)
+                    raise ApiError(429, "gift_daily_limit")
+
+        # (Проверка дружбы стоит выше, до подарочных замков.)
         self.db.add_event(to_player, player["id"], data["type"], payload, time.time())
         return {"ok": True, "serverNow": time.time()}
 
@@ -1351,11 +1511,16 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
             doc = json.loads(row["state"])
         except (ValueError, TypeError):
             return 0
+        # Суммой по всем стопкам: с сортами (07.08.2026) один ресурс лежит в складе
+        # несколькими записями, и «первая найденная» дала бы ложный отказ дарителю,
+        # у которого товар просто разложен по сортам.
+        total = 0
         for entry in (doc.get("Storage") or {}).get("Entries") or []:
             if isinstance(entry, dict) and entry.get("ResourceId") == resource:
                 amount = entry.get("Amount", 0)
-                return int(amount) if isinstance(amount, (int, float)) else 0
-        return 0
+                if isinstance(amount, (int, float)):
+                    total += int(amount)
+        return total
 
     def _api_market_get(self):
         self._auth()
@@ -1392,8 +1557,15 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
 
         # Суточный потолок выручки: превращает любой насос в капельницу. Резервируем
         # на листинге, а не на продаже, — качать нельзя даже впрок.
+        #
+        # ПЕРВЫЙ лот дня проходит сверх потолка, но ТОЛЬКО ПО ОДНОЙ ШТУКЕ: у ступеней
+        # 11–12 единица стоит 111–311 тысяч при потолке 50, и без исключения весь верх
+        # лестницы был бы непродаваем в принципе (аудит 06.08.2026). Штука — а не лот
+        # любого размера: 500 сердец звезды одним «первым лотом» были бы насосом на
+        # ~155 млн в день (поймал судья этапа 5) — капельница обязана остаться капельницей.
         day = time.strftime("%Y-%m-%d", time.gmtime(now))
-        if self.db.market_day_turnover(player["id"], day, seller_gold) > MARKET_DAILY_SELL_GOLD:
+        turnover = self.db.market_day_turnover(player["id"], day, seller_gold)
+        if turnover > MARKET_DAILY_SELL_GOLD and (turnover > seller_gold or amount > 1):
             self.db.market_day_rollback(player["id"], seller_gold)
             raise ApiError(429, "daily_limit")
 
@@ -1417,8 +1589,11 @@ class FarmHandler(http.server.SimpleHTTPRequestHandler):
             # не списывал (клиент трогает золото только после ok) — честный отказ.
             raise ApiError(409, "lot_sold")
 
+        # refund — только самовыкупу: возврат продавцовой доли сразу в ответе,
+        # итоговая цена отмены — ровно спред (см. Db.market_buy).
+        refund = lot["seller_gold"] if lot["seller"] == player["id"] else 0
         return {"ok": True, "resourceId": lot["resource"], "amount": lot["amount"],
-                "gold": lot["buyer_gold"], "serverNow": now}
+                "gold": lot["buyer_gold"], "refund": refund, "serverNow": now}
 
     def _api_events_get(self):
         player = self._auth()

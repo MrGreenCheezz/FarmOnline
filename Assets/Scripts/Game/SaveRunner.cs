@@ -54,19 +54,23 @@ namespace Farm.Game
         {
             FarmingEvents.Harvested += OnSignificantAction;
             FarmingEvents.Merged += OnSignificantAction;
+            FarmingEvents.TierAscended += OnTierAscended;
 
             // Уход — такое же значимое действие, как сбор: он тратит дефицит (ведро,
             // подкормку), и потерять его закрытой вкладкой обиднее, чем лишний PUT.
             FarmWater.Poured += OnCared;
             FarmFertilizer.Applied += OnCared;
+            FarmFeed.Fed += OnCared;   // мешок стоит три часа — терять его закрытой вкладкой нельзя
         }
 
         private void OnDisable()
         {
             FarmingEvents.Harvested -= OnSignificantAction;
             FarmingEvents.Merged -= OnSignificantAction;
+            FarmingEvents.TierAscended -= OnTierAscended;
             FarmWater.Poured -= OnCared;
             FarmFertilizer.Applied -= OnCared;
+            FarmFeed.Fed -= OnCared;
         }
 
         private void OnDestroy()
@@ -83,27 +87,73 @@ namespace Farm.Game
             if (pending != null && pending.IsGuest) GuestMode.Enter(pending.OwnerId, pending.OwnerName);
             else GuestMode.Exit();
 
-            // Уровень фермы ставится ВСЕГДА и раньше всего остального, даже когда снимка нет.
-            // FarmLevels — статика, а она переживает смену сцены: без этой строки «Начать
-            // заново» после шестой ступени оставляло бы уровень 6 при земле в 13 метров,
-            // а возвращение из гостей уносило бы домой чужой уровень — и записывало его
-            // в свой сейв первым же автосохранением.
-            FarmLevels.RestoreState(pending != null && pending.Data != null ? pending.Data.FarmLevel : 1);
+            // Зерно характеров — ДО загрузки: его читает и живой приезд (ColonyRoster),
+            // и миграционный пересев внутри FarmSave.ApplyFarmer (житель старой партии,
+            // которого сейв ещё не знает). Позже было бы поздно.
+            ColonyRoster.PlayerSeed = GuestMode.IsGuest ? null : NetSession.PlayerName;
 
-            if (pending != null)
+            // Своё окно восстановления вокруг всего старта: FarmLevels.RestoreState ниже
+            // поднимает Changed до Apply, и без окна каждая загрузка «объявляла» бы приезд
+            // давно живущих жителей и выдавала фантомные вехи ступеней (золото которых тут же
+            // затирал Wallet.RestoreState). Окно счётное — Apply внутри открывает своё.
+            FarmingRuntime.BeginRestore();
+            try
             {
-                if (pending.Data != null)
+                // Уровень фермы ставится ВСЕГДА и раньше всего остального, даже когда снимка нет.
+                // FarmLevels — статика, а она переживает смену сцены: без этой строки «Начать
+                // заново» после шестой ступени оставляло бы уровень 6 при земле в 13 метров,
+                // а возвращение из гостей уносило бы домой чужой уровень — и записывало его
+                // в свой сейв первым же автосохранением.
+                FarmLevels.RestoreState(pending != null && pending.Data != null ? pending.Data.FarmLevel : 1);
+
+                if (pending != null)
                 {
-                    FarmSave.Apply(pending.Data, pending.OfflineSeconds);
-                    if (_logSaves)
-                        Debug.Log("[Save] Загружено (" + pending.Source + ", оффлайн " +
-                                  Mathf.RoundToInt((float)pending.OfflineSeconds) + " с): " + pending.Data.Describe());
+                    if (pending.Data != null)
+                    {
+                        FarmSave.Apply(pending.Data, pending.OfflineSeconds);
+                        if (_logSaves)
+                            Debug.Log("[Save] Загружено (" + pending.Source + ", оффлайн " +
+                                      Mathf.RoundToInt((float)pending.OfflineSeconds) + " с): " + pending.Data.Describe());
+                    }
+                    else
+                    {
+                        Debug.LogWarning("[Save] Просили продолжить, но снимок пуст — играем с нуля");
+                    }
                 }
-                else
+
+                // Свежая партия: счётчики и вехи — статики и переживают смену сцены, ровно
+                // как FarmLevels строкой выше. Без сброса «Начать заново» наследовала бы
+                // прожитое старой партии и вписывала чужие числа в свежий сейв.
+                if (pending == null || pending.Data == null)
                 {
-                    Debug.LogWarning("[Save] Просили продолжить, но снимок пуст — играем с нуля");
+                    FarmProgress.RestoreState(0, 0);
+                    FarmAchievements.RestoreState(System.Array.Empty<string>(), 0);
                 }
             }
+            finally
+            {
+                FarmingRuntime.EndRestore();
+            }
+
+            // Добрые дела из гостей вливаются дома: гостевая сцена жила на чужом
+            // FarmProgress, и счёт помощи ждал в PlayerPrefs (GuestMode.ReportHelp).
+            if (!GuestMode.IsGuest)
+            {
+                int pendingHelp = PlayerPrefs.GetInt(GuestMode.PendingHelpKey, 0);
+                if (pendingHelp > 0)
+                {
+                    PlayerPrefs.DeleteKey(GuestMode.PendingHelpKey);
+                    FarmProgress.AddHelpGiven(pendingHelp);
+                    // Влитое — в сейв поскорее: prefs уже стёрты, и закрытая до автосейва
+                    // вкладка потеряла бы счёт добрых дел.
+                    RequestSoon();
+                }
+            }
+
+            // Первый Check — сразу после восстановления, а не на первом сборе: он же лениво
+            // подписывает кошелёк, и золото входящего ящика (ежедневка, рынок) проверяет
+            // пороги вех без ожидания живого события фермы.
+            if (!GuestMode.IsGuest) FarmAchievements.Check();
 
             // Свежая партия — пересеять характеры жителей от имени игрока: у каждого хозяина
             // свои люди, а не общий на всех слепок от имени объекта сцены. Зерно — имя игрока
@@ -151,6 +201,7 @@ namespace Farm.Game
 
         private void OnSignificantAction(Growable plot, HarvestResult result) => RequestSoon();
         private void OnSignificantAction(Growable survivor, Growable absorbed) => RequestSoon();
+        private void OnTierAscended(Growable survivor, GrowableDefinition from) => RequestSoon();
         private void OnCared(Growable plot) => RequestSoon();
 
         /// <summary>Попросить сохраниться скоро, но не сейчас: серия сборов подряд — один сейв.</summary>

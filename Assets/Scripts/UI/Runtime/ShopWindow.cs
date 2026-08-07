@@ -255,6 +255,7 @@ namespace Farm.UI
 
             string reason = null;
             bool affordable = _shop != null && _shop.CanBuy(item, out reason);
+            bool locked = _shop != null && _shop.ProgressLock(item, out _); // причина уже в reason: CanBuy зовёт ProgressLock первым
 
             string priceText = item.Price.ToString();
             if (item.MaxOwned > 0 && _shop != null)
@@ -262,8 +263,18 @@ namespace Farm.UI
 
             var price = new Label(priceText);
             price.AddToClassList("shop-item__price");
-            price.EnableInClassList("shop-item__price--unaffordable", !affordable);
+            // Дорого и заперто — разные вещи: дорогое копится, запертое требует уровня.
+            price.EnableInClassList("shop-item__price--unaffordable", !affordable && !locked);
             text.Add(price);
+
+            // Замок — видимой строкой, не тултипом: рантайм UI Toolkit тултипы не рисует,
+            // а выключенная кнопка не примет клик, чтобы сказать причину голосом Refused.
+            if (locked && !string.IsNullOrEmpty(reason))
+            {
+                var lockLine = new Label(reason);
+                lockLine.AddToClassList("shop-item__lock");
+                text.Add(lockLine);
+            }
 
             row.Add(text);
 
@@ -271,7 +282,6 @@ namespace Farm.UI
             buy.AddToClassList("btn");
             buy.AddToClassList("btn--accent");
             buy.SetEnabled(affordable);
-            if (!affordable && !string.IsNullOrEmpty(reason)) buy.tooltip = reason;
             row.Add(buy);
 
             return row;

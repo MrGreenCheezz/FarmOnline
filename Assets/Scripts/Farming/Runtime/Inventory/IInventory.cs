@@ -21,22 +21,92 @@ namespace Farm.Farming
         Slots = 2
     }
 
-    /// <summary>Один ресурс и сколько его лежит. Неизменяемая — заменяй, а не правь.</summary>
+    /// <summary>
+    /// Сорт единицы товара: что выросло на ухоженной земле, то и стоит дороже.
+    /// <para>
+    /// Сорт — поле записи склада, а не отдельный ассет: «отборная пшеница» отдельным
+    /// ресурсом удвоила бы каталог с первым же сортом и утроила со вторым, а это ровно
+    /// тот случай, когда контент начинает трогать системы.
+    /// </para>
+    /// <para>Значения сериализуются в сейв — добавлять только в конец.</para>
+    /// </summary>
+    public enum ResourceGrade
+    {
+        /// <summary>Обычный. Всё, что выросло без постоянного ухода.</summary>
+        Common = 0,
+        /// <summary>Отборный: земля ухожена несколько циклов подряд.</summary>
+        Choice = 1,
+        /// <summary>Призовой: уход не прерывался почти никогда.</summary>
+        Prime = 2
+    }
+
+    /// <summary>Один ресурс, его сорт и сколько лежит. Неизменяемая — заменяй, а не правь.</summary>
     public readonly struct InventoryEntry
     {
         public readonly ResourceDefinition Resource;
         public readonly int Amount;
 
-        public InventoryEntry(ResourceDefinition resource, int amount)
+        /// <summary>Сорт этой стопки. Стопки разных сортов лежат порознь и не смешиваются.</summary>
+        public readonly ResourceGrade Grade;
+
+        public InventoryEntry(ResourceDefinition resource, int amount,
+                              ResourceGrade grade = ResourceGrade.Common)
         {
             Resource = resource;
             Amount = amount;
+            Grade = grade;
         }
 
-        public InventoryEntry WithAmount(int amount) => new InventoryEntry(Resource, amount);
+        public InventoryEntry WithAmount(int amount) => new InventoryEntry(Resource, amount, Grade);
 
         public override string ToString() =>
-            Amount + "x " + (Resource != null ? Resource.Id : "<none>");
+            Amount + "x " + (Resource != null ? Resource.Id : "<none>") +
+            (Grade == ResourceGrade.Common ? "" : " [" + ResourceGrades.Name(Grade) + "]");
+    }
+
+    /// <summary>Что сорт значит для игры: имя, значок и во сколько раз он дороже обычного.</summary>
+    public static class ResourceGrades
+    {
+        /// <summary>
+        /// Надбавка сорта к цене. Числа скромные нарочно: сорт — награда за постоянство ухода,
+        /// а не второй множитель дохода поверх прибавки в штуках, которую уход и так даёт.
+        /// </summary>
+        public static float PriceFactor(ResourceGrade grade)
+        {
+            switch (grade)
+            {
+                case ResourceGrade.Choice: return 1.4f;
+                case ResourceGrade.Prime: return 2f;
+                default: return 1f;
+            }
+        }
+
+        public static string Name(ResourceGrade grade)
+        {
+            switch (grade)
+            {
+                case ResourceGrade.Choice: return "отборный";
+                case ResourceGrade.Prime: return "призовой";
+                default: return "обычный";
+            }
+        }
+
+        /// <summary>Значок для списков: звёзды читаются боковым зрением, слово — нет.</summary>
+        public static string Mark(ResourceGrade grade)
+        {
+            switch (grade)
+            {
+                case ResourceGrade.Choice: return "★";
+                case ResourceGrade.Prime: return "★★";
+                default: return "";
+            }
+        }
+
+        /// <summary>Все сорта от обычного к лучшему — чтобы порядок обхода жил в одном месте.</summary>
+        public static readonly ResourceGrade[] All =
+        {
+            ResourceGrade.Common, ResourceGrade.Choice, ResourceGrade.Prime
+        };
     }
 
     /// <summary>
@@ -90,14 +160,32 @@ namespace Farm.Farming
         /// <summary>Живой вид содержимого. Порядок стабилен — можно напрямую кормить список UI.</summary>
         IReadOnlyList<InventoryEntry> Entries { get; }
 
+        /// <summary>Сколько лежит ВСЕГО, всех сортов. Ответ на «хватит ли на рецепт».</summary>
         int GetAmount(ResourceDefinition resource);
+
+        /// <summary>Сколько лежит именно такого сорта.</summary>
+        int GetAmount(ResourceDefinition resource, ResourceGrade grade);
+
         bool Contains(ResourceDefinition resource, int amount = 1);
 
-        /// <summary>Добавить до <paramref name="amount"/>. Возвращает, сколько реально принято.</summary>
+        /// <summary>Добавить до <paramref name="amount"/> обычного сорта. Возвращает, сколько принято.</summary>
         int TryAdd(ResourceDefinition resource, int amount);
 
-        /// <summary>Забрать до <paramref name="amount"/>. Возвращает, сколько реально изъято.</summary>
+        /// <summary>Добавить до <paramref name="amount"/> нужного сорта.</summary>
+        int TryAdd(ResourceDefinition resource, int amount, ResourceGrade grade);
+
+        /// <summary>
+        /// Забрать до <paramref name="amount"/>, начиная с обычного сорта.
+        /// <para>
+        /// Порядок именно такой во всём, что тратит склад молча — станки, кухня, заказы,
+        /// постройки: сперва расходуется дешёвое. Иначе первое же случайное списание съело бы
+        /// призовой урожай, ради которого игрок девять циклов носил воду.
+        /// </para>
+        /// </summary>
         int TryRemove(ResourceDefinition resource, int amount);
+
+        /// <summary>Забрать до <paramref name="amount"/> именно такого сорта.</summary>
+        int TryRemove(ResourceDefinition resource, int amount, ResourceGrade grade);
 
         /// <summary>Перелить всё в простой сток. Возвращает число перенесённых единиц.</summary>
         int TransferTo(IResourceSink target);

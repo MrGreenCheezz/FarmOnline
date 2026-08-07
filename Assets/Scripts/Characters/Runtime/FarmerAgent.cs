@@ -220,7 +220,8 @@ namespace Farm.Characters
         [SerializeField, Range(0f, 1f)] private float _hummingWellbeing = 0.75f;
 
         [Header("Обустройство")]
-        [Tooltip("На каком расстоянии он ставит грядку рядом с её парой.\n" +
+        [Tooltip("Шаг раскладки во дворе вида: на таком расстоянии он ставит принесённую " +
+                 "грядку от соседней.\n" +
                  "Он сводит одинаковые вплотную, но не сливает: слияние остаётся ходом игрока.")]
         [SerializeField, Min(0.4f)] private float _tidySpacing = 1.3f;
 
@@ -248,7 +249,13 @@ namespace Farm.Characters
         private Vector3 _relaxSpot;
         private Vector3 _tidySpot;
         private Vector3 _homePosition;
-        private Vector3 _bedPosition;
+
+        /// <summary>
+        /// Место сна — живым чтением, не кэшем: все койки лежат внутри амбара, а амбар —
+        /// Movable, и после переноса жители ходили бы спать на старые мировые координаты
+        /// (аудит). Пустая койка — сон у дома, как и раньше.
+        /// </summary>
+        private Vector3 BedPosition => _bed != null ? _bed.position : _homePosition;
         private Vector3 _favouriteSpot;
         private string _thought = "";
 
@@ -382,9 +389,9 @@ namespace Farm.Characters
         internal IReadOnlyList<ImprovementDefinition> Improvements => _improvements;
 
         /// <summary>
-        /// Сколько таких он построил: у якоря-постройки — в её дворике, иначе на ферме.
+        /// Сколько таких он построил САМ: у якоря-постройки — в её дворике, иначе на ферме.
         /// </summary>
-        internal int BuiltCount(ImprovementDefinition project, Building anchor = null)
+        internal int OwnBuiltCount(ImprovementDefinition project, Building anchor = null)
         {
             if (project == null) return 0;
 
@@ -392,6 +399,20 @@ namespace Farm.Characters
                 return _builtAt.TryGetValue(anchor, out var yard) && yard.TryGetValue(project, out int at) ? at : 0;
 
             return _builtCount.TryGetValue(project, out int n) ? n : 0;
+        }
+
+        /// <summary>
+        /// Сколько таких построено ВСЕЙ фермой. Лимит замысла (MaxCount) — свойство фермы,
+        /// а не биография одного жителя: со счётом на агента четверо жителей с общим
+        /// списком ставили бы по четыре «единственных» указателя у одного дома (аудит).
+        /// </summary>
+        internal static int BuiltCount(ImprovementDefinition project, Building anchor = null)
+        {
+            int total = 0;
+            var all = FarmerRegistry.All;
+            for (int i = 0; i < all.Count; i++)
+                if (all[i] != null) total += all[i].OwnBuiltCount(project, anchor);
+            return total;
         }
 
         /// <summary>Не выбрана ли дневная норма обживания.</summary>
@@ -468,8 +489,11 @@ namespace Farm.Characters
         internal float SearchRadius => _searchRadius;
         internal bool SleepsAtNight => _sleepAtNight;
         // Наём подсобника включает сбор рутины; наём мастерового — станки, не сбор:
-        // демаркация ролей (CLAUDE.md), урожай остаётся хозяйским.
-        internal bool MayHarvest => _mayHarvest || (IsHired && Role == ResidentRole.None);
+        // демаркация ролей (CLAUDE.md), урожай остаётся хозяйским. В гостях — никогда:
+        // гостевая сцена собирает в выбрасываемый склад, и нанятый хозяином подсобник
+        // молча съедал бы грядки, которым гость пришёл помочь.
+        internal bool MayHarvest =>
+            !Farming.GuestMode.IsGuest && (_mayHarvest || (IsHired && Role == ResidentRole.None));
         internal bool OnlyOwnCategory => _filterByCategory;
         internal ResourceCategory Category => _category;
         internal int KeepFood => _keepFood;
@@ -506,16 +530,59 @@ namespace Farm.Characters
         public double HiredUntil => _hiredUntil;
 
         /// <summary>
-        /// Нанять фермера на <paramref name="seconds"/> вперёд за <paramref name="wage"/> золота.
-        /// Продление складывается: заплатил дважды — работает двое суток. Денег нет — false,
-        /// и говорить об этом вслух обязан вызывающий UI.
+        /// Разрешено ли жителю тратить золото фермы на новые грядки и живность.
+        /// <para>
+        /// Переключатель, а не жёсткое правило, потому что обе стороны законны: одному
+        /// нравится, что ферма растёт сама, пока его нет, другой копит на постройку и
+        /// не хочет обнаружить, что деньги ушли на кроликов. Молчаливая трата чужого
+        /// золота — худший вид «помощи», и раньше выключить её было нечем.
+        /// </para>
+        /// <para>
+        /// Границы самостоятельности остаются на месте и при разрешении: золотой резерв
+        /// (<see cref="GoldReserve"/>), потолок грядок и «только за чистое золото».
+        /// </para>
         /// </summary>
-        public bool TryHire(double seconds, int wage)
+        public bool MayRestock
         {
-            if (seconds <= 0.0) return false;
+            get => _mayRestock;
+            set
+            {
+                if (_mayRestock == value) return;
+                _mayRestock = value;
+
+                // Вслух: переключатель — решение игрока, и житель обязан на него отозваться,
+                // иначе тумблер выглядит декоративным.
+                SetThought(value ? "хорошо, подкуплю чего надо" : "понял, за покупками не хожу");
+            }
+        }
+
+        private bool _mayRestock = true;
+
+        /// <summary>Вернуть разрешение из сохранения — без мысли вслух: это не решение, а память.</summary>
+        public void RestoreMayRestock(bool value) => _mayRestock = value;
+
+        /// <summary>
+        /// Нанять фермера на <paramref name="seconds"/> вперёд за <paramref name="wage"/> золота.
+        /// Продление складывается: заплатил дважды — работает двое суток. Отказ — false
+        /// с причиной: говорить её вслух обязан вызывающий UI, но знать — система
+        /// (иначе UI озвучил бы гостевой отказ как «не хватает золота»).
+        /// </summary>
+        public bool TryHire(double seconds, int wage, out string reason)
+        {
+            reason = null;
+            if (seconds <= 0.0) { reason = "нечего нанимать"; return false; }
+
+            // В гостях наёма нет: сейв в гостях отбит наглухо, деньги «списались» бы,
+            // а результат исчез при выходе — трата чужого золота в никуда. Правило
+            // в системе, как у FarmLevels.TryBuyNext, — кнопка спрятана, но не только ею.
+            if (Farming.GuestMode.IsGuest) { reason = "в гостях не нанимают — это чужие люди"; return false; }
 
             var wallet = Wallet.Instance;
-            if (wallet == null || !wallet.TrySpend(wage)) return false;
+            if (wallet == null || !wallet.TrySpend(wage))
+            {
+                reason = "не хватает золота — жалование " + wage + " зол.";
+                return false;
+            }
 
             double from = System.Math.Max(FarmingRuntime.Now, _hiredUntil);
             _hiredUntil = from + seconds;
@@ -570,8 +637,13 @@ namespace Farm.Characters
             _improvementUrgeTime = Mathf.Max(10f, _improvementUrgeTime /
                 Mathf.Clamp(definition.ProjectZeal, 0.5f, 2f));
 
-            if (definition.Improvements != null && definition.Improvements.Length > 0)
-                _improvements = (ImprovementDefinition[])definition.Improvements.Clone();
+            // Список применяется ВСЕГДА, включая пустой: тултип определения обещает
+            // «пусто — не строит», а прежняя проверка на непустоту делала обратное —
+            // жители без своего списка наследовали сценовые 18, и обустраивали все,
+            // кроме той единственной, ради кого списки заведены (дефект аудита).
+            _improvements = definition.Improvements != null
+                ? (ImprovementDefinition[])definition.Improvements.Clone()
+                : System.Array.Empty<ImprovementDefinition>();
 
             // Характер от имени по определению: свой у каждого жителя и одинаковый от
             // запуска к запуску даже без входа в аккаунт. Пересев от имени игрока и
@@ -672,7 +744,6 @@ namespace Farm.Characters
         private void Start()
         {
             _homePosition = _home != null ? _home.position : transform.position;
-            _bedPosition = _bed != null ? _bed.position : _homePosition;
             _lastPosition = transform.position;
 
             // Любимое место — своё у каждого работника и неизменное от запуска к запуску.
@@ -1747,6 +1818,16 @@ namespace Farm.Characters
                 return;
             }
 
+            // Лимит — ещё раз у самой стройки: замысел общий у нескольких жителей, и пока
+            // этот шёл, тот же «единственный» мог поставить сосед (лимит теперь фермовый,
+            // а клейма на замыслах нет). Отказ — вслух, по правилу заметности.
+            if (BuiltCount(project, anchor) >= project.MaxCount)
+            {
+                SetThought("уже стоит — опоздал…");
+                EnterIdle();
+                return;
+            }
+
             // Материалы могли уйти, пока он шёл и мастерил, — тогда честно бросаем без вещи.
             var cost = project.Cost;
             if (cost.IsValid)
@@ -1816,7 +1897,7 @@ namespace Farm.Characters
                 return;
             }
 
-            _mover.SetDestination(_bedPosition);
+            _mover.SetDestination(BedPosition);
         }
 
         private void TickSleeping()
@@ -2067,7 +2148,12 @@ namespace Farm.Characters
             // Сырьё кончилось — стоять над пустым станком нечего, пусть быт заберёт.
             if (!_craftShop.IsWorking)
             {
-                SetThought("стружка вышла — сырья бы");
+                // С составными рецептами причина простоя перестала быть одна: мука есть,
+                // яиц нет. Мастеровой называет недостающее — иначе игрок ищет не то.
+                var missing = _craftShop.MissingInput();
+                SetThought(missing != null
+                    ? "дела нет — нужно: " + missing.DisplayName
+                    : "стружка вышла — сырья бы");
                 EnterIdle();
                 _craftShop = null;
                 return;
@@ -2274,7 +2360,7 @@ namespace Farm.Characters
             _serviceTarget = null;
             _market = null;
 
-            _mover.SetDestination(_bedPosition);
+            _mover.SetDestination(BedPosition);
             SetState(FarmerState.GoingToSleep);
         }
 

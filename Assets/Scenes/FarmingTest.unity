@@ -256,7 +256,6 @@ GameObject:
   m_Component:
   - component: {fileID: 1335844076}
   - component: {fileID: 1335844075}
-  - component: {fileID: 1335844074}
   m_Layer: 0
   m_Name: Systems
   m_TagString: Untagged
@@ -264,22 +263,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1335844074
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1335844073}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: df86f6dc771191c49b34eb74106498a4, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Farm.Farming::Farm.Farming.Samples.AutoHarvester
-  _interval: 0.5
-  _range: 10
-  _filterByCategory: 0
-  _category: 0
 --- !u!114 &1335844075
 MonoBehaviour:
   m_ObjectHideFlags: 0
